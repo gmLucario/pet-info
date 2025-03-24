@@ -2,3 +2,8 @@
 web_app/debug/
 web_app/target/
 web_app/**/*.rs.bk
+
+# scripts
+scripts/debug/
+scripts/target/
+scripts/**/*.rs.bk
