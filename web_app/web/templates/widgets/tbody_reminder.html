@@ -1,0 +1,10 @@
+{% for reminder in reminders | default(value=[]) %}
+<tr hx-swap="outerHTML swap:1s">
+    <td>
+        {% set delete_url = "/reminder" ~ "/" ~ reminder.id %}
+        {% include "widgets/trash_icon.html" %}
+    </td>
+    <td>{{ reminder.send_at | date(format="%Y-%m-%d %H:%M", timezone=reminder.user_timezone) }}</td>
+    <td data-tooltip="vía: {{reminder.notification_type}}">{{ reminder.body }}</td>
+</tr>
+{% endfor %}

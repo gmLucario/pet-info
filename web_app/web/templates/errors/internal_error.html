@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}
+error 5xx
+{% endblock title %}
+
+{% block meta_desc %}internal error{% endblock meta_desc %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+{% include "errors/widget_page_err.html" %}
+
+<container role="group" style="text-align: center;">
+    <kbd>Intente mas tarde</kbd>
+</container>
+
+{% endblock content %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{record_type}}
+{% endblock title %}
+
+{% block meta_desc %}
+health record table
+{% endblock meta_desc %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+{% if can_edit %}
+{% set modal_id = "health_modal" %}
+{% include "widgets/btn_open_modal.html" %}
+<div popover id="{{modal_id}}">
+  <form method="dialog" style="padding: 2rem;" hx-post='/pet/health/{{pet_external_id}}/{{record_type}}/add'
+    hx-swap="none" hx-on::after-request="this.reset()">
+    <fieldset>
+      {% if record_type == "weight" %}
+      <label>
+        Peso
+        <input type="number" name="value" aria-label="Number" step="0.01" min="0" max="100" required>
+      </label>
+      {% else %}
+      <label>
+        Descripcion
+        <input name="value" placeholder="desc" autocomplete="given-name" required />
+      </label>
+      {% endif %}
+      <label>
+        Fecha
+        <input type="date" name="date" aria-label="Date" required>
+      </label>
+    </fieldset>
+
+    <button style="width: 100%;" hx-on:click="document.getElementById('{{modal_id}}').hidePopover()">Guardar</button>
+  </form>
+</div>
+{% endif %}
+<table class="striped">
+  <thead>
+    <tr>
+      {% if can_edit %}
+      <th scope="col">-</th>
+      {% endif %}
+      {% if record_type == "weight" %}
+      <th scope="col">Peso</th>
+      {% else %}
+      <th scope="col">Descripcion</th>
+      {% endif %}
+      <th scope="col">Fecha (<i>dd-mm-yyy</i>)</th>
+    </tr>
+  </thead>
+  <tbody hx-get="/pet/health/{{pet_external_id}}/{{record_type}}/tbody" hx-trigger="healthRecordUpdated from:body">
+    {% include "widgets/tbody_health_record.html" %}
+  </tbody>
+</table>
+{% endblock content %}

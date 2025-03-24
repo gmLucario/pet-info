@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}
+pet details
+{% endblock title %}
+
+{% block meta_desc %}
+datos de tu mascota
+{% endblock meta_desc %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/quill.snow.css" />
+<script src="/static/js/quill.js"></script>
+{% endblock extra_css %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+{% include "widgets/add_pet_form.html" %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    const quill = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                ['bold', 'italic', 'underline', 'blockquote'],
+                [{ 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+            ]
+        }
+    });
+    const form = document.querySelector('form');
+    {% if pet %}
+    quill.root.innerHTML = '{{pet.about_pet | safe}}';
+    {% endif %}
+
+    form.addEventListener('formdata', (event) => {
+        event.formData.append('about_pet', quill.root.innerHTML);
+    });
+</script>
+{% endblock extra_js %}

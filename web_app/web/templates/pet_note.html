@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}
+notes
+{% endblock title %}
+
+{% block meta_desc %}
+notas de tu mascota
+{% endblock meta_desc %}
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/quill.snow.css" />
+<script src="/static/js/quill.js"></script>
+{% endblock extra_css %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+{% if can_edit | default(value=false) %}
+{% set modal_id = "note_modal" %}
+{% include "widgets/btn_open_modal.html" %}
+<div popover id="{{modal_id}}">
+    <form method="dialog" style="padding: 2rem;" hx-post='/pet/note/{{pet_id}}' hx-swap="none"
+        hx-on::after-request="this.reset()">
+        <fieldset>
+            <input placeholder="Titulo" type="text" name="title" aria-label="Text" required>
+
+            <div id="note_content" style="font-size: 18px; height: 30vh;"></div>
+        </fieldset>
+
+        <button style="width: 100%;"
+            hx-on:click="document.getElementById('{{modal_id}}').hidePopover();">Guardar</button>
+    </form>
+</div>
+{% endif %}
+
+<div hx-get="/pet/note/{{pet_id}}/list" hx-trigger="petNoteRecordUpdated from:body">
+    {% include "widgets/pet_notes.html" %}
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+{% if can_edit | default(value=false) %}
+<script>
+    const quill = new Quill('#note_content', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                ['bold', 'italic', 'underline', 'blockquote'],
+                [{ 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+            ]
+        }
+    });
+    const form = document.querySelector('form');
+    form.addEventListener('formdata', (event) => {
+        event.formData.append('body', quill.root.innerHTML);
+        quill.setContents('');
+    });
+</script>
+{% endif %}
+{% endblock extra_js %}

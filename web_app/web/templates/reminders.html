@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}
+reminders
+{% endblock title %}
+
+{% block meta_desc %}
+Recordatorios
+{% endblock meta_desc %}
+
+{% block mid_nav_summary %}Recordatorios{% endblock mid_nav_summary %}
+
+{% block content %}
+
+{% set modal_id = "reminder_modal" %}
+{% include "widgets/btn_open_modal.html" %}
+<div popover id="{{modal_id}}">
+    <form method="dialog" style="padding: 2rem;" hx-post='/reminder' hx-swap="none" hx-on::after-request="this.reset()"
+        hx-headers='js:{timezone: Intl.DateTimeFormat().resolvedOptions().timeZone}'>
+        <fieldset>
+            <label>
+                Cuando?
+                <input type="datetime-local" name="when" aria-label="Datetime local" required>
+            </label>
+            <label>
+                Recordatorio
+                <textarea name="body" placeholder="Cual seria el recordatorio"></textarea>
+            </label>
+        </fieldset>
+
+        <button style="width: 100%;"
+            hx-on:click="document.getElementById('{{modal_id}}').hidePopover()">Guardar</button>
+    </form>
+</div>
+
+<table class="striped">
+    <thead>
+        <tr>
+            <th>-</th>
+            <th>Cuándo?</th>
+            <th>Recordatorio</th>
+        </tr>
+    </thead>
+    <tbody hx-get="/reminder/tbody" hx-trigger="reminderRecordUpdated from:body">
+        {% include "widgets/tbody_reminder.html" %}
+    </tbody>
+</table>
+
+{% endblock content %}

@@ -1,0 +1,11 @@
+{% for note in notes | default(value=[]) %}
+<article>
+    <h3>{{note.title}}</h3>
+    {{ note.content | safe }}
+
+    <footer>
+        {% set delete_url = "/pet/note/" ~ pet_id ~ "/delete/" ~ note.id %}
+        {% include "widgets/trash_icon.html" %}
+    </footer>
+</article>
+{% endfor %}

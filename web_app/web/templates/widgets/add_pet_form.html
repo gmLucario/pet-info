@@ -1,0 +1,68 @@
+<form {% if pet %} action="/pet/details/{{pet.id}}" {% else %} action="/pet/new" {% endif %} method="post"
+    enctype="multipart/form-data">
+    <fieldset>
+        {% if pet %}
+        <fieldset class="grid">
+            <label>
+                <input type="checkbox" role="switch" name="is_lost" {% if pet.is_lost %} checked {% endif %} />
+                Perdida
+            </label>
+        </fieldset>
+        {% endif %}
+        <label>
+            Foto
+            <input type="file" accept="image/{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=', image/') }}" name="pet_pic" aria-describedby="pet-pic-helper">
+            <small id="pet-pic-helper">
+                <ul>
+                    <li>el tamaño de la imagen debe ser menor a {{ PIC_PET_MAX_SIZE_BYTES | filesizeformat }}</li>
+                    <li>extensiones validas: <i>{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=", ") }}.</i></li>
+                </ul>
+            </small>
+        </label>
+        <label>
+            Nombre
+            <input 
+                type="text"
+                name="pet_full_name" 
+                placeholder="Cooki3-l4_Ga113ta" 
+                {% if pet %} value="{{pet.pet_full_name}}" {%endif %}
+                required
+                aria-describedby="pet-name-helper">
+            <small id="pet-name-helper">
+                <ul>
+                    <li>utilice letras, numeros y/o <i>-,_</i></li>
+                </ul>
+            </small>                
+        </label>
+        <label>
+            Cumple
+            <input type="date" name="pet_birthday" placeholder="cumple" {% if pet %} value="{{pet.pet_birthday}}" {%
+                endif %} required>
+        </label>
+        <label>
+            Raza
+            <input type="text" name="pet_breed" placeholder="mestiza" {% if pet %} value="{{pet.pet_breed}}" {% endif %}
+                required>
+        </label>
+        <fieldset class="grid" style="margin-left: 1em;">
+            <label>
+                <input name="is_spaying_neutering" type="checkbox" role="switch" {% if pet and pet.is_spaying_neutering
+                    %} checked {% endif %} />
+                Esterilizada
+            </label>
+
+            <fieldset>
+                <input type="radio" name="is_female" id="female-sex" {% if pet %} {% if pet.is_female %} checked
+                    value="on" {% else %} value="off" {% endif %} {% else %} checked value="on" {% endif %} />
+                <label htmlFor="female-sex">Hembra</label>
+                <input type="radio" name="is_female" id="male-sex" {% if pet %} {% if not pet.is_female %} checked
+                    value="on" {% else %} value="off" {% endif %} {% else %} value="off" {% endif %} />
+                <label htmlFor="male-sex">Macho</label>
+            </fieldset>
+        </fieldset>
+        <div id="editor" style="font-size: 18px;"> </div>
+    </fieldset>
+    <footer style="text-align: center;">
+        <button>Guardar</button>
+    </footer>
+</form>

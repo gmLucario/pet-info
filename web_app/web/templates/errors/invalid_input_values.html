@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}
+error 400
+{% endblock title %}
+
+{% block meta_desc %}valores erroneos{% endblock meta_desc %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+
+<article style="text-align: center;">
+    <h1>Oops !</h1>
+    <mark>{..}</mark>
+
+    {% if msg_details %}
+    <code>{{ msg_details }}</code>
+    {% endif %}
+
+</article>
+
+<container role="group">
+    <a href="{{form_url}}" role="button" tabindex="0">reintentar</a>
+</container>
+
+{% endblock content %}

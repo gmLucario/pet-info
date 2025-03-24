@@ -1,0 +1,34 @@
+<div hx-get="/pet/list" hx-trigger="petRecordUpdated from:body">
+    {% for pet in pets | default(value=[]) %}
+    <article hx-target="this" hx-swap="outerHTML">
+        <header>
+            <nav>
+                <ul>
+                    <li><strong><a href="/pet/details/{{pet.id}}">{{ pet.name | title }}</a></strong></li>
+                </ul>
+                <ul>
+                    <li><a href="/pet/qr_code/{{pet.external_id}}" download="qr_code_profile.png">qr_code</a></li>
+                    <li><a href="/pet/info/{{pet.external_id}}" target="_blank">pdf</a></li>
+                </ul>
+            </nav>
+        </header>
+        <container style="text-align: center;">
+            <p>{{ pet.breed }} {{ pet.sex }} {{ pet.fmt_age }}</p>
+            <p><code><a href="/pet/info/{{pet.external_id}}">https:://pet-info.in/pet/info/{{pet.external_id}}</a></code>
+            </p>
+        </container>
+
+        <ul>
+            <li><a href="/pet/health/{{pet.external_id}}/weight">peso</a></li>
+            <li><a href="/pet/health/{{pet.external_id}}/vaccine">vacunas</a></li>
+            <li><a href="/pet/health/{{pet.external_id}}/deworm">desparacitaciones</a></li>
+            <li><a href="/pet/note/{{pet.id}}">nota(s)</a></li>
+        </ul>
+
+        <footer>
+            {% set delete_url = "/pet/delete/" ~ pet.id %}
+            {% include "widgets/trash_icon.html" %}
+        </footer>
+    </article>
+    {% endfor %}
+</div>

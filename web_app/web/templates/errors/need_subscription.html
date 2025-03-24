@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}
+need login
+{% endblock title %}
+
+{% block meta_desc %}need login{% endblock meta_desc %}
+
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+{% include "errors/widget_page_err.html" %}
+
+<container role="group">
+    <a href="/profile" role="button" tabindex="0">perfil</a>
+</container>
+
+{% endblock content %}

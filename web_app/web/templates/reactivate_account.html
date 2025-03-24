@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}
+bye or not
+{% endblock title %}
+
+{% block meta_desc %}informacion pet-info eliminada{% endblock meta_desc %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+
+<article style="text-align: center;">
+    <h1>Oops !</h1>
+    <mark>{..}</mark>
+    <p>
+        <code>
+            Su cuenta fue desactivada. Desea activarla de nuevo?
+        </code>
+    </p>
+    <form action="/reactivate-account" method="post">
+        <input type="submit" value="activar" />
+    </form>
+</article>
+
+{% endblock content %}

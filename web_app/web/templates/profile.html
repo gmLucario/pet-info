@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}
+perfil
+{% endblock title %}
+
+{% block meta_desc %}
+datos del perfil
+{% endblock meta_desc %}
+
+{% block mid_nav_summary %}Perfil{% endblock mid_nav_summary %}
+
+{% block content %}
+
+<article>
+    <header>Subscripcion: <mark>{% if end_free_trial %} Prueba {% else %} Premium {% endif %}</mark></header>
+    {% if end_free_trial %}
+    Su periodo de prueba termina: {{ end_free_trial | date(format="%d-%m-%Y") }} (<i>dd-mm-yyy</i>)
+    <footer>
+        <a href="/checkout" role="button" tabindex="0" style="width: 100%;">Subscribirse: ${{ service_price }} mxn</a>
+    </footer>
+    {% else %}
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">Fecha pago (<i>dd-mm-yyy</i>)</th>
+                <th scope="col">Estatus</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in payments | default(value=[]) %}
+            <tr>
+                <td>{{ payment.created_at | date(format="%d-%m-%Y") }}</td>
+                <td>{{ payment.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <footer style="text-align: center;">
+        Gracias por adquirir este producto
+    </footer>
+    {% endif %}
+</article>
+<article>
+    <header>
+        Contacto:
+        {% if not end_free_trial %}
+        <button class="outline" popovertarget="owner_contact_modal" style="transform: scale(0.7);">crear nuevo
+            contacto</button>
+        {% endif %}
+    </header>
+    <div id="owner_contacts">
+        <ul hx-get="/profile/contact" hx-trigger="ownerContactRecordUpdated from:body">
+            {% include "widgets/owner_contact_list.html" %}
+        </ul>
+    </div>
+    <footer>
+        <blockquote>
+            <small><i>Apareceran en el perfil publico de tus mascotas, en la seccion de contacto</i></small>
+        </blockquote>
+    </footer>
+</article>
+<article>
+    <header>
+        Whats recibir notificaciones:
+    </header>
+    {% include "widgets/otp.html" %}
+    <footer>
+        <blockquote>
+            <small><i>Numero de whats app para recibir sus recordatorios</i></small>
+        </blockquote>
+    </footer>
+</article>
+
+<div popover id="owner_contact_modal">
+    <form method="dialog" style="padding: 2rem;" hx-post='/profile/contact' hx-swap="none"
+        hx-on::after-request="this.reset()">
+        <fieldset>
+            <label>
+                Nombre
+                <input type="text" name="contact_name" placeholder="Juanito Perez">
+            </label>
+            <label>
+                Valor
+                <input type="text" name="contact_value" placeholder="55223..." />
+            </label>
+        </fieldset>
+
+        <button style="width: 100%;"
+            hx-on:click="document.getElementById('owner_contact_modal').hidePopover()">Guardar</button>
+    </form>
+</div>
+<article>
+    <form action="/profile/delete-data" method="post">
+        <input type="submit" class="pico-background-red-250" value="Eliminar Datos" />
+    </form>
+    <blockquote>
+        <small><i>Todos sus datos seran eliminados, incluida tu subscripcion</i></small>
+    </blockquote>
+</article>
+{% endblock content %}

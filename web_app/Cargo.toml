@@ -1,0 +1,51 @@
+[package]
+name = "pet-info"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Front Web dependencies:
+ntex = { version = "2.12.3", features = [ "tokio", "compress", "openssl" ] }
+ntex-files = "2.0.0"
+ntex-multipart = "2.0.0"
+ntex-identity = "2.0.0"
+ntex-session = "2.0.0"
+tera = { version = "1.20.0", default-features = false, features = [ "builtins" ]}
+oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
+fast_qr = { version = "0.12.7", features = ["image"]}
+pulldown-cmark = "0.12.2"
+ammonia = "4.0.0"
+totp-rs = "5.6.0"
+
+# General deps all app
+# i am pinning libsqlite3-sys and sqlx due sqlx cant use a dif version
+libsqlite3-sys = { version = "=0.30.1", optional = false, default-features = false, features = [
+     "bundled-sqlcipher"
+] }
+sqlx = { version = "=0.8.3", default-features = false, features = [ "runtime-tokio", "tls-native-tls" , "sqlite", "derive", "chrono", "uuid"] }
+csrf = "0.5.0"
+argon2 = "0.5.3"
+reqwest = { version = "0.12.15", features = ["json"] }
+rust_decimal = "1.37"
+rust_decimal_macros = "1.37"
+envconfig = "0.11.0"
+
+# Tools app
+derive_more = { version = "2.0.1", features = ["display", "error"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+uuid = { version = "1.16.0", features = [ "v4", "serde" ] }
+chrono = { version = "0.4.40", features = [ "serde" ] }
+async-trait = "0.1.88"
+anyhow = "1.0.97"
+base64 = "0.22.1"
+lazy_static = "1.5.0"
+futures = "0.3.31"
+simplelog = "0.12.2"
+log = "0.4.26"
+aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.79.0"
+aws-sdk-sfn = "1.66.0"
+chrono-tz = "0.10.2"
+openssl = "0.10.71"
+

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}
+inicio
+{% endblock title %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+{% block content %}
+
+<section id="about">
+    <h1>Acerca de ...</h1>
+    <p>Esta plataforma te ayudara a gestionar lo relacionado a tu mascota <a href="/blog/about">mas información</a></p>
+</section>
+
+<section>
+    <h1>Suscripción</h1>
+
+    <p>
+        <mark>Cuentas nuevas</mark> tienen un periodo de
+        <mark>15 días naturales</mark> para probar la aplicación <mark>gratis</mark>
+    </p>
+
+    <article>
+        <header style="text-align: center;"><b>Premium</b></header>
+        Beneficios:
+        <ul>
+            <li>Registrar vacunas y desparacitaciones</li>
+            <li>Crear un perfil público</li>
+            <li>Codigo qr al perfil de tu mascota</li>
+            <li>Exportar su informacion: pdf</li>
+        </ul>
+        <footer style="text-align: center;">Pago unico: <b>${{service_price}} mxn</b></footer>
+    </article>
+
+    Pasos a seguir:
+    <ol>
+        <li><a href="{{google_outh_auth_url}}">Iniciar sesión usando Google</a></li>
+        <li>Disfrutar de los beneficios</li>
+    </ol>
+</section>
+
+{% endblock content %}

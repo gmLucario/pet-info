@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ blog.title }}
+{% endblock title %}
+
+{% block meta_desc %}
+{{ blog.title }}
+{% endblock meta_desc %}
+
+{% block mid_nav_content %}
+{% endblock mid_nav_content %}
+
+
+{% block content %}
+{{ blog.content | safe }}
+{% endblock content %}

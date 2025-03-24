@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+
+    <title>{% block title %}{% endblock title %}</title>
+
+    <meta name="description" content="{% block meta_desc %}{% endblock meta_desc %}" />
+
+    <link rel="stylesheet" href="/static/css/pico.min.css" />
+    <link rel="stylesheet" href="/static/css/pico.colors.min.css">
+    {% block extra_css %}
+    {% endblock extra_css %}
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <a href="/" style="--pico-font-family: Pacifico, cursive;" data-discover="true">
+                            <h3>Pet-Info</h3>
+                        </a>
+                    </li>
+                </ul>
+                {% block mid_nav_content %}
+                <ul>
+                    <li>
+                        <details class="dropdown">
+                            <summary>{% block mid_nav_summary %}{% endblock mid_nav_summary %}</summary>
+                            <ul dir="rtl">
+                                <li><a href="/profile">Perfil</a></li>
+                                <li><a href="/pet">Mascotas</a></li>
+                                <li><a href="/reminder">Recordatorios</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                </ul>
+                {% endblock mid_nav_content %}
+                <ul>
+                    <li>
+                        <fieldset>
+                            <input name="theme" type="checkbox" role="switch" id="theme-toggle" />
+
+                        </fieldset>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        {% block content %}
+        {% endblock content %}
+    </div>
+
+    <script src="/static/js/minimal-theme-switcher.js"></script>
+    <script src="/static/js/htmx.min.js"></script>
+    {% block extra_js %}
+    {% endblock extra_js %}
+
+</body>
+
+</html>

@@ -1,0 +1,9 @@
+{% for contact in owner_contacts | default(value=[]) %}
+<li>
+    {% if can_edit | default(value=false) %}
+        {% set delete_url = "/profile/contact/" ~ contact.id %}
+        {% include "widgets/trash_icon.html" %}
+    {% endif %}
+    {{ contact.full_name | title }}: {{contact.contact_value}}
+</li>
+{% endfor %}
