@@ -2761,6 +2761,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntex-cors"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5240350681b4dab9bcbdbafdb7b25c526c069a9e298f06de00331cd3442311bf"
+dependencies = [
+ "derive_more 0.99.18",
+ "futures",
+ "ntex",
+]
+
+[[package]]
 name = "ntex-files"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3325,6 +3336,7 @@ dependencies = [
  "libsqlite3-sys",
  "log",
  "ntex",
+ "ntex-cors",
  "ntex-files",
  "ntex-identity",
  "ntex-multipart",

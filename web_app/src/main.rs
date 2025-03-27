@@ -14,6 +14,7 @@ use anyhow::anyhow;
 use argon2::Argon2;
 use csrf::AesGcmCsrfProtection;
 use ntex::web;
+use ntex_cors::Cors;
 use ntex_identity::{CookieIdentityPolicy, IdentityService};
 use ntex_session::CookieSession;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -49,8 +50,10 @@ async fn main() -> anyhow::Result<()> {
     let notification_service = services::notification::NotificationHandler {
         client: aws_sdk_sfn::Client::new(&aws_config),
     };
+
     let server = web::server(move || {
         web::App::new()
+            .wrap(Cors::default())
             .wrap(CookieSession::private(&[0; 32]).secure(config::APP_CONFIG.is_prod()))
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
@@ -89,16 +92,5 @@ async fn main() -> anyhow::Result<()> {
                     .to(front::server::serve_not_found),
             )
     });
-
-    let server = if config::APP_CONFIG.is_prod() {
-        // load ssl keys
-        let mut openssl_builder = SslAcceptor::mozilla_modern(SslMethod::tls())?;
-        openssl_builder.set_private_key_file("key.pem", SslFiletype::PEM)?;
-        openssl_builder.set_certificate_chain_file("cert.pem")?;
-
-        server.bind_openssl(config::APP_CONFIG.url_host(), openssl_builder)?
-    } else {
-        server.bind(config::APP_CONFIG.url_host())?
-    };
-    Ok(server.run().await?)
+    Ok(server.bind(("0.0.0.0", 80))?.run().await?)
 }
