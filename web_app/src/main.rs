@@ -17,7 +17,6 @@ use ntex::web;
 use ntex_cors::Cors;
 use ntex_identity::{CookieIdentityPolicy, IdentityService};
 use ntex_session::CookieSession;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use uuid::Uuid;
 
 #[ntex::main]

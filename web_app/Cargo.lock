@@ -2728,7 +2728,6 @@ dependencies = [
  "ntex-service",
  "ntex-tls",
  "ntex-util",
- "openssl",
  "percent-encoding",
  "pin-project-lite",
  "regex",
@@ -2989,7 +2988,6 @@ dependencies = [
  "ntex-net",
  "ntex-service",
  "ntex-util",
- "openssl",
 ]
 
 [[package]]
@@ -3342,7 +3340,6 @@ dependencies = [
  "ntex-multipart",
  "ntex-session",
  "oauth2",
- "openssl",
  "pulldown-cmark",
  "reqwest",
  "rust_decimal",

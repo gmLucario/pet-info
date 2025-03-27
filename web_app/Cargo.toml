@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Front Web dependencies:
-ntex = { version = "2.12.3", features = [ "tokio", "compress", "openssl" ] }
+ntex = { version = "2.12.3", features = [ "tokio", "compress" ] }
 ntex-files = "2.0.0"
 ntex-multipart = "2.0.0"
 ntex-identity = "2.0.0"
@@ -47,6 +47,6 @@ aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1.79.0"
 aws-sdk-sfn = "1.66.0"
 chrono-tz = "0.10.2"
-openssl = "0.10.71"
+
 ntex-cors = "2.0.0"
 
