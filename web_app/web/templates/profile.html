@@ -43,10 +43,12 @@ datos del perfil
 </article>
 <article>
     <header>
-        Contacto:
-        {% if not end_free_trial %}
-        <button class="outline" popovertarget="owner_contact_modal" style="transform: scale(0.7);">crear nuevo
+        Contacto
+        {% if can_access_service %}
+        : <button class="outline" popovertarget="owner_contact_modal" style="transform: scale(0.7);">crear nuevo
             contacto</button>
+        {% else %}
+        <p>necesita una suscripción para esta función</p>
         {% endif %}
     </header>
     <div id="owner_contacts">
@@ -64,7 +66,10 @@ datos del perfil
     <header>
         Whats recibir notificaciones:
     </header>
+    {% if can_access_service %}
     {% include "widgets/otp.html" %}
+
+    {% endif %}
     <footer>
         <blockquote>
             <small><i>Numero de whats app para recibir sus recordatorios</i></small>
