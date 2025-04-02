@@ -7,5 +7,5 @@
 <details>
   <summary role="button" class="outline contrast">Contacto para soporte?</summary>
 
-  `gmlukario@gmail.com`
+  `gmlukario+pet-info@gmail.com`
 </details>

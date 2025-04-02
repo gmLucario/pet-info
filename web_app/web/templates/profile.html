@@ -11,7 +11,11 @@ datos del perfil
 {% block mid_nav_summary %}Perfil{% endblock mid_nav_summary %}
 
 {% block content %}
-
+<nav style="padding-bottom: 2em; padding-right: 1em;">
+    <ul></ul>
+    <ul></ul>
+    <ul><button class="outline secondary" hx-delete="/profile/close-session">Cerrar Sesión</button></ul>
+</nav>
 <article>
     <header>Subscripcion: <mark>{% if end_free_trial %} Prueba {% else %} Premium {% endif %}</mark></header>
     {% if end_free_trial %}
@@ -43,10 +47,12 @@ datos del perfil
 </article>
 <article>
     <header>
-        Contacto:
-        {% if not end_free_trial %}
-        <button class="outline" popovertarget="owner_contact_modal" style="transform: scale(0.7);">crear nuevo
+        Contacto
+        {% if can_access_service %}
+        : <button class="outline" popovertarget="owner_contact_modal" style="transform: scale(0.7);">crear nuevo
             contacto</button>
+        {% else %}
+        <p>necesita una suscripción para esta función</p>
         {% endif %}
     </header>
     <div id="owner_contacts">
@@ -64,7 +70,10 @@ datos del perfil
     <header>
         Whats recibir notificaciones:
     </header>
+    {% if can_access_service %}
     {% include "widgets/otp.html" %}
+
+    {% endif %}
     <footer>
         <blockquote>
             <small><i>Numero de whats app para recibir sus recordatorios</i></small>

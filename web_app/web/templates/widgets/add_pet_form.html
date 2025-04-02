@@ -10,7 +10,7 @@
         </fieldset>
         {% endif %}
         <label>
-            Foto
+            Foto {% if pet.pet_pic %} actual: <small><code>{{ pet.pet_pic.filename_extension }}</code></small> {% endif %}
             <input type="file" accept="image/{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=', image/') }}" name="pet_pic" aria-describedby="pet-pic-helper">
             <small id="pet-pic-helper">
                 <ul>
@@ -35,7 +35,7 @@
             </small>                
         </label>
         <label>
-            Cumple
+            Fecha Nacimiento
             <input type="date" name="pet_birthday" placeholder="cumple" {% if pet %} value="{{pet.pet_birthday}}" {%
                 endif %} required>
         </label>

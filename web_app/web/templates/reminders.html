@@ -13,7 +13,14 @@ Recordatorios
 {% block content %}
 
 {% set modal_id = "reminder_modal" %}
+{% if can_schedule_reminder %}
 {% include "widgets/btn_open_modal.html" %}
+{% else %}
+<nav style="padding: 1em;">
+    <ul></ul>
+    <ul><mark>ingrese un número de whatsapp en su perfil</mark></ul>
+</nav>
+{% endif %}
 <div popover id="{{modal_id}}">
     <form method="dialog" style="padding: 2rem;" hx-post='/reminder' hx-swap="none" hx-on::after-request="this.reset()"
         hx-headers='js:{timezone: Intl.DateTimeFormat().resolvedOptions().timeZone}'>

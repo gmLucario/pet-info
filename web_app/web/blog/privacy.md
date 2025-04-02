@@ -1,4 +1,6 @@
-# Politica de privacidad
+# Política de privacidad
+
+Esta [política de privacidad](https://www.freeprivacypolicy.com/live/7c4516b2-ace1-4758-bfc3-9873e937468c) detalla como se almacenan y el uso que se da a los datos ingresados por los usuarios.
 
 Pet-Info utiliza el [servicio de Google Oauth](https://support.google.com/a/answer/11609141?sjid=14674853996002502171-NC) para dar de alta un usuario e iniciar sesión. Por lo que, no se almacenan contraseñas.
 
@@ -15,4 +17,14 @@ Pet-Info usa la [api proporcionada por meta para WhatsApp Business](https://deve
 
 ## Información personal que almacenamos
 
+### Informacion personal
+- correo electronico
+- numero(s) de telofono(s)
+- nombres
+
+### Informacion de terceros
+- Google: para valdiar el correo y asociar la cuenta a dicho correo
+
+
 ## Como almacenamos y protegemos tu información
+Toda la informacion es encriptada en los servidores y cuando se hacen peticiones al servidor
