@@ -14,3 +14,5 @@ pub const S3_MAIN_BUCKET_NAME: &str = "pet-info-app-storage";
 pub const DATETIME_LOCAL_INPUT_FORMAT: &str = "%Y-%m-%dT%H:%M";
 
 pub const ACCEPTED_IMAGE_EXTENSIONS: [&str; 4] = ["png", "jpeg", "jpg", "heic"];
+
+pub const MAX_AGE_COOKIES: i64 = chrono::TimeDelta::hours(4).num_seconds();

@@ -6,10 +6,10 @@ use log::error;
 use serde_json::json;
 
 pub async fn send_verification(phone_number: &str) -> anyhow::Result<()> {
-    let totp = utils::totp_client.generate_current();
+    let totp = utils::TOTP_CLIENT.generate_current();
 
     if let Ok(otp) = totp {
-        let response = utils::request_client
+        let response = utils::REQUEST_CLIENT
             .post(config::APP_CONFIG.whatsapp_send_msg_endpoint())
             .header("accept", "application/json")
             .header("content-type", "application/json")
@@ -55,7 +55,7 @@ pub async fn send_verification(phone_number: &str) -> anyhow::Result<()> {
 }
 
 pub async fn validate_otp(otp: &str) -> bool {
-    utils::totp_client.check_current(otp).unwrap_or(false)
+    utils::TOTP_CLIENT.check_current(otp).unwrap_or(false)
 }
 
 pub async fn add_verified_phone_to_user(

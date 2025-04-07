@@ -33,6 +33,21 @@ pub struct OwnerContactRequest {
     pub contact_value: String,
 }
 
+impl OwnerContactRequest {
+    pub fn fields_are_valid(&self) -> bool {
+        !self
+            .contact_name
+            .split_whitespace()
+            .collect::<String>()
+            .is_empty()
+            && !self
+                .contact_value
+                .split_whitespace()
+                .collect::<String>()
+                .is_empty()
+    }
+}
+
 pub async fn add_owner_contact(
     user_app_id: i64,
     request: &OwnerContactRequest,

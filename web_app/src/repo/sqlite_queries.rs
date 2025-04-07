@@ -125,8 +125,7 @@ UPDATE pet
     is_female = $7,
     is_lost = $8,
     is_spaying_neutering = $9,
-    pic = $10,
-    updated_at = $11
+    updated_at = $10
 WHERE id = $1 AND user_app_id = $2;
 "#;
 

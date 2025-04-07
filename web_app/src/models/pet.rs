@@ -42,6 +42,7 @@ pub struct PetWeight {
     pub created_at: NaiveDateTime,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub struct PetHealth {
     pub id: i64,
     pub pet_id: i64,

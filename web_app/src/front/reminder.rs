@@ -1,12 +1,12 @@
 use crate::{
     api, consts,
     front::{
-        errors, forms,
+        AppState, errors, forms,
         middleware::{
             csrf_token::CsrfToken,
             logged_user::{CheckUserCanAccessService, IsUserLoggedAndCanEdit},
         },
-        templates, AppState,
+        templates,
     },
     models,
 };
@@ -24,6 +24,7 @@ async fn get_reminder_view(
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::from_value(json!({
         "reminders": api::reminder::get_scheduled_reminders(logged_user.id, &app_state.repo).await.unwrap_or_default(),
+        "can_schedule_reminder": logged_user.phone_reminder.is_some(),
     })).unwrap_or_default();
 
     let content = templates::WEB_TEMPLATES
@@ -247,6 +248,12 @@ async fn create_reminder(
         .unwrap_or("America/Mexico_City");
     let user_timezone: Tz = user_timezone.parse().unwrap_or(Tz::America__Mexico_City);
 
+    if logged_user.phone_reminder.is_none() {
+        return Ok(web::HttpResponse::BadRequest()
+            .content_type("text/html; charset=utf-8")
+            .body(""));
+    }
+
     if let Some(user_dt) =
         chrono::NaiveDateTime::parse_from_str(&form.when, consts::DATETIME_LOCAL_INPUT_FORMAT)
             .map_err(|e| errors::UserError::FormInputValueError(format!("invalid timezone: {e}")))?
@@ -271,8 +278,8 @@ async fn create_reminder(
         })?;
     }
 
-    Ok(web::HttpResponse::Ok()
+    Ok(web::HttpResponse::Created()
         .content_type("text/html; charset=utf-8")
         .set_header("HX-Trigger", "reminderRecordUpdated")
-        .body("content"))
+        .body(""))
 }

@@ -1,8 +1,8 @@
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use fast_qr::{
-    convert::{image::ImageBuilder, Builder, Shape},
-    qr::QRBuilder,
     ECL,
+    convert::{Builder, Shape, image::ImageBuilder},
+    qr::QRBuilder,
 };
 use futures::StreamExt;
 
@@ -16,13 +16,7 @@ pub fn redirect_to(url: &str) -> Result<ntex::web::HttpResponse, ntex::web::Erro
 /// Concats all the [bytes](Bytes) extracted from [Field]
 pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
     field
-        .filter_map(|x| async move {
-            if let Ok(b) = x {
-                Some(b)
-            } else {
-                None
-            }
-        })
+        .filter_map(|x| async move { if let Ok(b) = x { Some(b) } else { None } })
         .collect::<Vec<ntex::util::Bytes>>()
         .await
         .concat()
@@ -50,44 +44,38 @@ pub async fn get_field_value(field: ntex_multipart::Field) -> String {
 }
 
 /// Human readable pet age
-pub fn get_fmt_pet_age(birthday: NaiveDate, now: NaiveDate) -> String {
-    let years = (now.year() - 1) - birthday.year();
-    let months = now.month0().abs_diff(birthday.month0());
+pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> String {
+    let (start_date, end_date) = if start_date <= end_date {
+        (start_date, end_date)
+    } else {
+        (end_date, start_date)
+    };
 
-    if now.month0() < birthday.month0() {
-        return format!(
-            "{years} años y {months} meses",
-            years = years,
-            months = 12 - months
-        );
+    let num_days = end_date.signed_duration_since(start_date).num_days();
+    if num_days.lt(&1) {
+        return "0 dîas".into();
     }
 
-    if now.month0() > birthday.month0() {
-        return format!(
-            "{years} años y {months} meses",
-            years = years + 1,
-            months = months
-        );
+    let remaining_days = num_days % 365;
+    let mut msg = String::new();
+
+    let years = num_days / 365;
+    let months = remaining_days / 30;
+    let days = remaining_days % 30;
+
+    if years > 0 {
+        msg.push_str(&format!("{years} años"));
     }
 
-    if now.day0() < birthday.day0() {
-        return format!(
-            "{years} años, y {months} meses y {days} dias",
-            years = years,
-            months = 11,
-            days = now.day0() + 1,
-        );
+    if months > 0 {
+        msg.push_str(&format!(" {months} meses"));
     }
 
-    if now.day0() > birthday.day0() {
-        return format!(
-            "{years} años, y {days} dias",
-            years = years + 1,
-            days = now.day0().abs_diff(birthday.day0()),
-        );
+    if days > 0 {
+        msg.push_str(&format!(" {days} dîas"));
     }
 
-    format!("{years} años", years = years + 1)
+    msg
 }
 
 pub fn get_qr_code(info_url_pat: String) -> anyhow::Result<Vec<u8>> {

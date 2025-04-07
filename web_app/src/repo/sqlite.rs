@@ -5,7 +5,7 @@ use serde_json::from_str;
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
-use super::{sqlite_queries, AppRepo};
+use super::{AppRepo, sqlite_queries};
 
 #[derive(Clone)]
 pub struct SqlxSqliteRepo {
@@ -63,7 +63,7 @@ impl AppRepo for SqlxSqliteRepo {
             .bind(Utc::now())
             .execute(&self.db_pool)
             .await
-            .and_then(|_| Ok(()))?)
+            .map(|_| ())?)
     }
 
     async fn set_user_as_active(&self, user_id: i64) -> anyhow::Result<()> {
@@ -73,7 +73,7 @@ impl AppRepo for SqlxSqliteRepo {
                 .bind(Utc::now())
                 .execute(&self.db_pool)
                 .await
-                .and_then(|_| Ok(()))?,
+                .map(|_| ())?,
         )
     }
 
@@ -235,10 +235,21 @@ impl AppRepo for SqlxSqliteRepo {
             .bind(pet.is_female)
             .bind(pet.is_lost)
             .bind(pet.is_spaying_neutering)
-            .bind(&pet.pic)
             .bind(Utc::now())
             .execute(&self.db_pool)
             .await?;
+
+        if let Some(pic_path) = &pet.pic {
+            sqlx::query(
+                "UPDATE pet SET pic=$3, updated_at = $4 WHERE id = $1 AND user_app_id = $2;",
+            )
+            .bind(pet.id)
+            .bind(pet.user_app_id)
+            .bind(pic_path)
+            .bind(Utc::now())
+            .execute(&self.db_pool)
+            .await?;
+        }
 
         Ok(pet.id)
     }

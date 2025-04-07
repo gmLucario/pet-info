@@ -1,21 +1,27 @@
 [package]
 name = "pet-info"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 # Front Web dependencies:
-ntex = { version = "2.12.3", features = [ "tokio", "compress" ] }
+ntex = { version = "2.12.4", features = [ "tokio", "compress", "openssl" ] }
 ntex-files = "2.0.0"
 ntex-multipart = "2.0.0"
 ntex-identity = "2.0.0"
-ntex-session = "2.0.0"
+ntex-session = { version = "2.0.0", features = [] }
 tera = { version = "1.20.0", default-features = false, features = [ "builtins" ]}
 oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
 fast_qr = { version = "0.12.7", features = ["image"]}
 pulldown-cmark = "0.12.2"
 ammonia = "4.0.0"
 totp-rs = "5.6.0"
+openssl = { version = "0.10", features = ["vendored"] }
+
+ntex-cors = "2.0.0"
+typst = "0.13.1"
+typst-pdf = "0.13.1"
+typst-assets = { version = "0.13.1", features = ["fonts"] }
 
 # General deps all app
 # i am pinning libsqlite3-sys and sqlx due sqlx cant use a dif version
@@ -39,14 +45,11 @@ chrono = { version = "0.4.40", features = [ "serde" ] }
 async-trait = "0.1.88"
 anyhow = "1.0.97"
 base64 = "0.22.1"
-lazy_static = "1.5.0"
 futures = "0.3.31"
 simplelog = "0.12.2"
-log = "0.4.26"
-aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.79.0"
-aws-sdk-sfn = "1.66.0"
-chrono-tz = "0.10.2"
-
-ntex-cors = "2.0.0"
+log = "0.4.27"
+aws-config = { version = "1.6.1", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.82.0"
+aws-sdk-sfn = "1.68.0"
+chrono-tz = "0.10.3"
 

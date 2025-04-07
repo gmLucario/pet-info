@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::{
     api,
-    front::{errors, middleware, templates, AppState},
+    front::{AppState, errors, middleware, templates},
     models,
 };
 

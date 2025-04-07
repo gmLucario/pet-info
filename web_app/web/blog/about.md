@@ -7,7 +7,7 @@ Pet-Info te ayuda a organizar la información básica de tus mascotas como:
 - edad
 - peso
 - vacunas
-- desparacitaciones
+- Desparasitaciones
 - peso
 - notas generales
 

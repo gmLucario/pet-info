@@ -36,7 +36,7 @@ pub trait AppRepo {
     async fn set_user_as_subscribed(&self, user_id: i64) -> anyhow::Result<()>;
 
     async fn save_or_update_pet(&self, pet: &models::pet::Pet, insert: bool)
-        -> anyhow::Result<i64>;
+    -> anyhow::Result<i64>;
 
     async fn delete_pet(&self, pet_id: i64, user_id: i64) -> anyhow::Result<()>;
 

@@ -1,14 +1,15 @@
 use crate::{
     api, consts,
     front::{
-        errors,
+        AppState, errors,
         middleware::{self, logged_user::IsUserLoggedAndCanEdit},
-        templates, AppState,
+        templates,
     },
     models,
 };
 use ntex::web;
 use ntex_identity::Identity;
+use ntex_session::Session;
 use serde_json::json;
 
 #[web::get("")]
@@ -37,6 +38,7 @@ async fn get_profile_view(
         "phone_reminder": logged_user.phone_reminder,
         "service_price": &format!("{:.2}", consts::SERVICE_PRICE),
         "end_free_trial": &logged_user.end_free_trial(),
+        "can_access_service": logged_user.can_access_service(),
     }))
     .unwrap_or_default();
 
@@ -62,9 +64,13 @@ async fn add_new_owner_contact(
     _: middleware::csrf_token::CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
     let form_request = api::user::OwnerContactRequest {
-        contact_name: ammonia::clean(&form.0.contact_name),
-        contact_value: ammonia::clean(&form.0.contact_value),
+        contact_name: ammonia::clean(&form.contact_name),
+        contact_value: ammonia::clean(&form.contact_value),
     };
+
+    if !form_request.fields_are_valid() {
+        return Ok(web::HttpResponse::BadRequest().body(""));
+    }
 
     api::user::add_owner_contact(logged_user.id, &form_request, &app_state.repo)
         .await
@@ -168,4 +174,17 @@ async fn delete_user_data(
         })?;
 
     Ok(web::HttpResponse::Ok().body(content))
+}
+
+#[web::delete("/close-session")]
+async fn close_session(
+    cookie: Session,
+    identity: Identity,
+) -> Result<impl web::Responder, web::Error> {
+    identity.forget();
+    cookie.clear();
+
+    Ok(web::HttpResponse::Ok()
+        .set_header("HX-Redirect", "/")
+        .body(""))
 }

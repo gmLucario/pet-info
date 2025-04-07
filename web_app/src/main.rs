@@ -10,6 +10,8 @@ pub mod repo;
 pub mod services;
 pub mod utils;
 
+use std::str::FromStr;
+
 use anyhow::anyhow;
 use argon2::Argon2;
 use csrf::AesGcmCsrfProtection;
@@ -17,6 +19,8 @@ use ntex::web;
 use ntex_cors::Cors;
 use ntex_identity::{CookieIdentityPolicy, IdentityService};
 use ntex_session::CookieSession;
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
 #[ntex::main]
@@ -32,8 +36,8 @@ async fn main() -> anyhow::Result<()> {
     let mut csrf_key = [0u8; 32];
     Argon2::default()
         .hash_password_into(
-            Uuid::new_v4().as_bytes(),
-            Uuid::new_v4().as_bytes() as &[u8],
+            Uuid::from_str(&config::APP_CONFIG.csrf_pass)?.as_bytes(),
+            Uuid::from_str(&config::APP_CONFIG.csrf_salt)?.as_bytes(),
             &mut csrf_key,
         )
         .map_err(|err| anyhow!("csrf_key couldn't be created: {}", err))?;
@@ -52,17 +56,35 @@ async fn main() -> anyhow::Result<()> {
 
     let server = web::server(move || {
         web::App::new()
-            .wrap(Cors::default())
-            .wrap(CookieSession::private(&[0; 32]).secure(config::APP_CONFIG.is_prod()))
-            .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&[0; 32])
-                    .name("user_id")
-                    .path("/")
+            .wrap(
+                Cors::new()
+                    .allowed_methods(vec![
+                        "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
+                    ])
+                    .allowed_origin("http://localhost:8080")
+                    .allowed_origin("https://openidconnect.googleapis.com")
+                    .allowed_origin("https://pet-info.link")
+                    .allowed_origin("https://oauth2.googleapis.com")
+                    .allowed_origin("https://www.googleapis.com")
+                    .allowed_origin("https://accounts.google.com")
+                    .allowed_origin("https://graph.facebook.com")
+                    .allowed_origin("https://api.mercadopago.com")
+                    .finish(),
+            )
+            .wrap(
+                CookieSession::private(&[0; 64])
+                    .secure(config::APP_CONFIG.is_prod())
                     .domain(config::APP_CONFIG.wep_server_host.to_string())
-                    .max_age(chrono::TimeDelta::days(1).num_seconds())
+                    .max_age(consts::MAX_AGE_COOKIES)
+                    .name("pet-info-session"),
+            )
+            .wrap(IdentityService::new(
+                CookieIdentityPolicy::new(&[0; 64])
+                    .name("user_id")
+                    .domain(config::APP_CONFIG.wep_server_host.to_string())
+                    .max_age(consts::MAX_AGE_COOKIES)
                     .secure(config::APP_CONFIG.is_prod()),
             ))
-            .wrap(front::middleware::csrf_token::CsrfToken)
             .wrap(web::middleware::Logger::default())
             .wrap(web::middleware::Compress::default())
             .state(front::AppState {
@@ -91,5 +113,20 @@ async fn main() -> anyhow::Result<()> {
                     .to(front::server::serve_not_found),
             )
     });
-    Ok(server.bind(("0.0.0.0", 80))?.run().await?)
+
+    let server_addr = (
+        "0.0.0.0",
+        config::APP_CONFIG.wep_server_port.to_u16().unwrap_or(443),
+    );
+    let server = if config::APP_CONFIG.is_prod() {
+        let mut ssl_server = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())?;
+        ssl_server.set_private_key_file(&config::APP_CONFIG.private_key_path, SslFiletype::PEM)?;
+        ssl_server.set_certificate_file(&config::APP_CONFIG.certificate_path, SslFiletype::PEM)?;
+
+        server.bind_openssl(server_addr, ssl_server)
+    } else {
+        server.bind(server_addr)
+    };
+
+    Ok(server?.run().await?)
 }

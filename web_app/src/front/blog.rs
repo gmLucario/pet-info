@@ -1,14 +1,12 @@
-use lazy_static::lazy_static;
 use ntex::web;
 use serde_json::json;
+use std::sync::LazyLock;
 use tera::Tera;
 
 use crate::front::{errors, templates};
 use pulldown_cmark::{Options, Parser};
 
-lazy_static! {
-    pub static ref BLOG_TEMPLATES: Tera = Tera::new("web/blog/*.md").unwrap();
-}
+pub static BLOG_TEMPLATES: LazyLock<Tera> = LazyLock::new(|| Tera::new("web/blog/*.md").unwrap());
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct Blog {

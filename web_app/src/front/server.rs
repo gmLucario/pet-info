@@ -1,14 +1,15 @@
+use csrf::CsrfProtection;
 use ntex::web;
 use ntex_files::NamedFile;
 use ntex_identity::Identity;
 use ntex_session::Session;
-use oauth2::{reqwest, AuthorizationCode, CsrfToken, ResponseType, TokenResponse};
+use oauth2::{AuthorizationCode, CsrfToken, ResponseType, TokenResponse, reqwest};
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
     api, consts,
-    front::{errors, oauth, templates, utils, AppState},
+    front::{AppState, errors, middleware, oauth, templates, utils},
     models,
 };
 
@@ -154,7 +155,7 @@ async fn google_callback(
         .secret()
         .to_string();
 
-    let profile = crate::utils::request_client
+    let profile = crate::utils::REQUEST_CLIENT
         .get(consts::GOOGLE_ENDPOINT_USER_INFO)
         .bearer_auth(token)
         .send()
@@ -168,6 +169,24 @@ async fn google_callback(
             errors::ServerError::ExternalServiceError(format!("at get google user info: {}", e))
         })?;
 
+    let (csrf_token, csrf_cookie) = app_state
+        .csrf_protec
+        .generate_token_pair(None, consts::MAX_AGE_COOKIES)
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "cant set token csrf protection: {}",
+                e
+            ))
+        })?;
+
+    cookie.set(
+        consts::CSRF_TOKEN_COOKIE_NAME,
+        serde_json::to_string(&middleware::csrf_token::CsrfToken {
+            token_base64: csrf_token.b64_string(),
+            cookie_base64: csrf_cookie.b64_string(),
+        })?,
+    )?;
+
     let user = api::user::get_or_create_app_user_by_email(&app_state.repo, &profile.email)
         .await
         .map_err(|e| {
@@ -178,7 +197,7 @@ async fn google_callback(
         })?;
 
     //unwrap cause its safe, it comes internally
-    identity.remember(serde_json::to_string(&user).unwrap());
+    identity.remember(serde_json::to_string(&user)?);
 
     if !user.is_enabled {
         return utils::redirect_to("/reactivate-account");

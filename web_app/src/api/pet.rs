@@ -5,9 +5,10 @@ use serde::Serialize;
 use std::path::Path;
 use uuid::Uuid;
 
-pub async fn add_new_pet_to_user(
+async fn update_or_create_pet(
     user_id: i64,
     user_email: &str,
+    insert: bool,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
@@ -19,7 +20,7 @@ pub async fn add_new_pet_to_user(
         pic: pet_info.get_pic_storage_path(user_email),
         ..pet_info.clone().into()
     };
-    repo.save_or_update_pet(&pet, true).await?;
+    repo.save_or_update_pet(&pet, insert).await?;
 
     if let Some(pet_pic) = pet_info.pet_pic {
         storage_service
@@ -30,6 +31,16 @@ pub async fn add_new_pet_to_user(
     Ok(())
 }
 
+pub async fn add_new_pet_to_user(
+    user_id: i64,
+    user_email: &str,
+    pet_info: front::forms::pet::CreatePetForm,
+    repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
+) -> anyhow::Result<()> {
+    update_or_create_pet(user_id, user_email, true, pet_info, repo, storage_service).await
+}
+
 pub async fn update_pet_to_user(
     user_id: i64,
     user_email: &str,
@@ -37,23 +48,7 @@ pub async fn update_pet_to_user(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    let pic_filename = pet_info.get_pet_pic_filename();
-
-    let pet: models::pet::Pet = models::pet::Pet {
-        user_app_id: user_id,
-        pic: pet_info.get_pic_storage_path(user_email),
-        ..pet_info.clone().into()
-    };
-
-    repo.save_or_update_pet(&pet, false).await?;
-
-    if let Some(pet_pic) = pet_info.pet_pic {
-        storage_service
-            .save_pic(user_email, &pic_filename, pet_pic.body)
-            .await?;
-    }
-
-    Ok(())
+    update_or_create_pet(user_id, user_email, false, pet_info, repo, storage_service).await
 }
 
 #[derive(Debug, Display, Default, Serialize)]
@@ -88,7 +83,7 @@ impl From<models::pet::Pet> for PetListSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
-            fmt_age: front::utils::get_fmt_pet_age(val.birthday, Utc::now().date_naive()),
+            fmt_age: front::utils::fmt_dates_difference(val.birthday, Utc::now().date_naive()),
         }
     }
 }
@@ -121,7 +116,10 @@ pub async fn get_pet_user_to_edit(
         is_spaying_neutering: pet.is_spaying_neutering,
         is_female: pet.is_female,
         about_pet: pet.about,
-        pet_pic: None,
+        pet_pic: pet.pic.map(|path| front::forms::pet::PetPic {
+            body: vec![],
+            filename_extension: path,
+        }),
     })
 }
 
@@ -149,7 +147,7 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
             },
             pet_breed: val.breed,
             last_weight: val.weights.into_iter().next(),
-            fmt_age: front::utils::get_fmt_pet_age(val.birthday, Utc::now().date_naive()),
+            fmt_age: front::utils::fmt_dates_difference(val.birthday, Utc::now().date_naive()),
             is_spaying_neutering: val.is_spaying_neutering,
             is_lost: val.is_lost,
             about_pet: val.about,
@@ -355,4 +353,42 @@ pub async fn delete_note(
 ) -> anyhow::Result<()> {
     repo.delete_pet_note(pet_id, user_id, note_id).await?;
     Ok(())
+}
+
+pub struct PetFullInfo {
+    pub pet: models::pet::Pet,
+    pub vaccines: Vec<models::pet::PetHealth>,
+    pub deworms: Vec<models::pet::PetHealth>,
+    pub weights: Vec<models::pet::PetWeight>,
+    pub notes: Vec<models::pet::PetNote>,
+}
+
+pub async fn get_full_info(
+    pet_id: i64,
+    user_id: i64,
+    repo: &repo::ImplAppRepo,
+) -> anyhow::Result<PetFullInfo> {
+    let pet = repo.get_pet_by_id(pet_id, user_id).await?;
+    let external_id = pet.external_id;
+    let pet_id = pet.id;
+
+    Ok(PetFullInfo {
+        pet,
+        vaccines: repo
+            .get_pet_health_records(
+                external_id,
+                Some(user_id),
+                models::pet::PetHealthType::Vaccine,
+            )
+            .await?,
+        deworms: repo
+            .get_pet_health_records(
+                external_id,
+                Some(user_id),
+                models::pet::PetHealthType::Deworm,
+            )
+            .await?,
+        weights: repo.get_pet_weights(external_id, Some(user_id)).await?,
+        notes: repo.get_pet_notes(user_id, pet_id).await?,
+    })
 }

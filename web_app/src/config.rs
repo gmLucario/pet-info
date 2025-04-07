@@ -1,12 +1,13 @@
 //! Abstraction of all the values needed to setup the app
 
 use envconfig::Envconfig;
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
 /// Enviroment variables used to set specific instances in
 /// the application
 #[derive(Envconfig, Clone)]
 pub struct AppConfig {
+    #[envconfig(default = "local")]
     pub env: String,
 
     /// Database host value
@@ -20,6 +21,14 @@ pub struct AppConfig {
 
     /// Port Host, which web app will be binded
     pub wep_server_port: u64,
+
+    #[envconfig(default = "server.key")]
+    pub private_key_path: String,
+    #[envconfig(default = "server.crt")]
+    pub certificate_path: String,
+
+    pub csrf_pass: String,
+    pub csrf_salt: String,
 
     pub mercado_pago_public_key: String,
 
@@ -70,7 +79,7 @@ impl AppConfig {
         if self.is_prod() {
             return "https".into();
         }
-        return "http".into();
+        "http".into()
     }
 
     pub fn whatsapp_send_msg_endpoint(&self) -> String {
@@ -81,10 +90,6 @@ impl AppConfig {
     }
 }
 
-lazy_static! {
-    pub static ref APP_CONFIG: AppConfig = AppConfig::init_from_env().unwrap();
-}
+pub static APP_CONFIG: LazyLock<AppConfig> = LazyLock::new(|| AppConfig::init_from_env().unwrap());
 
-lazy_static! {
-    pub static ref OTP_SECRET: uuid::Uuid = uuid::Uuid::new_v4();
-}
+pub static OTP_SECRET: LazyLock<uuid::Uuid> = LazyLock::new(uuid::Uuid::new_v4);

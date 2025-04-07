@@ -1,8 +1,8 @@
-use lazy_static::lazy_static;
 use oauth2::{
-    basic::BasicClient, AuthUrl, Client, ClientId, ClientSecret, RedirectUrl, RevocationUrl, Scope,
-    StandardErrorResponse, TokenUrl,
+    AuthUrl, Client, ClientId, ClientSecret, RedirectUrl, RevocationUrl, Scope,
+    StandardErrorResponse, TokenUrl, basic::BasicClient,
 };
+use std::sync::LazyLock;
 
 use crate::{config::APP_CONFIG, consts};
 
@@ -49,6 +49,5 @@ fn build_google_oauth_client() -> anyhow::Result<GoogleOauthClient> {
     )
 }
 
-lazy_static! {
-    pub static ref GOOGLE_OAUTH: GoogleOauthClient = build_google_oauth_client().unwrap();
-}
+pub static GOOGLE_OAUTH: LazyLock<GoogleOauthClient> =
+    LazyLock::new(|| build_google_oauth_client().unwrap());

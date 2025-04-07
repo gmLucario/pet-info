@@ -1,10 +1,10 @@
 use crate::config;
-use lazy_static::lazy_static;
 use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode},
     SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
 use std::str::FromStr;
+use std::sync::LazyLock;
 use totp_rs::{Algorithm, Secret, TOTP};
 
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
@@ -28,12 +28,10 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
     .await?)
 }
 
-lazy_static! {
-    pub static ref request_client: reqwest::Client = reqwest::Client::new();
-}
+pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
-lazy_static! {
-    pub static ref totp_client: TOTP = TOTP::new(
+pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
+    TOTP::new(
         Algorithm::SHA512,
         6,
         1,
@@ -42,5 +40,5 @@ lazy_static! {
             .to_bytes()
             .unwrap(),
     )
-    .unwrap();
-}
+    .unwrap()
+});

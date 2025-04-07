@@ -1,7 +1,7 @@
 use crate::{
     api,
     front::{
-        errors, middleware, middleware::logged_user::IsUserLoggedAndCanEdit, templates, AppState,
+        AppState, errors, middleware, middleware::logged_user::IsUserLoggedAndCanEdit, templates,
     },
     models,
 };

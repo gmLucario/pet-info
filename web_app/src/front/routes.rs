@@ -9,6 +9,7 @@ pub fn pet(cfg: &mut web::ServiceConfig) {
         pet::render_pet_details_form,
         pet::create_pet_request,
         pet::get_profile_qr_code,
+        pet::get_pdf_report,
         pet::get_pet_public_pic,
         pet::delete_pet,
         pet::get_pet_details_form,
@@ -48,6 +49,7 @@ pub fn profile(cfg: &mut web::ServiceConfig) {
         profile::get_owner_contacts,
         profile::delete_owner_contact,
         profile::delete_user_data,
+        profile::close_session,
     )));
 }
 

@@ -1,6 +1,6 @@
 use crate::{
     api, config, consts,
-    front::{errors, middleware, templates, AppState},
+    front::{AppState, errors, middleware, templates},
     models,
 };
 use ntex::web;

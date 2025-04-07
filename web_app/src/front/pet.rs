@@ -1,14 +1,17 @@
 use std::path::Path;
 
 use anyhow::bail;
-use futures::{future::ok, stream::once, TryStreamExt};
+use chrono::{NaiveDateTime, Utc};
+use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    api, consts,
-    front::{errors, forms, middleware, templates, utils, AppState},
+    api,
+    config::APP_CONFIG,
+    consts,
+    front::{AppState, errors, forms, middleware, templates, utils},
     models,
 };
 
@@ -275,18 +278,91 @@ async fn get_profile_qr_code(
     path: web::types::Path<(Uuid,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_external_id = path.0;
-    let qr_code = super::utils::get_qr_code(format!("https://pet-info.in/pet/{}", pet_external_id))
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!(
-                "qr_code could not be generated: {}",
-                e
-            ))
-        })?;
+    let qr_code = super::utils::get_qr_code(format!(
+        "{protocol}://{url_host}/pet/info/{external_id}",
+        protocol = APP_CONFIG.wep_server_protocol(),
+        url_host = APP_CONFIG.url_host(),
+        external_id = pet_external_id
+    ))
+    .map_err(|e| {
+        errors::ServerError::InternalServerError(format!("qr_code could not be generated: {}", e))
+    })?;
 
     let body = once(ok::<_, web::Error>(Bytes::from_iter(&qr_code)));
 
     Ok(web::HttpResponse::Ok()
         .content_type("image/jpeg")
+        .streaming(body))
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, PartialEq)]
+struct WeightReport {
+    pub value: f64,
+    pub created_at: NaiveDateTime,
+    pub fmt_age: String,
+}
+
+#[web::get("pdf_report/{pet_id}")]
+async fn get_pdf_report(
+    _: middleware::logged_user::CheckUserCanAccessService,
+    path: web::types::Path<(i64,)>,
+    logged_user: models::user_app::User,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let pet_full_info = api::pet::get_full_info(path.0, logged_user.id, &app_state.repo)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "get_full_info could not be retrieved: {}",
+                e
+            ))
+        })?;
+
+    let now = Utc::now().date_naive();
+
+    let content = templates::PDF_REPORT_TEMPLATES
+        .render(
+            "pet_default.typ",
+            &tera::Context::from_value(json!({
+                "pet_name": pet_full_info.pet.pet_name,
+                "birthday": pet_full_info.pet.birthday,
+                "age": utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
+                "breed": pet_full_info.pet.breed,
+                "is_female": pet_full_info.pet.is_female,
+                "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
+                "pet_link": format!(
+                    "https://pet-info.link/pet/info/{external_id}",
+                    external_id=pet_full_info.pet.external_id
+                ),
+                "vaccines": pet_full_info.vaccines,
+                "deworms": pet_full_info.deworms,
+                "weights": pet_full_info.weights.iter().map(|w| WeightReport{
+                    value: w.value,
+                    created_at: w.created_at,
+                    fmt_age: utils::fmt_dates_difference(pet_full_info.pet.birthday, w.created_at.into()),
+                }).collect::<Vec<WeightReport>>(),
+                "notes": pet_full_info.notes,
+            }))
+            .unwrap_or_default(),
+        )
+        .map_err(|e| {
+            errors::ServerError::TemplateError(format!(
+                "at /blog endpoint the template couldnt be rendered: {}",
+                e
+            ))
+        })?;
+
+    let content = api::pdf_handler::create_pdf_bytes_from_str(&content).map_err(|e| {
+        errors::ServerError::TemplateError(format!(
+            "at /blog endpoint the template couldnt be rendered: {}",
+            e
+        ))
+    })?;
+
+    let body = once(ok::<_, web::Error>(Bytes::from_iter(&content)));
+
+    Ok(web::HttpResponse::Ok()
+        .content_type("application/pdf")
         .streaming(body))
 }
 

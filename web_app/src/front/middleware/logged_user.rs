@@ -45,13 +45,11 @@ impl<Err> FromRequest<Err> for CheckUserCanAccessService {
     ) -> impl std::future::Future<Output = Result<Self, Self::Error>> {
         let identity_cookie = req.get_identity();
         match get_logged_user(identity_cookie) {
-            Ok(user) => {
-                if user.can_access_service() {
-                    futures::future::ready(Ok(Self))
-                } else {
-                    futures::future::ready(Err(errors::UserError::NeedSubscription.into()))
-                }
-            }
+            Ok(user) => futures::future::ready(if user.can_access_service() {
+                Ok(Self)
+            } else {
+                Err(errors::UserError::NeedSubscription.into())
+            }),
             Err(err) => futures::future::ready(Err(err)),
         }
     }

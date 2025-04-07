@@ -49,7 +49,7 @@ pub async fn create_subscription(
 
     let mut subs_payment: models::payment::Payment = payment_request.into();
 
-    let response = utils::request_client
+    let response = utils::REQUEST_CLIENT
         .post("https://api.mercadopago.com/v1/payments")
         .header("accept", "application/json")
         .header("content-type", "application/json")
@@ -71,7 +71,7 @@ pub async fn create_subscription(
         .unwrap();
 
     if !response.status().is_success() {
-        error!("{:#?}", response.text().await);
+        error!("{:#?}", response.json::<serde_json::Value>().await);
         bail!("mercado pago api is returning an error");
     }
 
