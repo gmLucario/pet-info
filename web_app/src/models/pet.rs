@@ -15,7 +15,7 @@ pub struct Pet {
     pub is_female: bool,
     pub is_lost: bool,
     pub is_spaying_neutering: bool,
-    pub weights: Vec<f64>,
+    pub last_weight: Option<f64>,
     pub pic: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -35,6 +35,7 @@ pub enum PetHealthType {
     Weight,
 }
 
+#[derive(sqlx::FromRow)]
 pub struct PetWeight {
     pub id: i64,
     pub pet_id: i64,
@@ -51,7 +52,7 @@ pub struct PetHealth {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, sqlx::FromRow)]
 pub struct PetNote {
     pub id: i64,
     pub pet_id: i64,

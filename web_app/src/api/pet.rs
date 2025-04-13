@@ -83,7 +83,10 @@ impl From<models::pet::Pet> for PetListSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
-            fmt_age: front::utils::fmt_dates_difference(val.birthday, Utc::now().date_naive()),
+            fmt_age: front::utils::fmt_dates_difference(
+                val.birthday,
+                front::utils::get_utc_now_with_default_time().date_naive(),
+            ),
         }
     }
 }
@@ -146,8 +149,11 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
                 false => Sex::Male,
             },
             pet_breed: val.breed,
-            last_weight: val.weights.into_iter().next(),
-            fmt_age: front::utils::fmt_dates_difference(val.birthday, Utc::now().date_naive()),
+            last_weight: val.last_weight,
+            fmt_age: front::utils::fmt_dates_difference(
+                val.birthday,
+                front::utils::get_utc_now_with_default_time().date_naive(),
+            ),
             is_spaying_neutering: val.is_spaying_neutering,
             is_lost: val.is_lost,
             about_pet: val.about,

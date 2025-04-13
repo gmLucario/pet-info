@@ -106,7 +106,7 @@ async fn add_health_record(
     _: middleware::csrf_token::CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
     let form = forms::pet::HealthRecordForm {
-        value: ammonia::clean(&form.0.value),
+        value: ammonia::clean(&form.value),
         ..form.0
     };
 

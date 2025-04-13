@@ -17,11 +17,8 @@ fn serialize_logged_user(str: &str) -> serde_json::Result<models::user_app::User
 
 /// Extracts the [LoggedUser] from a string session cookie
 fn get_logged_user(auth_cookie: Option<String>) -> Result<models::user_app::User, Error> {
-    if let Ok(user) = serialize_logged_user(&auth_cookie.unwrap_or_default()) {
-        return Ok(user);
-    }
-
-    Err(errors::UserError::Unauthorized.into())
+    serialize_logged_user(&auth_cookie.unwrap_or_default())
+        .map_err(|_| errors::UserError::Unauthorized.into())
 }
 
 impl<Err> FromRequest<Err> for models::user_app::User {
@@ -56,11 +53,9 @@ impl<Err> FromRequest<Err> for CheckUserCanAccessService {
 }
 
 fn check_can_edit(auth_cookie: Option<String>) -> IsUserLoggedAndCanEdit {
-    if let Ok(user) = get_logged_user(auth_cookie) {
-        return IsUserLoggedAndCanEdit(user.can_access_service(), Some(user.id));
-    }
-
-    IsUserLoggedAndCanEdit(false, None)
+    get_logged_user(auth_cookie)
+        .map(|user| IsUserLoggedAndCanEdit(user.can_access_service(), Some(user.id)))
+        .unwrap_or(IsUserLoggedAndCanEdit(false, None))
 }
 
 impl<Err> FromRequest<Err> for IsUserLoggedAndCanEdit {

@@ -50,7 +50,7 @@ INSERT INTO pet_weight (
 ) SELECT p.id,$3,$4
 FROM pet AS p
 WHERE external_id=$1 AND user_app_id=$2
-RETURNING id,pet_id,weight,created_at;
+RETURNING id,pet_id,weight AS value,created_at;
 "#;
 
 pub const QUERY_INSERT_PET_HEALTH_RECORD: &str = r#"
@@ -131,7 +131,7 @@ WHERE id = $1 AND user_app_id = $2;
 
 pub const QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_AND_USER_ID: &str = r#"
 SELECT 
-    pw.id,pw.pet_id,pw.weight,pw.created_at 
+    pw.id,pw.pet_id,pw.weight AS value,pw.created_at 
 FROM pet_weight AS pw 
 LEFT JOIN pet AS p on  (p.id=pw.pet_id)
 WHERE 
@@ -142,7 +142,7 @@ ORDER BY pw.created_at DESC;
 
 pub const QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_ID: &str = r#"
 SELECT 
-    pw.id,pw.pet_id,pw.weight,pw.created_at 
+    pw.id,pw.pet_id,pw.weight AS value,pw.created_at 
 FROM pet_weight AS pw 
 LEFT JOIN pet AS p on  (p.id=pw.pet_id)
 WHERE p.external_id = $1

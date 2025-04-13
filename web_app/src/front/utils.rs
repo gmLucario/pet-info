@@ -1,4 +1,6 @@
+use anyhow::bail;
 use chrono::NaiveDate;
+use chrono_tz::Tz;
 use fast_qr::{
     ECL,
     convert::{Builder, Shape, image::ImageBuilder},
@@ -25,10 +27,8 @@ pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
 async fn get_bytes_as_str(
     x: Result<ntex::util::Bytes, ntex_multipart::MultipartError>,
 ) -> Option<String> {
-    if let Ok(b) = x {
-        if let Ok(value) = std::str::from_utf8(&b) {
-            return Some(value.to_string());
-        }
+    if let Ok(Ok(v)) = x.map(|b| std::str::from_utf8(&b).map(|value| value.to_string())) {
+        return Some(v);
     }
 
     None
@@ -41,6 +41,18 @@ pub async fn get_field_value(field: ntex_multipart::Field) -> String {
         .collect::<Vec<String>>()
         .await
         .join("")
+}
+
+pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::Result<Tz> {
+    let user_timezone = request_headers
+        .get("timezone")
+        .map(|v| v.to_str().map(|tz| tz.parse::<Tz>()));
+
+    if let Some(Ok(Ok(tz))) = user_timezone {
+        return Ok(tz);
+    }
+
+    bail!("cant perse user time zone")
 }
 
 /// Human readable pet age
@@ -72,10 +84,17 @@ pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> Strin
     }
 
     if days > 0 {
-        msg.push_str(&format!(" {days} dîas"));
+        msg.push_str(&format!(" {} dîas", days - 1));
     }
 
     msg
+}
+
+pub fn get_utc_now_with_default_time() -> chrono::DateTime<chrono::Utc> {
+    chrono::Utc::now()
+        .with_time(chrono::NaiveTime::default())
+        .single()
+        .unwrap()
 }
 
 pub fn get_qr_code(info_url_pat: String) -> anyhow::Result<Vec<u8>> {

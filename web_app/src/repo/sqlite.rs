@@ -2,7 +2,7 @@ use crate::models;
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::from_str;
-use sqlx::{Row, SqlitePool};
+use sqlx::{FromRow, Row, SqlitePool, sqlite::SqliteRow};
 use uuid::Uuid;
 
 use super::{AppRepo, sqlite_queries};
@@ -12,46 +12,26 @@ pub struct SqlxSqliteRepo {
     pub db_pool: SqlitePool,
 }
 
-#[derive(sqlx::FromRow)]
-struct PetRow {
-    id: i64,
-    external_id: uuid::fmt::Hyphenated,
-    user_app_id: i64,
-    pet_name: String,
-    birthday: sqlx::types::chrono::NaiveDate,
-    breed: String,
-    last_weight: Option<f64>,
-    about: String,
-    is_female: bool,
-    is_lost: bool,
-    is_spaying_neutering: bool,
-    pic: Option<String>,
-    created_at: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
-    updated_at: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
-}
+impl FromRow<'_, SqliteRow> for models::pet::Pet {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        let external_id: uuid::fmt::Hyphenated = row.try_get("external_id")?;
 
-impl From<PetRow> for models::pet::Pet {
-    fn from(val: PetRow) -> Self {
-        models::pet::Pet {
-            weights: if let Some(last_weight) = val.last_weight {
-                vec![last_weight]
-            } else {
-                vec![]
-            },
-            id: val.id,
-            external_id: val.external_id.into_uuid(),
-            pic: val.pic,
-            user_app_id: val.user_app_id,
-            pet_name: val.pet_name,
-            birthday: val.birthday,
-            breed: val.breed,
-            about: val.about,
-            is_female: val.is_female,
-            is_lost: val.is_lost,
-            is_spaying_neutering: val.is_spaying_neutering,
-            created_at: val.created_at,
-            updated_at: val.updated_at,
-        }
+        Ok(Self {
+            id: row.try_get("id")?,
+            external_id: external_id.into(),
+            user_app_id: row.try_get("user_app_id")?,
+            pet_name: row.try_get("pet_name")?,
+            birthday: row.try_get("birthday")?,
+            breed: row.try_get("breed")?,
+            about: row.try_get("about")?,
+            is_female: row.try_get("is_female")?,
+            is_lost: row.try_get("is_lost")?,
+            is_spaying_neutering: row.try_get("is_spaying_neutering")?,
+            last_weight: row.try_get("last_weight")?,
+            pic: row.try_get("pic")?,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
     }
 }
 
@@ -265,13 +245,10 @@ impl AppRepo for SqlxSqliteRepo {
 
     async fn get_all_pets_user_id(&self, user_id: i64) -> anyhow::Result<Vec<models::pet::Pet>> {
         Ok(
-            sqlx::query_as::<_, PetRow>(sqlite_queries::QUERY_GET_ALL_PETS_USER_ID)
+            sqlx::query_as::<_, models::pet::Pet>(sqlite_queries::QUERY_GET_ALL_PETS_USER_ID)
                 .bind(user_id)
                 .fetch_all(&self.db_pool)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+                .await?,
         )
     }
 
@@ -280,11 +257,10 @@ impl AppRepo for SqlxSqliteRepo {
         pet_external_id: Uuid,
     ) -> anyhow::Result<models::pet::Pet> {
         Ok(
-            sqlx::query_as::<_, PetRow>(sqlite_queries::QUERY_GET_PET_BY_EXTERNAL_ID)
+            sqlx::query_as::<_, models::pet::Pet>(sqlite_queries::QUERY_GET_PET_BY_EXTERNAL_ID)
                 .bind(pet_external_id.to_string())
                 .fetch_one(&self.db_pool)
-                .await?
-                .into(),
+                .await?,
         )
     }
 
@@ -303,12 +279,11 @@ impl AppRepo for SqlxSqliteRepo {
 
     async fn get_pet_by_id(&self, pet_id: i64, user_id: i64) -> anyhow::Result<models::pet::Pet> {
         Ok(
-            sqlx::query_as::<_, PetRow>(sqlite_queries::QUERY_GET_PET_BY_ID)
+            sqlx::query_as::<_, models::pet::Pet>(sqlite_queries::QUERY_GET_PET_BY_ID)
                 .bind(pet_id)
                 .bind(user_id)
                 .fetch_one(&self.db_pool)
-                .await?
-                .into(),
+                .await?,
         )
     }
 
@@ -319,22 +294,19 @@ impl AppRepo for SqlxSqliteRepo {
     ) -> anyhow::Result<Vec<models::pet::PetWeight>> {
         let pet_external_id = pet_external_id.to_string();
         let query = if let Some(user_id) = user_id {
-            sqlx::query(sqlite_queries::QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_AND_USER_ID)
-                .bind(pet_external_id)
-                .bind(user_id)
+            sqlx::query_as::<_, models::pet::PetWeight>(
+                sqlite_queries::QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_AND_USER_ID,
+            )
+            .bind(pet_external_id)
+            .bind(user_id)
         } else {
-            sqlx::query(sqlite_queries::QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_ID).bind(pet_external_id)
+            sqlx::query_as::<_, models::pet::PetWeight>(
+                sqlite_queries::QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_ID,
+            )
+            .bind(pet_external_id)
         };
 
-        Ok(query
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetWeight {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id: row.try_get("pet_id").unwrap_or(-1),
-                value: row.try_get("weight").unwrap_or(0.0),
-                created_at: row.try_get("created_at").unwrap_or_default(),
-            })
-            .fetch_all(&self.db_pool)
-            .await?)
+        Ok(query.fetch_all(&self.db_pool).await?)
     }
 
     async fn get_pet_health_records(
@@ -434,21 +406,15 @@ impl AppRepo for SqlxSqliteRepo {
     ) -> anyhow::Result<models::pet::PetWeight> {
         let date = date.and_time(chrono::NaiveTime::default());
 
-        let record = sqlx::query(sqlite_queries::QUERY_INSERT_PET_WEIGHT)
-            .bind(pet_external_id.to_string())
-            .bind(user_id)
-            .bind(weight)
-            .bind(date)
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetWeight {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id: row.try_get("pet_id").unwrap_or(-1),
-                value: row.try_get("weight").unwrap_or(0.0),
-                created_at: date,
-            })
-            .fetch_one(&self.db_pool)
-            .await?;
-
-        return Ok(record);
+        return Ok(sqlx::query_as::<_, models::pet::PetWeight>(
+            sqlite_queries::QUERY_INSERT_PET_WEIGHT,
+        )
+        .bind(pet_external_id.to_string())
+        .bind(user_id)
+        .bind(weight)
+        .bind(date)
+        .fetch_one(&self.db_pool)
+        .await?);
     }
 
     async fn delete_pet_weight(
@@ -457,7 +423,7 @@ impl AppRepo for SqlxSqliteRepo {
         user_id: i64,
         weight_id: i64,
     ) -> anyhow::Result<()> {
-        let _ = sqlx::query(sqlite_queries::QUERY_DELETE_PET_WEIGHT)
+        sqlx::query(sqlite_queries::QUERY_DELETE_PET_WEIGHT)
             .bind(weight_id)
             .bind(pet_external_id.to_string())
             .bind(user_id)
@@ -472,7 +438,7 @@ impl AppRepo for SqlxSqliteRepo {
         user_id: i64,
         deworm_id: i64,
     ) -> anyhow::Result<()> {
-        let _ = sqlx::query(sqlite_queries::QUERY_DELETE_PET_HEALTH_RECORD)
+        sqlx::query(sqlite_queries::QUERY_DELETE_PET_HEALTH_RECORD)
             .bind(deworm_id)
             .bind(models::pet::PetHealthType::Deworm.to_string())
             .bind(pet_external_id.to_string())
@@ -502,38 +468,24 @@ impl AppRepo for SqlxSqliteRepo {
         &self,
         pet_external_id: Uuid,
     ) -> anyhow::Result<Vec<models::user_app::OwnerContact>> {
-        return Ok(sqlx::query(sqlite_queries::QUERY_GET_PET_OWNER_CONTACTS)
-            .bind(pet_external_id.to_string())
-            .map(
-                |row: sqlx::sqlite::SqliteRow| models::user_app::OwnerContact {
-                    id: row.try_get("id").unwrap_or(-1),
-                    user_app_id: row.try_get("id").unwrap_or(-1),
-                    full_name: row.try_get("full_name").unwrap_or_default(),
-                    contact_value: row.try_get("contact_value").unwrap_or_default(),
-                    created_at: row.try_get("created_at").unwrap_or_default(),
-                },
-            )
-            .fetch_all(&self.db_pool)
-            .await?);
+        return Ok(sqlx::query_as::<_, models::user_app::OwnerContact>(
+            sqlite_queries::QUERY_GET_PET_OWNER_CONTACTS,
+        )
+        .bind(pet_external_id.to_string())
+        .fetch_all(&self.db_pool)
+        .await?);
     }
 
     async fn get_owner_contacts(
         &self,
         user_id: i64,
     ) -> anyhow::Result<Vec<models::user_app::OwnerContact>> {
-        return Ok(sqlx::query(sqlite_queries::QUERY_GET_OWNER_CONTACTS)
-            .bind(user_id)
-            .map(
-                |row: sqlx::sqlite::SqliteRow| models::user_app::OwnerContact {
-                    id: row.try_get("id").unwrap_or(-1),
-                    user_app_id: row.try_get("id").unwrap_or(-1),
-                    full_name: row.try_get("full_name").unwrap_or_default(),
-                    contact_value: row.try_get("contact_value").unwrap_or_default(),
-                    created_at: row.try_get("created_at").unwrap_or_default(),
-                },
-            )
-            .fetch_all(&self.db_pool)
-            .await?);
+        return Ok(sqlx::query_as::<_, models::user_app::OwnerContact>(
+            sqlite_queries::QUERY_GET_OWNER_CONTACTS,
+        )
+        .bind(user_id)
+        .fetch_all(&self.db_pool)
+        .await?);
     }
 
     async fn insert_owner_contact(
@@ -590,19 +542,13 @@ impl AppRepo for SqlxSqliteRepo {
         user_id: i64,
         pet_id: i64,
     ) -> anyhow::Result<Vec<models::pet::PetNote>> {
-        return Ok(sqlx::query(sqlite_queries::QUERY_GET_PET_NOTES)
-            .bind(pet_id)
-            .bind(user_id)
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetNote {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id,
-                title: row.try_get("title").unwrap_or_default(),
-                content: row.try_get("content").unwrap_or_default(),
-                created_at: row.try_get("created_at").unwrap_or_default(),
-                updated_at: row.try_get("updated_at").unwrap_or_default(),
-            })
-            .fetch_all(&self.db_pool)
-            .await?);
+        return Ok(
+            sqlx::query_as::<_, models::pet::PetNote>(sqlite_queries::QUERY_GET_PET_NOTES)
+                .bind(pet_id)
+                .bind(user_id)
+                .fetch_all(&self.db_pool)
+                .await?,
+        );
     }
 
     async fn delete_pet_note(&self, pet_id: i64, user_id: i64, note_id: i64) -> anyhow::Result<()> {

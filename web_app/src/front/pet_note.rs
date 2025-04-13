@@ -58,8 +58,8 @@ async fn new_pet_note(
 ) -> Result<impl web::Responder, web::Error> {
     let pet_id = params.0;
     let form = forms::pet::PetNoteForm {
-        title: ammonia::clean(&form.0.title),
-        body: ammonia::clean(&form.0.body),
+        title: ammonia::clean(&form.title),
+        body: ammonia::clean(&form.body),
     };
 
     api::pet::add_new_note(logged_user.id, pet_id, form.into(), &app_state.repo)

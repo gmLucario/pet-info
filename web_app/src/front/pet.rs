@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::bail;
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
 use serde_json::json;
@@ -36,10 +36,15 @@ fn get_filename_extension(content_disposition: &str) -> anyhow::Result<String> {
             name.trim_matches('"')
         });
 
-    if let Some(filename) = Path::new(sections.next().unwrap_or_default()).extension() {
-        if let Some(filename) = filename.to_str() {
-            return Ok(filename.to_string().trim().to_lowercase());
-        }
+    if let Some(Some(filename)) = Path::new(sections.next().unwrap_or_default())
+        .extension()
+        .map(|filename| {
+            filename
+                .to_str()
+                .map(|f| f.to_string().trim().to_lowercase())
+        })
+    {
+        return Ok(filename);
     }
 
     bail!("filename extension couldnt be found in the request content_disposition form")
@@ -318,7 +323,7 @@ async fn get_pdf_report(
             ))
         })?;
 
-    let now = Utc::now().date_naive();
+    let now = utils::get_utc_now_with_default_time().date_naive();
 
     let content = templates::PDF_REPORT_TEMPLATES
         .render(

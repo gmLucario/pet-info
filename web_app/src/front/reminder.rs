@@ -6,7 +6,7 @@ use crate::{
             csrf_token::CsrfToken,
             logged_user::{CheckUserCanAccessService, IsUserLoggedAndCanEdit},
         },
-        templates,
+        templates, utils,
     },
     models,
 };
@@ -95,7 +95,6 @@ async fn send_verification_code_to_reminder_phone(
     }))
     .unwrap_or_default();
 
-    let form = form.0;
     let phone_number = format!(
         "{country_code}{phone}",
         country_code = form.country_phone_code,
@@ -240,13 +239,8 @@ async fn create_reminder(
     app_state: web::types::State<AppState>,
     _: CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
-    let request_headers = r.headers();
-
-    let user_timezone = request_headers
-        .get("timezone")
-        .map(|v| v.to_str().unwrap_or("America/Mexico_City"))
-        .unwrap_or("America/Mexico_City");
-    let user_timezone: Tz = user_timezone.parse().unwrap_or(Tz::America__Mexico_City);
+    let user_timezone: Tz =
+        utils::extract_usertimezone(r.headers()).unwrap_or(Tz::America__Mexico_City);
 
     if logged_user.phone_reminder.is_none() {
         return Ok(web::HttpResponse::BadRequest()
@@ -254,12 +248,7 @@ async fn create_reminder(
             .body(""));
     }
 
-    if let Some(user_dt) =
-        chrono::NaiveDateTime::parse_from_str(&form.when, consts::DATETIME_LOCAL_INPUT_FORMAT)
-            .map_err(|e| errors::UserError::FormInputValueError(format!("invalid timezone: {e}")))?
-            .and_local_timezone(user_timezone)
-            .earliest()
-    {
+    if let Some(user_dt) = form.when.and_local_timezone(user_timezone).single() {
         api::reminder::schedule_reminder(
             api::reminder::ScheduleReminderInfo {
                 user_id: logged_user.id,
