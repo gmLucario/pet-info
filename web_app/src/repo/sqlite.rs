@@ -145,7 +145,7 @@ impl AppRepo for SqlxSqliteRepo {
         .await?
         .last_insert_rowid();
 
-        sqlx::query("INSERT INTO add_pet_balance(user_id) VALUES($1);")
+        sqlx::query("INSERT INTO add_pet_balance(user_id, balance) VALUES($1, 0);")
             .bind(user_app_id)
             .execute(&mut *transaction)
             .await?;
