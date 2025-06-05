@@ -1,11 +1,14 @@
-use super::{blog, checkout, pet, pet_health, pet_note, profile, reminder};
+use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder};
 use ntex::web;
+
+pub fn pet_public_profile(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::scope("/info").service((pet_public::get_pet_info_view,)));
+}
 
 pub fn pet(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/pet").service((
         pet::get_pet_view,
         pet::user_pets_list,
-        pet::get_pet_info_view,
         pet::render_pet_details_form,
         pet::create_pet_request,
         pet::get_profile_qr_code,
@@ -42,7 +45,7 @@ pub fn reminders(cfg: &mut web::ServiceConfig) {
     )));
 }
 
-pub fn profile(cfg: &mut web::ServiceConfig) {
+pub fn user_profile(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/profile").service((
         profile::get_profile_view,
         profile::add_new_owner_contact,

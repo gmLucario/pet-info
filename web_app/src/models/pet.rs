@@ -35,6 +35,11 @@ pub enum PetHealthType {
     Weight,
 }
 
+pub struct ExternalIdMetadata {
+    pub external_id: Uuid,
+    pub is_linked: bool,
+}
+
 #[derive(sqlx::FromRow)]
 pub struct PetWeight {
     pub id: i64,

@@ -1,18 +1,18 @@
-use std::path::Path;
+//! Handlers related to the /pet url
 
 use anyhow::bail;
 use chrono::NaiveDateTime;
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
 use serde_json::json;
+use std::{path::Path, str::FromStr};
 use uuid::Uuid;
 
 use crate::{
     api,
     config::APP_CONFIG,
     consts,
-    front::{AppState, errors, forms, middleware, templates, utils},
-    models,
+    front::{AppState, errors, forms, middleware, session, templates, utils},
 };
 
 fn get_header_str_value(headers: &ntex::http::HeaderMap, key: &str) -> String {
@@ -97,25 +97,28 @@ async fn deserialize_pet_form(
             form.is_female = field_value.contains("on");
         } else if content_disposition.contains("about_pet") {
             form.about_pet = field_value;
+        } else if content_disposition.contains("pet_external_id") {
+            form.pet_external_id = Some(Uuid::from_str(&field_value).unwrap_or(Uuid::new_v4()));
         }
     }
 
     Ok(form)
 }
 
+/// Renders the pets view section:
+/// List all user's pets
+/// Start PetInfo id tag payment flow
 #[web::get("")]
 async fn get_pet_view(
-    _: middleware::logged_user::CheckUserCanAccessService,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::from_value(json!({
-        "pets": api::pet::get_user_pets_cards(logged_user.id, &app_state.repo)
+        "pets": api::pet::get_user_pets_cards(user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "function get_user_pets_cards raised an error: {}",
-                e
+                "function get_user_pets_cards raised an error: {e}"
             ))
         })?,
     }))
@@ -125,8 +128,7 @@ async fn get_pet_view(
         .render("pet.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
@@ -135,19 +137,18 @@ async fn get_pet_view(
         .body(content))
 }
 
+/// Renders all user's pets
 #[web::get("/list")]
 async fn user_pets_list(
-    _: middleware::logged_user::CheckUserCanAccessService,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::from_value(json!({
-        "pets": api::pet::get_user_pets_cards(logged_user.id, &app_state.repo)
+        "pets": api::pet::get_user_pets_cards(user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "function get_user_pets_cards raised an error: {}",
-                e
+                "function get_user_pets_cards raised an error: {e}"
             ))
         })?,
     }))
@@ -157,8 +158,7 @@ async fn user_pets_list(
         .render("widgets/pets.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet/list endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet/list endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
@@ -167,9 +167,16 @@ async fn user_pets_list(
         .body(content))
 }
 
+#[derive(serde::Deserialize, Debug)]
+struct PetFormQueryParams {
+    pet_external_id: Option<Uuid>,
+}
+
+/// Renders the form of a specific pet, filled previously by its owner
 #[web::get("/new")]
 async fn render_pet_details_form(
-    _: middleware::logged_user::CheckUserCanAccessService,
+    _: session::WebAppSession,
+    q: web::types::Query<PetFormQueryParams>,
 ) -> Result<impl web::Responder, web::Error> {
     let content = templates::WEB_TEMPLATES
         .render(
@@ -177,13 +184,13 @@ async fn render_pet_details_form(
             &tera::Context::from_value(json!({
                 "PIC_PET_MAX_SIZE_BYTES": consts::PIC_PET_MAX_SIZE_BYTES,
                 "ACCEPTED_IMAGE_EXTENSIONS": consts::ACCEPTED_IMAGE_EXTENSIONS,
+                "pet_external_id": q.pet_external_id,
             }))
             .unwrap_or_default(),
         )
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet/new endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet/new endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
@@ -192,21 +199,34 @@ async fn render_pet_details_form(
         .body(content))
 }
 
+/// Handles the request to create a new pet
+/// A new pet can be created if the user has a positive pet balance
 #[web::post("/new")]
 async fn create_pet_request(
-    _: middleware::logged_user::CheckUserCanAccessService,
     _: middleware::csrf_token::CsrfToken,
-    logged_user: models::user_app::User,
+    mut user_session: session::WebAppSession,
     app_state: web::types::State<AppState>,
     payload: ntex_multipart::Multipart,
+    identity: ntex_identity::Identity,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_form = deserialize_pet_form(payload)
         .await
         .map_err(|e| errors::UserError::FormInputValueError(e.to_string()))?;
 
+    let request_has_pet_external_id = pet_form.pet_external_id.is_some();
+
+    if !(request_has_pet_external_id
+        || user_session.has_pet_balance() && user_session.user.can_access_service())
+    {
+        return Err(errors::UserError::NeedSubscription.into());
+    }
+
     api::pet::add_new_pet_to_user(
-        logged_user.id,
-        &logged_user.email,
+        api::pet::UserStateAddNewPet {
+            user_id: user_session.user.id,
+            user_email: user_session.user.email.to_string(),
+            pet_balance: user_session.add_pet_balance,
+        },
         pet_form,
         &app_state.repo,
         &app_state.storage_service,
@@ -214,19 +234,27 @@ async fn create_pet_request(
     .await
     .map_err(|e| errors::ServerError::InternalServerError(e.to_string()))?;
 
+    user_session.add_pet_balance -=
+        u32::from(!request_has_pet_external_id && user_session.add_pet_balance > 0);
+    user_session.user.is_subscribed = true;
+
+    identity.remember(serde_json::to_string(&user_session)?);
+
     utils::redirect_to("/pet")
 }
 
+/// Handles the request to delete a user's pet
+/// The user has to pay or acquire a Pet Info id tag previously
 #[web::delete("/delete/{pet_id}")]
 async fn delete_pet(
     _: middleware::logged_user::CheckUserCanAccessService,
     _: middleware::csrf_token::CsrfToken,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
     path: web::types::Path<(i64,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_id = path.0;
-    api::pet::delete_pet_and_its_info(pet_id, logged_user.id, &app_state.repo)
+    api::pet::delete_pet_and_its_info(pet_id, user.id, &app_state.repo)
         .await
         .map_err(|e| errors::ServerError::InternalServerError(e.to_string()))?;
 
@@ -235,48 +263,8 @@ async fn delete_pet(
         .body(""))
 }
 
-#[web::get("info/{pet_external_id}")]
-async fn get_pet_info_view(
-    app_state: web::types::State<AppState>,
-    path: web::types::Path<(Uuid,)>,
-) -> Result<impl web::Responder, web::Error> {
-    let pet_external_id = path.0;
-    let pet = api::pet::get_pet_public_info(pet_external_id, &app_state.repo)
-        .await
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!(
-                "at /pet/external_id endpoint pet info couldnt be retrieved: {}",
-                e
-            ))
-        })?;
-
-    let context = tera::Context::from_value(json!({
-        "pet": pet,
-        "owner_contacts": api::user::get_owner_contacts(0, Some(pet_external_id), &app_state.repo)
-        .await
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!(
-                "function get_owner_contacts raised an error: {}",
-                e
-            ))
-        })?
-    }))
-    .unwrap_or_default();
-
-    let content = templates::WEB_TEMPLATES
-        .render("pet_public_info.html", &context)
-        .map_err(|e| {
-            errors::ServerError::TemplateError(format!(
-                "at /pet/external_id endpoint the template couldnt be rendered: {}",
-                e
-            ))
-        })?;
-
-    Ok(web::HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(content))
-}
-
+/// Stream the qr pet info link public profile
+/// This handler builds the qr pet request
 #[web::get("qr_code/{pet_external_id}")]
 async fn get_profile_qr_code(
     _: middleware::logged_user::CheckUserCanAccessService,
@@ -284,9 +272,8 @@ async fn get_profile_qr_code(
 ) -> Result<impl web::Responder, web::Error> {
     let pet_external_id = path.0;
     let qr_code = super::utils::get_qr_code(format!(
-        "{protocol}://{url_host}/pet/info/{external_id}",
-        protocol = APP_CONFIG.wep_server_protocol(),
-        url_host = APP_CONFIG.url_host(),
+        "{base_url}/info/{external_id}",
+        base_url = APP_CONFIG.base_url(),
         external_id = pet_external_id
     ))
     .map_err(|e| {
@@ -307,19 +294,20 @@ struct WeightReport {
     pub fmt_age: String,
 }
 
+/// Builds and serve the pet's pdf report per each call
+/// received, based on the `pet_id`
 #[web::get("pdf_report/{pet_id}")]
 async fn get_pdf_report(
     _: middleware::logged_user::CheckUserCanAccessService,
     path: web::types::Path<(i64,)>,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let pet_full_info = api::pet::get_full_info(path.0, logged_user.id, &app_state.repo)
+    let pet_full_info = api::pet::get_full_info(path.0, user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "get_full_info could not be retrieved: {}",
-                e
+                "get_full_info could not be retrieved: {e}"
             ))
         })?;
 
@@ -336,7 +324,7 @@ async fn get_pdf_report(
                 "is_female": pet_full_info.pet.is_female,
                 "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
                 "pet_link": format!(
-                    "https://pet-info.link/pet/info/{external_id}",
+                    "https://pet-info.link/info/{external_id}",
                     external_id=pet_full_info.pet.external_id
                 ),
                 "vaccines": pet_full_info.vaccines,
@@ -352,15 +340,13 @@ async fn get_pdf_report(
         )
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /blog endpoint the template couldnt be rendered: {}",
-                e
+                "at /blog endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
     let content = api::pdf_handler::create_pdf_bytes_from_str(&content).map_err(|e| {
         errors::ServerError::TemplateError(format!(
-            "at /blog endpoint the template couldnt be rendered: {}",
-            e
+            "at /blog endpoint the template couldnt be rendered: {e}"
         ))
     })?;
 
@@ -371,6 +357,7 @@ async fn get_pdf_report(
         .streaming(body))
 }
 
+/// Serves the public pet image previously saved by its user
 #[web::get("public_pic/{pet_external_id}")]
 async fn get_pet_public_pic(
     path: web::types::Path<(Uuid,)>,
@@ -382,8 +369,7 @@ async fn get_pet_public_pic(
             .await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
-                    "pet_public_pic could not be generated: {}",
-                    e
+                    "pet_public_pic could not be generated: {e}"
                 ))
             })?;
 
@@ -398,22 +384,23 @@ async fn get_pet_public_pic(
     Ok(web::HttpResponse::NoContent().into())
 }
 
+/// Renders the form to edit a pet info data. If the field was
+/// filled previously, the form will be populated with that
 #[web::get("details/{pet_id}")]
 async fn get_pet_details_form(
     _: middleware::logged_user::CheckUserCanAccessService,
     _: middleware::csrf_token::CsrfToken,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
     path: web::types::Path<(i64,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_id = path.0;
     let context = tera::Context::from_value(json!({
-        "pet": api::pet::get_pet_user_to_edit(pet_id, logged_user.id,&app_state.repo)
+        "pet": api::pet::get_pet_user_to_edit(pet_id, user.id,&app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "at /pet/details/pet_id endpoint pet info [get_pet_user_to_edit] couldnt be retrieved: {}",
-                e
+                "at /pet/details/pet_id endpoint pet info [get_pet_user_to_edit] couldnt be retrieved: {e}"
             ))
         })?,
         "PIC_PET_MAX_SIZE_BYTES": consts::PIC_PET_MAX_SIZE_BYTES,
@@ -425,8 +412,7 @@ async fn get_pet_details_form(
         .render("pet_details.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet/details/pet_id endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet/details/pet_id endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
@@ -435,11 +421,12 @@ async fn get_pet_details_form(
         .body(content))
 }
 
+/// Handles the request from a pet form to edit a pet info data.
 #[web::post("details/{pet_id}")]
 async fn edit_pet_details(
     _: middleware::logged_user::CheckUserCanAccessService,
     _: middleware::csrf_token::CsrfToken,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
     payload: ntex_multipart::Multipart,
     path: web::types::Path<(i64,)>,
@@ -452,8 +439,8 @@ async fn edit_pet_details(
     };
 
     api::pet::update_pet_to_user(
-        logged_user.id,
-        &logged_user.email,
+        user.id,
+        &user.email,
         pet_form,
         &app_state.repo,
         &app_state.storage_service,

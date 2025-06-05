@@ -1,10 +1,11 @@
+//! Helper functions could be used in api/, front/, ...
+
 use crate::config;
 use sqlx::{
     SqlitePool,
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
-use std::str::FromStr;
-use std::sync::LazyLock;
+use std::{str::FromStr, sync::LazyLock};
 use totp_rs::{Algorithm, Secret, TOTP};
 
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
@@ -28,8 +29,10 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
     .await?)
 }
 
+/// Client to make http requests
 pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
+/// Time-based one time password  client
 pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
     TOTP::new(
         Algorithm::SHA512,

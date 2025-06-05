@@ -20,6 +20,7 @@ pub struct CreatePetForm {
     pub is_female: bool,
     pub about_pet: String,
     pub pet_pic: Option<PetPic>,
+    pub pet_external_id: Option<Uuid>,
 }
 
 impl From<CreatePetForm> for models::pet::Pet {

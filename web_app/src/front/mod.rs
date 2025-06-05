@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod blog;
 pub mod checkout;
 pub mod errors;
@@ -7,10 +8,12 @@ pub mod oauth;
 pub mod pet;
 pub mod pet_health;
 pub mod pet_note;
+pub mod pet_public;
 pub mod profile;
 pub mod reminder;
 pub mod routes;
 pub mod server;
+pub mod session;
 pub mod templates;
 pub mod utils;
 

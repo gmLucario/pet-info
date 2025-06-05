@@ -1,3 +1,7 @@
+//! # Front end Utils
+//!
+//! Here are functions needed in all the front end app
+
 use anyhow::bail;
 use chrono::NaiveDate;
 use chrono_tz::Tz;
@@ -43,6 +47,8 @@ pub async fn get_field_value(field: ntex_multipart::Field) -> String {
         .join("")
 }
 
+/// Extracts the 'timezone' header value from a [ntex::http::HeaderMap]
+/// to cast it into a [chrono_tz::Tz]
 pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::Result<Tz> {
     let user_timezone = request_headers
         .get("timezone")
@@ -55,7 +61,10 @@ pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::
     bail!("cant perse user time zone")
 }
 
-/// Human readable pet age
+/// Human-readable dates difference.
+/// It does not consider leap years. Months are taken as 30 days average
+/// The output format is: x years y month u days
+/// if x,y or u are zero, will be ignored
 pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> String {
     let (start_date, end_date) = if start_date <= end_date {
         (start_date, end_date)
@@ -114,4 +123,33 @@ pub fn filter_only_alphanumeric_chars(s: &str) -> String {
     s.chars()
         .filter(|c| c.is_alphanumeric())
         .collect::<String>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_valid_usertimezone() -> anyhow::Result<()> {
+        let vec = vec![("timezone", "America/Mexico_City"), ("Accept", "text/html")];
+        let map = ntex::http::HeaderMap::from_iter(vec);
+
+        let timezone = extract_usertimezone(&map)?;
+        assert_eq!(timezone, chrono_tz::America::Mexico_City);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_raise_error_due_invalid_usertimezone() {
+        let vec = vec![
+            ("timezone", "America/Mexico_Citie"),
+            ("Accept", "text/html"),
+        ];
+        let map = ntex::http::HeaderMap::from_iter(vec);
+
+        let timezone = extract_usertimezone(&map);
+
+        assert_eq!(timezone.is_err(), true);
+    }
 }

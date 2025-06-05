@@ -1,4 +1,5 @@
 use crate::{front, models, repo, services};
+use anyhow::bail;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use derive_more::Display;
 use serde::Serialize;
@@ -13,14 +14,35 @@ async fn update_or_create_pet(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    let pic_filename = pet_info.get_pet_pic_filename();
+    if let Some(external_id) = pet_info.pet_external_id {
+        let is_external_id_valid = repo
+            .is_pet_external_id_linked(&external_id)
+            .await?
+            .map(|is_linked| !is_linked)
+            .unwrap_or_else(|| false)
+            && insert;
 
+        if !is_external_id_valid {
+            bail!("invalid pet_external_id")
+        }
+    }
+
+    let pic_filename = pet_info.get_pet_pic_filename();
     let pet: models::pet::Pet = models::pet::Pet {
         user_app_id: user_id,
         pic: pet_info.get_pic_storage_path(user_email),
+        external_id: pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4),
         ..pet_info.clone().into()
     };
-    repo.save_or_update_pet(&pet, insert).await?;
+
+    if insert {
+        repo.save_pet(&pet).await?;
+
+        repo.set_user_as_subscribed(user_id).await?;
+    } else {
+        // update
+        repo.update_pet(&pet).await?;
+    }
 
     if let Some(pet_pic) = pet_info.pet_pic {
         storage_service
@@ -31,14 +53,36 @@ async fn update_or_create_pet(
     Ok(())
 }
 
+pub struct UserStateAddNewPet {
+    pub user_id: i64,
+    pub user_email: String,
+    pub pet_balance: u32,
+}
+
+/// Flow to add a new pet to a user
+/// Calling this function will reduce the user pet balance 1 unit value
 pub async fn add_new_pet_to_user(
-    user_id: i64,
-    user_email: &str,
+    user_state: UserStateAddNewPet,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    update_or_create_pet(user_id, user_email, true, pet_info, repo, storage_service).await
+    update_or_create_pet(
+        user_state.user_id,
+        &user_state.user_email,
+        true,
+        pet_info,
+        repo,
+        storage_service,
+    )
+    .await?;
+
+    if user_state.pet_balance > 0 {
+        repo.set_pet_balance(user_state.user_id, user_state.pet_balance - 1)
+            .await?;
+    }
+
+    Ok(())
 }
 
 pub async fn update_pet_to_user(
@@ -123,6 +167,7 @@ pub async fn get_pet_user_to_edit(
             body: vec![],
             filename_extension: path,
         }),
+        pet_external_id: Some(pet.external_id),
     })
 }
 
@@ -167,6 +212,20 @@ pub async fn get_pet_public_info(
 ) -> anyhow::Result<PetPublicInfoSchema> {
     let pet = repo.get_pet_by_external_id(pet_external_id).await?;
     Ok(pet.into())
+}
+
+pub async fn get_pet_external_id_metadata(
+    pet_external_id: &Uuid,
+    repo: &repo::ImplAppRepo,
+) -> anyhow::Result<Option<models::pet::ExternalIdMetadata>> {
+    if let Some(is_linked) = repo.is_pet_external_id_linked(pet_external_id).await? {
+        return Ok(Some(models::pet::ExternalIdMetadata {
+            external_id: *pet_external_id,
+            is_linked,
+        }));
+    }
+
+    Ok(None)
 }
 
 #[derive(Debug, Serialize, Default)]

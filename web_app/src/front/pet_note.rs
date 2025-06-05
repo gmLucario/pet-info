@@ -3,12 +3,12 @@ use serde_json::json;
 
 use crate::{
     api,
-    front::{AppState, errors, middleware, templates},
-    models,
+    front::{AppState, errors, middleware, session, templates},
 };
 
 use super::forms;
 
+/// Renders the notes of a pet view
 #[web::get("{pet_id}")]
 async fn get_pet_notes_view(
     middleware::logged_user::IsUserLoggedAndCanEdit(can_edit, user_id): middleware::logged_user::IsUserLoggedAndCanEdit,
@@ -23,8 +23,7 @@ async fn get_pet_notes_view(
             api::pet::get_pet_notes(user_id, pet_id, &app_state.repo).await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
-                    "function get_pet_notes raised an error: {}",
-                    e
+                    "function get_pet_notes raised an error: {e}"
                 ))
             })?
         } else {
@@ -37,8 +36,7 @@ async fn get_pet_notes_view(
         .render("pet_note.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 
@@ -47,10 +45,11 @@ async fn get_pet_notes_view(
         .body(content))
 }
 
+/// Handles the request to add a new note to a pet
 #[web::post("{pet_id}")]
 async fn new_pet_note(
     _: middleware::logged_user::CheckUserCanAccessService,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     params: web::types::Path<(i64,)>,
     form: web::types::Form<forms::pet::PetNoteForm>,
     app_state: web::types::State<AppState>,
@@ -62,12 +61,11 @@ async fn new_pet_note(
         body: ammonia::clean(&form.body),
     };
 
-    api::pet::add_new_note(logged_user.id, pet_id, form.into(), &app_state.repo)
+    api::pet::add_new_note(user.id, pet_id, form.into(), &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "function add_new_note raised an error: {}",
-                e
+                "function add_new_note raised an error: {e}"
             ))
         })?;
 
@@ -95,8 +93,7 @@ async fn get_pet_notes(
             api::pet::get_pet_notes(user_id, pet_id, &app_state.repo).await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
-                    "function get_pet_notes raised an error: {}",
-                    e
+                    "function get_pet_notes raised an error: {e}"
                 ))
             })?
         } else {
@@ -109,8 +106,7 @@ async fn get_pet_notes(
         .render("widgets/pet_notes.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /pet/note/<pet_id>/list endpoint the template couldnt be rendered: {}",
-                e
+                "at /pet/note/<pet_id>/list endpoint the template couldnt be rendered: {e}",
             ))
         })?;
 
@@ -119,19 +115,19 @@ async fn get_pet_notes(
         .body(content))
 }
 
+/// Handles the request to delete a pet note
 #[web::delete("{pet_id}/delete/{note_id}")]
 async fn delete_pet_note(
     _: middleware::logged_user::CheckUserCanAccessService,
-    logged_user: models::user_app::User,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     params: web::types::Path<(i64, i64)>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    api::pet::delete_note(params.1, params.0, logged_user.id, &app_state.repo)
+    api::pet::delete_note(params.1, params.0, user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "function delete_note raised an error: {}",
-                e
+                "function delete_note raised an error: {e}"
             ))
         })?;
 

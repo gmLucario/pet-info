@@ -93,8 +93,10 @@ async fn main() -> anyhow::Result<()> {
                 storage_service: Box::new(storage_service.clone()),
                 notification_service: Box::new(notification_service.clone()),
             })
+            // .configure(front::routes::auth)
+            .configure(front::routes::pet_public_profile)
             .configure(front::routes::pet)
-            .configure(front::routes::profile)
+            .configure(front::routes::user_profile)
             .configure(front::routes::checkout)
             .configure(front::routes::blog)
             .configure(front::routes::reminders)
@@ -102,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
                 ntex_files::Files::new("/static", "web/static/"),
                 front::server::serve_favicon,
                 front::server::index,
-                front::server::google_callback,
+                front::auth::google_callback,
                 front::server::get_reactivate_account_view,
                 front::server::reactivate_account,
             ))
