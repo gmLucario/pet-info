@@ -42,8 +42,7 @@ async fn get_blog_entry(
         .render("blog.html", &context)
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
-                "at /blog endpoint the template couldnt be rendered: {}",
-                e
+                "at /blog endpoint the template couldnt be rendered: {e}"
             ))
         })?;
 

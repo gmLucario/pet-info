@@ -29,9 +29,16 @@ CREATE TABLE IF NOT EXISTS user_sub_payment(
 );
 
 
+CREATE TABLE IF NOT EXISTS add_pet_balance(
+  id                      INTEGER PRIMARY KEY,
+  user_id                 INTEGER REFERENCES user_app(id) ON DELETE CASCADE,
+  balance                 INTEGER NOT NULL DEFAULT(0),
+  UNIQUE(user_id)
+);
+
+
 CREATE TABLE IF NOT EXISTS pet(
     id                      INTEGER PRIMARY KEY,
-    external_id             TEXT NOT NULL,
     user_app_id             INTEGER NOT NULL REFERENCES user_app(id) ON DELETE CASCADE,
     pet_name                TEXT NOT NULL,
     birthday                TEXT NOT NULL,
@@ -44,8 +51,22 @@ CREATE TABLE IF NOT EXISTS pet(
     created_at              TEXT NOT NULL DEFAULT (datetime('now','utc')),
     updated_at              TEXT NOT NULL DEFAULT (datetime('now','utc'))
 );
-CREATE INDEX IF NOT EXISTS idx_pet_external_id
-ON pet (external_id);
+
+
+CREATE TABLE IF NOT EXISTS pet_linked(
+  pet_id                  INTEGER REFERENCES pet(id) ON DELETE CASCADE,
+  id_pet_external_id      INTEGER REFERENCES pet_external_id(id) ON DELETE CASCADE,
+  UNIQUE(pet_id, id_pet_external_id)
+);
+
+
+CREATE TABLE IF NOT EXISTS pet_external_id(
+  id                      INTEGER PRIMARY KEY,
+  external_id             TEXT NOT NULL,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now','utc'))
+);
+CREATE INDEX IF NOT EXISTS idx_external_id_pet
+ON pet_external_id (external_id);
 
 
 CREATE TABLE IF NOT EXISTS pet_weight(

@@ -2,8 +2,6 @@ use chrono::{DateTime, Utc};
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::consts;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Display, Default)]
 pub enum AccountRole {
     #[serde(rename = "user")]
@@ -32,16 +30,7 @@ pub struct User {
 
 impl User {
     pub fn can_access_service(&self) -> bool {
-        self.end_free_trial()
-            .map(|end_free_trial| end_free_trial.date_naive() > Utc::now().date_naive())
-            .unwrap_or(self.is_subscribed && self.is_enabled)
-    }
-
-    pub fn end_free_trial(&self) -> Option<DateTime<Utc>> {
-        if !self.is_subscribed {
-            return Some(self.created_at + chrono::Duration::days(consts::DAYS_FREE_TRIAL));
-        }
-        None
+        self.is_subscribed && self.is_enabled
     }
 
     pub fn create_default_from_email(email: &str) -> Self {

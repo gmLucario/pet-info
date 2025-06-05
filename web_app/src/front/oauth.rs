@@ -1,6 +1,6 @@
 use oauth2::{
-    AuthUrl, Client, ClientId, ClientSecret, RedirectUrl, RevocationUrl, Scope,
-    StandardErrorResponse, TokenUrl, basic::BasicClient,
+    AuthUrl, Client, ClientId, ClientSecret, CsrfToken, RedirectUrl, ResponseType, RevocationUrl,
+    Scope, StandardErrorResponse, TokenUrl, basic::BasicClient,
 };
 use std::sync::LazyLock;
 
@@ -22,10 +22,29 @@ pub type GoogleOauthClient = Client<
     oauth2::EndpointSet,
 >;
 
+pub static GOOGLE_OAUTH: LazyLock<GoogleOauthClient> =
+    LazyLock::new(|| build_google_oauth_client().unwrap());
+
+pub fn get_new_auth_url() -> (oauth2::url::Url, oauth2::CsrfToken) {
+    GOOGLE_OAUTH
+        .authorize_url(CsrfToken::new_random)
+        .add_scopes(get_google_outh_scopes())
+        .set_response_type(&ResponseType::new("code".into()))
+        .url()
+}
+
 pub fn get_google_outh_scopes() -> Vec<Scope> {
     vec![Scope::new(
         "https://www.googleapis.com/auth/userinfo.email".into(),
     )]
+}
+
+fn build_redirect_url(redirect_url: &str) -> String {
+    format!(
+        "{base_path}/{redirect_url}",
+        base_path = APP_CONFIG.base_url(),
+        redirect_url = redirect_url,
+    )
 }
 
 fn build_google_oauth_client() -> anyhow::Result<GoogleOauthClient> {
@@ -38,16 +57,9 @@ fn build_google_oauth_client() -> anyhow::Result<GoogleOauthClient> {
             .set_token_uri(TokenUrl::new(
                 APP_CONFIG.google_oauth_token_uri.to_string(),
             )?)
-            .set_redirect_uri(RedirectUrl::new(format!(
-                "{}://{}/google_callback",
-                APP_CONFIG.wep_server_protocol(),
-                APP_CONFIG.url_host()
-            ))?)
+            .set_redirect_uri(RedirectUrl::new(build_redirect_url("google_callback"))?)
             .set_revocation_url(RevocationUrl::new(
                 consts::GOOGLE_ENDPOINT_REVOKE_TOKEN.to_string(),
             )?),
     )
 }
-
-pub static GOOGLE_OAUTH: LazyLock<GoogleOauthClient> =
-    LazyLock::new(|| build_google_oauth_client().unwrap());

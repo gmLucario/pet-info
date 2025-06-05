@@ -17,13 +17,7 @@ datos del perfil
     <ul><button class="outline secondary" hx-delete="/profile/close-session">Cerrar Sesión</button></ul>
 </nav>
 <article>
-    <header>Subscripcion: <mark>{% if end_free_trial %} Prueba {% else %} Premium {% endif %}</mark></header>
-    {% if end_free_trial %}
-    Su periodo de prueba termina: {{ end_free_trial | date(format="%d-%m-%Y") }} (<i>dd-mm-yyy</i>)
-    <footer>
-        <a href="/checkout" role="button" tabindex="0" style="width: 100%;">Subscribirse: ${{ service_price }} mxn</a>
-    </footer>
-    {% else %}
+    <header>Pagos</header>
     <table>
         <thead>
             <tr>
@@ -40,10 +34,6 @@ datos del perfil
             {% endfor %}
         </tbody>
     </table>
-    <footer style="text-align: center;">
-        Gracias por adquirir este producto
-    </footer>
-    {% endif %}
 </article>
 <article>
     <header>

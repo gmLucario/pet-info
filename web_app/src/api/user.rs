@@ -10,9 +10,16 @@ pub async fn get_or_create_app_user_by_email(
     }
 
     let mut user = models::user_app::User::create_default_from_email(email);
-    user.id = repo.save_user_app(&user).await?;
+    user.id = repo.insert_user_app(&user).await?;
 
     Ok(user)
+}
+
+pub async fn get_user_add_pet_balance(
+    repo: &repo::ImplAppRepo,
+    user_id: i64,
+) -> anyhow::Result<u32> {
+    repo.get_pet_balance(user_id).await
 }
 
 pub async fn get_owner_contacts(
@@ -73,7 +80,7 @@ pub async fn get_payments(
     user_app_id: i64,
     repo: &repo::ImplAppRepo,
 ) -> anyhow::Result<Vec<models::payment::Payment>> {
-    repo.get_user_payments(user_app_id).await
+    repo.get_user_payments(user_app_id, None).await
 }
 
 pub async fn delete_user_data(user_app_id: i64, repo: &repo::ImplAppRepo) -> anyhow::Result<()> {

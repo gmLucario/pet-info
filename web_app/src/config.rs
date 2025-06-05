@@ -7,6 +7,7 @@ use std::sync::LazyLock;
 /// the application
 #[derive(Envconfig, Clone)]
 pub struct AppConfig {
+    /// Environment name to deploy the app
     #[envconfig(default = "local")]
     pub env: String,
 
@@ -22,12 +23,16 @@ pub struct AppConfig {
     /// Port Host, which web app will be binded
     pub wep_server_port: u64,
 
+    /// Certificate key route path
     #[envconfig(default = "server.key")]
     pub private_key_path: String,
+    /// Certificate public route path
     #[envconfig(default = "server.crt")]
     pub certificate_path: String,
 
+    /// Cross-Site Request Forgery password
     pub csrf_pass: String,
+    /// Cross-Site Request Forgery password salt
     pub csrf_salt: String,
 
     pub mercado_pago_public_key: String,
@@ -80,6 +85,10 @@ impl AppConfig {
             return "https".into();
         }
         "http".into()
+    }
+
+    pub fn base_url(&self) -> String {
+        format!("{}://{}", self.wep_server_protocol(), self.url_host())
     }
 
     pub fn whatsapp_send_msg_endpoint(&self) -> String {

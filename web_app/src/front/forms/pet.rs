@@ -20,6 +20,7 @@ pub struct CreatePetForm {
     pub is_female: bool,
     pub about_pet: String,
     pub pet_pic: Option<PetPic>,
+    pub pet_external_id: Option<Uuid>,
 }
 
 impl From<CreatePetForm> for models::pet::Pet {
@@ -44,17 +45,15 @@ impl From<CreatePetForm> for models::pet::Pet {
 
 impl CreatePetForm {
     pub fn get_pet_pic_filename(&self) -> String {
-        utils::filter_only_alphanumeric_chars(&self.pet_full_name)
+        utils::filter_only_alphanumeric_chars(&self.pet_full_name).to_lowercase()
     }
 
     pub fn get_pic_storage_path(&self, user_email: &str) -> Option<String> {
         self.pet_pic.as_ref().map(|pic| {
-            format!(
-                "pics/{}/{}.{}",
-                user_email,
-                self.get_pet_pic_filename(),
-                pic.filename_extension
-            )
+            let pic_filename = self.get_pet_pic_filename();
+            let pic_extension = pic.filename_extension.to_string();
+
+            format!("pics/{user_email}/{pic_filename}.{pic_extension}").to_lowercase()
         })
     }
 }
