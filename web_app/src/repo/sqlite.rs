@@ -344,7 +344,7 @@ impl AppRepo for SqlxSqliteRepo {
         pet_external_id: Uuid,
     ) -> anyhow::Result<Option<String>> {
         Ok(
-            sqlx::query_scalar::<_, String>("SELECT p.pic FROM pet AS p WHERE p.external_id = $1;")
+            sqlx::query_scalar::<_, String>(sqlite_queries::QUERY_GET_PET_PUBLIC_PIC_BY_EXTERNAL_ID)
                 .bind(pet_external_id.to_string())
                 .fetch_optional(&self.db_pool)
                 .await?,

@@ -174,6 +174,14 @@ WHERE
 ORDER BY pw.created_at DESC;
 "#;
 
+pub const QUERY_GET_PET_PUBLIC_PIC_BY_EXTERNAL_ID: &str = r#"
+SELECT p.pic
+FROM pet AS p
+LEFT JOIN pet_linked AS plinked ON (p.id=plinked.pet_id)
+LEFT JOIN pet_external_id AS peid ON (peid.id=plinked.id_pet_external_id)
+WHERE peid.external_id = $1;
+"#;
+
 pub const QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_ID: &str = r#"
 SELECT 
     pw.id,pw.pet_id,pw.weight AS value,pw.created_at 
