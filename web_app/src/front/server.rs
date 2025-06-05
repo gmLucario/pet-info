@@ -18,11 +18,6 @@ async fn serve_favicon() -> Result<impl web::Responder, web::Error> {
     Ok(NamedFile::open("web/static/images/favicon.ico")?)
 }
 
-#[web::get("/rive/dog_hi.riv")]
-async fn serve_dog_hi() -> Result<impl web::Responder, web::Error> {
-    Ok(NamedFile::open("web/static/images/dog_hi.riv")?)
-}
-
 pub async fn serve_not_found() -> Result<web::HttpResponse, web::Error> {
     Err(errors::UserError::UrlNotFound.into())
 }
@@ -203,9 +198,5 @@ async fn google_callback(
         return utils::redirect_to("/reactivate-account");
     }
 
-    if user.can_access_service() {
-        return utils::redirect_to("/pet");
-    }
-
-    utils::redirect_to("/profile")
+    utils::redirect_to("/pet")
 }

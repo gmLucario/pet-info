@@ -61,6 +61,7 @@
             </fieldset>
         </fieldset>
         <div id="editor" style="font-size: 18px;"> </div>
+        {% if pet_external_id %} <input type="hidden" name="pet_external_id" value="{{pet_external_id}}"> {% endif %}
     </fieldset>
     <footer style="text-align: center;">
         <button>Guardar</button>

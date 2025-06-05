@@ -21,9 +21,9 @@
     <div class="grid" id="checkout">
         <article style="display: flex; align-items: center;">
             <hgroup>
-                <h2>Subscripcion a Pet-Info</h2>
+                <h2>Pago para registrar mascota en Pet-Info</h2>
                 <h5><i>Revisa y confirma tu compra</i></h5>
-                <p>Esta realizando la compra de una subscripcion Premium de <i>pet-info</i> por:</p>
+                <p>Esta realizando la compra para registrar una mascota en <i>pet-info</i> por:</p>
                 <p><b>Total:</b> <i><mark>${{service_price}}</mark></i></p>
             </hgroup>
         </article>
@@ -50,10 +50,13 @@
                             style: {
                                 theme: 'default', // 'default' | 'dark' | 'bootstrap' | 'flat'
                             },
+                            texts: {
+                                ctaReturnLabel: "Regresar a Pet-Info"
+                            }
                         },
                         backUrls: {
-                            'error': '{{back_error_url}}',
-                            'return': '{{back_error_url}}'
+                            'error': '{{back_url | safe}}',
+                            'return': '{{back_url | safe}}'
                         }
                     },
                     callbacks: {
@@ -85,7 +88,7 @@
                                 theme: 'flat',
                             },
                             texts: {
-                                formTitle: "Realizar pago subscripcion pet-info",
+                                formTitle: "Pago registro mascota en pet-info",
                             }
                         },
                         paymentMethods: {

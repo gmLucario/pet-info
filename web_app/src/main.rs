@@ -101,7 +101,6 @@ async fn main() -> anyhow::Result<()> {
             .service((
                 ntex_files::Files::new("/static", "web/static/"),
                 front::server::serve_favicon,
-                front::server::serve_dog_hi,
                 front::server::index,
                 front::server::google_callback,
                 front::server::get_reactivate_account_view,
