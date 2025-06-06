@@ -2,7 +2,8 @@ use chrono::{DateTime, Utc};
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Display, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Display, Clone, Default, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "varchar", rename_all = "lowercase")]
 pub enum ReminderNotificationType {
     #[default]
     #[display("whatsapp")]
@@ -10,7 +11,7 @@ pub enum ReminderNotificationType {
     WhatsApp,
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, sqlx::FromRow)]
 pub struct Reminder {
     pub id: i64,
     pub user_app_id: i64,

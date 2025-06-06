@@ -10,10 +10,6 @@ pub mod repo;
 pub mod services;
 pub mod utils;
 
-use std::str::FromStr;
-
-use anyhow::anyhow;
-use argon2::Argon2;
 use csrf::AesGcmCsrfProtection;
 use ntex::web;
 use ntex_cors::Cors;
@@ -21,7 +17,6 @@ use ntex_identity::{CookieIdentityPolicy, IdentityService};
 use ntex_session::CookieSession;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use rust_decimal::prelude::ToPrimitive;
-use uuid::Uuid;
 
 #[ntex::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,15 +27,6 @@ async fn main() -> anyhow::Result<()> {
     let sqlite_repo = repo::sqlite::SqlxSqliteRepo {
         db_pool: db_pool.clone(),
     };
-
-    let mut csrf_key = [0u8; 32];
-    Argon2::default()
-        .hash_password_into(
-            Uuid::from_str(&config::APP_CONFIG.csrf_pass)?.as_bytes(),
-            Uuid::from_str(&config::APP_CONFIG.csrf_salt)?.as_bytes(),
-            &mut csrf_key,
-        )
-        .map_err(|err| anyhow!("csrf_key couldn't be created: {}", err))?;
 
     let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .region(aws_config::Region::new("us-east-2"))
@@ -53,6 +39,9 @@ async fn main() -> anyhow::Result<()> {
     let notification_service = services::notification::NotificationHandler {
         client: aws_sdk_sfn::Client::new(&aws_config),
     };
+
+    let csrf_key =
+        utils::build_csrf_key(&config::APP_CONFIG.csrf_pass, &config::APP_CONFIG.csrf_salt)?;
 
     let server = web::server(move || {
         web::App::new()
@@ -93,7 +82,6 @@ async fn main() -> anyhow::Result<()> {
                 storage_service: Box::new(storage_service.clone()),
                 notification_service: Box::new(notification_service.clone()),
             })
-            // .configure(front::routes::auth)
             .configure(front::routes::pet_public_profile)
             .configure(front::routes::pet)
             .configure(front::routes::user_profile)

@@ -108,7 +108,7 @@ async fn add_health_record(
 ) -> Result<impl web::Responder, web::Error> {
     let form = forms::pet::HealthRecordForm {
         value: ammonia::clean(&form.value),
-        ..form.0
+        date: form.date,
     };
 
     let desc = form.value.to_string();
@@ -135,7 +135,7 @@ async fn add_health_record(
     Ok(web::HttpResponse::Created()
         .set_header("HX-Trigger", "healthRecordUpdated")
         .content_type("text/html; charset=utf-8")
-        .body(""))
+        .finish())
 }
 
 #[derive(serde::Deserialize)]
@@ -171,5 +171,5 @@ async fn delete_health_record(
     Ok(web::HttpResponse::Created()
         .set_header("HX-Trigger", "healthRecordUpdated")
         .content_type("text/html; charset=utf-8")
-        .body(""))
+        .finish())
 }

@@ -71,7 +71,7 @@ async fn new_pet_note(
 
     Ok(web::HttpResponse::Created()
         .set_header("HX-Trigger", "petNoteRecordUpdated")
-        .body(""))
+        .finish())
 }
 
 #[web::get("{pet_id}/list")]
@@ -83,7 +83,7 @@ async fn get_pet_notes(
     if !can_edit {
         return Ok(web::HttpResponse::PaymentRequired()
             .content_type("text/html; charset=utf-8")
-            .body(""));
+            .finish());
     }
 
     let pet_id = params.0;
@@ -133,5 +133,5 @@ async fn delete_pet_note(
 
     Ok(web::HttpResponse::Ok()
         .set_header("HX-Trigger", "petNoteRecordUpdated")
-        .body(""))
+        .finish())
 }

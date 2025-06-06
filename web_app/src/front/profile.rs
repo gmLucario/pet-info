@@ -69,7 +69,7 @@ async fn add_new_owner_contact(
     };
 
     if !form_request.fields_are_valid() {
-        return Ok(web::HttpResponse::BadRequest().body(""));
+        return Ok(web::HttpResponse::BadRequest().finish());
     }
 
     api::user::add_owner_contact(user.id, &form_request, &app_state.repo)
@@ -82,7 +82,7 @@ async fn add_new_owner_contact(
 
     Ok(web::HttpResponse::Created()
         .set_header("HX-Trigger", "ownerContactRecordUpdated")
-        .body(""))
+        .finish())
 }
 
 #[web::get("contact")]
@@ -139,7 +139,7 @@ async fn delete_owner_contact(
 
     Ok(web::HttpResponse::Ok()
         .set_header("HX-Trigger", "ownerContactRecordUpdated")
-        .body(""))
+        .finish())
 }
 
 /// Deletes all data filled by the user app
@@ -181,5 +181,5 @@ async fn close_session(
 
     Ok(web::HttpResponse::Ok()
         .set_header("HX-Redirect", "/")
-        .body(""))
+        .finish())
 }

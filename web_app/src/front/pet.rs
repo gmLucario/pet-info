@@ -260,7 +260,7 @@ async fn delete_pet(
 
     Ok(web::HttpResponse::Ok()
         .set_header("HX-Trigger", "petRecordUpdated")
-        .body(""))
+        .finish())
 }
 
 /// Stream the qr pet info link public profile

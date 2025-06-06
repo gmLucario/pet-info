@@ -1,12 +1,15 @@
 //! Helper functions could be used in api/, front/, ...
 
 use crate::config;
+use anyhow::anyhow;
+use argon2::Argon2;
 use sqlx::{
     SqlitePool,
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
 use std::{str::FromStr, sync::LazyLock};
 use totp_rs::{Algorithm, Secret, TOTP};
+use uuid::Uuid;
 
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
     if encrypted {
@@ -27,6 +30,19 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
         SqliteConnectOptions::from_str(&config::APP_CONFIG.db_host)?.pragma("foreign_keys", "ON"),
     )
     .await?)
+}
+
+pub fn build_csrf_key(pwd: &str, salt: &str) -> anyhow::Result<[u8; 32]> {
+    let mut csrf_key = [0u8; 32];
+    Argon2::default()
+        .hash_password_into(
+            Uuid::from_str(pwd)?.as_bytes(),
+            Uuid::from_str(salt)?.as_bytes(),
+            &mut csrf_key,
+        )
+        .map_err(|err| anyhow!("csrf_key couldn't be created: {}", err))?;
+
+    Ok(csrf_key)
 }
 
 /// Client to make http requests

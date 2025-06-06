@@ -29,7 +29,7 @@ impl crate::services::StorageService for StorageHandler {
     }
 
     async fn get_pic_as_bytes(&self, file_name: &str) -> anyhow::Result<Vec<u8>> {
-        let mut object = self
+        let object = self
             .client
             .get_object()
             .bucket(consts::S3_MAIN_BUCKET_NAME)
@@ -37,12 +37,12 @@ impl crate::services::StorageService for StorageHandler {
             .send()
             .await?;
 
-        let mut body: Vec<u8> = vec![];
-
-        while let Ok(Some(bytes)) = object.body.try_next().await {
-            body.extend_from_slice(&bytes.into_iter().collect::<Vec<u8>>());
-        }
-
-        Ok(body)
+        Ok(object
+            .body
+            .collect()
+            .await
+            .map(|package| package.into_bytes())?
+            .into_iter()
+            .collect::<Vec<u8>>())
     }
 }

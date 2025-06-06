@@ -57,6 +57,26 @@ impl FromRow<'_, SqliteRow> for models::payment::Payment {
     }
 }
 
+impl FromRow<'_, SqliteRow> for models::user_app::User {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        let account_role = serde_json::from_value(serde_json::Value::String(
+            row.try_get::<String, &str>("account_role")?,
+        ))
+        .unwrap_or_default();
+
+        Ok(models::user_app::User {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            phone_reminder: row.try_get("phone_reminder")?,
+            account_role,
+            is_subscribed: row.try_get("is_subscribed")?,
+            is_enabled: row.try_get("is_enabled")?,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
+    }
+}
+
 #[async_trait]
 impl AppRepo for SqlxSqliteRepo {
     async fn remove_user_app_data(&self, user_id: i64) -> anyhow::Result<()> {
@@ -83,23 +103,8 @@ impl AppRepo for SqlxSqliteRepo {
         &self,
         email: &str,
     ) -> anyhow::Result<Option<models::user_app::User>> {
-        Ok(sqlx::query(sqlite_queries::QUERY_GET_USER_APP_BY_EMAIL)
+        Ok(sqlx::query_as(sqlite_queries::QUERY_GET_USER_APP_BY_EMAIL)
             .bind(email)
-            .map(|row: sqlx::sqlite::SqliteRow| models::user_app::User {
-                id: row.try_get("id").unwrap_or(-1),
-                email: row.try_get("email").unwrap_or_default(),
-                phone_reminder: row.try_get("phone_reminder").unwrap_or_default(),
-                account_role: serde_json::from_str::<models::user_app::AccountRole>(&format!(
-                    "\"{}\"",
-                    row.try_get::<String, &str>("account_role")
-                        .unwrap_or_default()
-                ))
-                .unwrap_or_default(),
-                is_subscribed: row.try_get("is_subscribed").unwrap_or_default(),
-                is_enabled: row.try_get("is_enabled").unwrap_or(true),
-                created_at: row.try_get("created_at").unwrap_or_default(),
-                updated_at: row.try_get("updated_at").unwrap_or_default(),
-            })
             .fetch_optional(&self.db_pool)
             .await?)
     }
@@ -344,10 +349,12 @@ impl AppRepo for SqlxSqliteRepo {
         pet_external_id: Uuid,
     ) -> anyhow::Result<Option<String>> {
         Ok(
-            sqlx::query_scalar::<_, String>(sqlite_queries::QUERY_GET_PET_PUBLIC_PIC_BY_EXTERNAL_ID)
-                .bind(pet_external_id.to_string())
-                .fetch_optional(&self.db_pool)
-                .await?,
+            sqlx::query_scalar::<_, String>(
+                sqlite_queries::QUERY_GET_PET_PUBLIC_PIC_BY_EXTERNAL_ID,
+            )
+            .bind(pet_external_id.to_string())
+            .fetch_optional(&self.db_pool)
+            .await?,
         )
     }
 
@@ -639,25 +646,13 @@ impl AppRepo for SqlxSqliteRepo {
         &self,
         user_id: i64,
     ) -> anyhow::Result<Vec<models::reminder::Reminder>> {
-        Ok(sqlx::query(sqlite_queries::QUERY_GET_USER_ACTIVE_REMINDERS)
-            .bind(user_id)
-            .bind(Utc::now())
-            .map(|row: sqlx::sqlite::SqliteRow| models::reminder::Reminder {
-                id: row.try_get("id").unwrap_or(-1),
-                user_app_id: row.try_get("user_app_id").unwrap_or_default(),
-                body: row.try_get("body").unwrap_or_default(),
-                execution_id: row.try_get("execution_id").unwrap_or_default(),
-                notification_type:
-                    serde_json::from_str::<models::reminder::ReminderNotificationType>(
-                        row.try_get("notification_type").unwrap_or_default(),
-                    )
-                    .unwrap_or_default(),
-                send_at: row.try_get("send_at").unwrap_or_default(),
-                user_timezone: row.try_get("user_timezone").unwrap_or_default(),
-                created_at: row.try_get("created_at").unwrap_or_default(),
-            })
-            .fetch_all(&self.db_pool)
-            .await?)
+        Ok(
+            sqlx::query_as(sqlite_queries::QUERY_GET_USER_ACTIVE_REMINDERS)
+                .bind(user_id)
+                .bind(Utc::now())
+                .fetch_all(&self.db_pool)
+                .await?,
+        )
     }
 
     async fn get_reminder_execution_id(

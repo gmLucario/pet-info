@@ -7,7 +7,5 @@ pub fn setup_simple_logger() -> anyhow::Result<()> {
         .add_filter_allow_str("pet_info")
         .build();
 
-    SimpleLogger::init(LevelFilter::Info, logger_config)?;
-
-    Ok(())
+    Ok(SimpleLogger::init(LevelFilter::Info, logger_config)?)
 }

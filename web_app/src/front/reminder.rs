@@ -230,7 +230,7 @@ async fn delete_reminder(
 
     Ok(web::HttpResponse::Ok()
         .set_header("HX-Trigger", "reminderRecordUpdated")
-        .body(""))
+        .finish())
 }
 
 /// Handles the request to create a reminder
@@ -249,7 +249,7 @@ async fn create_reminder(
     if user.phone_reminder.is_none() {
         return Ok(web::HttpResponse::BadRequest()
             .content_type("text/html; charset=utf-8")
-            .body(""));
+            .finish());
     }
 
     if let Some(user_dt) = form.when.and_local_timezone(user_timezone).single() {
@@ -274,5 +274,5 @@ async fn create_reminder(
     Ok(web::HttpResponse::Created()
         .content_type("text/html; charset=utf-8")
         .set_header("HX-Trigger", "reminderRecordUpdated")
-        .body(""))
+        .finish())
 }
