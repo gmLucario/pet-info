@@ -10,7 +10,22 @@ datos de tu mascota
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/quill.snow.css" />
-<script src="/static/js/quill.js"></script>
+<link rel="stylesheet" href="/static/css/cropper.min.css" />
+<style>
+    .cropper-view-box {
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px #39f;
+        outline: 0;
+    }
+
+    .cropper-face {
+        border-radius: 50%;
+    }
+
+    .img-container.image-loaded {
+        height: 50vh;
+    }
+</style>
 {% endblock extra_css %}
 
 {% block mid_nav_content %}
@@ -21,7 +36,44 @@ datos de tu mascota
 {% endblock content %}
 
 {% block extra_js %}
+<script src="/static/js/cropper.min.js"></script>
+<script src="/static/js/quill.js"></script>
 <script>
+    let cropper;
+    const previewPhoto = () => {
+
+        const file = input.files;
+        if (!file) return;
+
+        const fileReader = new FileReader();
+        const preview = document.getElementById('pet-pic-preview');
+
+        fileReader.onload = function (event) {
+            preview.setAttribute('src', event.target.result);
+        }
+
+        preview.onload = function () {
+            document.querySelector('.img-container').classList.add('image-loaded');
+            if (cropper) {
+                cropper.destroy();
+            }
+
+            cropper = new Cropper(preview, {
+                aspectRatio: 1,
+                viewMode: 1,
+                guides: true,
+                autoCropArea: 0.8,
+                responsive: true,
+                restore: false
+            });
+        }        
+
+        fileReader.readAsDataURL(file[0]);
+    }
+
+    const input = document.getElementById('pet-pic-input');
+    input.addEventListener("change", previewPhoto);
+
     const quill = new Quill('#editor', {
         theme: 'snow',
         modules: {
@@ -39,6 +91,16 @@ datos de tu mascota
 
     form.addEventListener('formdata', (event) => {
         event.formData.append('about_pet', quill.root.innerHTML);
+
+        if (cropper) {
+            const cropData = cropper.getData();
+
+            event.formData.append('cropper_box', JSON.stringify({
+                "x": Math.round(cropData.x + (cropData.width / 2)),
+                "y": Math.round(cropData.y + (cropData.height / 2)),
+                "diameter": Math.round(cropData.width),
+            }));
+        }
     });
 </script>
 {% endblock extra_js %}

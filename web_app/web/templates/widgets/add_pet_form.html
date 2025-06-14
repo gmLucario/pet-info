@@ -1,6 +1,32 @@
 <form {% if pet %} action="/pet/details/{{pet.id}}" {% else %} action="/pet/new" {% endif %} method="post"
     enctype="multipart/form-data">
     <fieldset>
+        <article>
+            <header>Foto</header>
+            <div class="grid">
+                <section class="img-container">
+                    <img src="" id="pet-pic-preview">
+                </section>                
+                <label>
+                    <input 
+                        type="file"
+                        accept="image/{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=', image/') }}"
+                        name="pet_pic"
+                        id="pet-pic-input"
+                        aria-describedby="pet-pic-helper">
+                    <small id="pet-pic-helper">
+                        <ul>
+                            <li>el tamaño de la imagen debe ser menor a {{ PIC_PET_MAX_SIZE_BYTES | filesizeformat }}</li>
+                            <li>extensiones validas: <i>{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=", ") }}.</i></li>
+                            <li>selecciona el área deseada</li>
+                            {% if pet.pet_pic %}
+                            <li>Reemplazará: <small><code>{{ pet.pet_pic.filename_extension }}</code></small></li>
+                            {% endif %}
+                        </ul>
+                    </small>
+                </label>
+            </div>
+        </article>
         {% if pet %}
         <fieldset class="grid">
             <label>
@@ -8,17 +34,7 @@
                 Perdida
             </label>
         </fieldset>
-        {% endif %}
-        <label>
-            Foto {% if pet.pet_pic %} actual: <small><code>{{ pet.pet_pic.filename_extension }}</code></small> {% endif %}
-            <input type="file" accept="image/{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=', image/') }}" name="pet_pic" aria-describedby="pet-pic-helper">
-            <small id="pet-pic-helper">
-                <ul>
-                    <li>el tamaño de la imagen debe ser menor a {{ PIC_PET_MAX_SIZE_BYTES | filesizeformat }}</li>
-                    <li>extensiones validas: <i>{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=", ") }}.</i></li>
-                </ul>
-            </small>
-        </label>
+        {% endif %}        
         <label>
             Nombre
             <input 
