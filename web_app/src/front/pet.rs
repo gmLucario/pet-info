@@ -53,7 +53,9 @@ fn get_filename_extension(content_disposition: &str) -> anyhow::Result<String> {
 async fn deserialize_pet_form(
     mut payload: ntex_multipart::Multipart,
 ) -> anyhow::Result<super::forms::pet::CreatePetForm> {
-    let mut form = super::forms::pet::CreatePetForm::default();
+    let mut form = forms::pet::CreatePetForm::default();
+    let mut cropper_box: Option<forms::pet::CropperBox> = None;
+    let mut pet_pic: Option<forms::pet::Pic> = None;
 
     while let Ok(Some(field)) = payload.try_next().await {
         let headers = field.headers();
@@ -73,7 +75,7 @@ async fn deserialize_pet_form(
                 )
             }
 
-            form.pet_pic = Some(super::forms::pet::PetPic {
+            pet_pic = Some(forms::pet::Pic {
                 filename_extension: get_filename_extension(&content_disposition)?,
                 body,
             });
@@ -99,7 +101,21 @@ async fn deserialize_pet_form(
             form.about_pet = field_value;
         } else if content_disposition.contains("pet_external_id") {
             form.pet_external_id = Some(Uuid::from_str(&field_value).unwrap_or(Uuid::new_v4()));
+        } else if content_disposition.contains("cropper_box") {
+            cropper_box = serde_json::from_str(&field_value)?;
         }
+    }
+
+    if let (Some(cropper_box), Some(pet_pic)) = (cropper_box, pet_pic) {
+        form.pet_pic = Some(forms::pet::PetPic {
+            filename_extension: pet_pic.filename_extension.to_string(),
+            body: utils::crop_circle(
+                &pet_pic,
+                cropper_box.x,
+                cropper_box.y,
+                cropper_box.diameter,
+            )?,
+        })
     }
 
     Ok(form)

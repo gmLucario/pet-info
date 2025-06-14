@@ -4,6 +4,19 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct CropperBox {
+    pub x: u32,
+    pub y: u32,
+    pub diameter: u32,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct Pic {
+    pub body: Vec<u8>,
+    pub filename_extension: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct PetPic {
     pub body: Vec<u8>,
     pub filename_extension: String,
