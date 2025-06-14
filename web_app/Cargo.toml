@@ -13,6 +13,7 @@ ntex-session = { version = "2.0.0", features = [] }
 tera = { version = "1.20.0", default-features = false, features = [ "builtins" ]}
 oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
 fast_qr = { version = "0.12.7", features = ["image"]}
+image = { version = "0.25.5"}
 pulldown-cmark = "0.12.2"
 ammonia = "4.1.0"
 totp-rs = "5.7.0"
@@ -49,7 +50,7 @@ futures = "0.3.31"
 simplelog = "0.12.2"
 log = "0.4.27"
 aws-config = { version = "1.6.3", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.90.0"
-aws-sdk-sfn = "1.75.0"
+aws-sdk-s3 = "1.91.0"
+aws-sdk-sfn = "1.76.0"
 chrono-tz = "0.10.3"
 
