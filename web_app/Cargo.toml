@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 # Front Web dependencies:
-ntex = { version = "2.12.4", features = [ "tokio", "compress", "openssl" ] }
+ntex = { version = "2.13.2", features = [ "tokio", "compress", "openssl" ] }
 ntex-files = "2.0.0"
 ntex-multipart = "2.0.0"
 ntex-identity = "2.0.0"
@@ -13,7 +13,8 @@ ntex-session = { version = "2.0.0", features = [] }
 tera = { version = "1.20.0", default-features = false, features = [ "builtins" ]}
 oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
 fast_qr = { version = "0.12.7", features = ["image"]}
-image = { version = "0.25.5"}
+# pinning image cause fast_qr is using a specific version
+image = { version = "=0.25.5"}
 pulldown-cmark = "0.12.2"
 ammonia = "4.1.0"
 totp-rs = "5.7.0"
@@ -32,10 +33,14 @@ libsqlite3-sys = { version = "=0.30.1", optional = false, default-features = fal
 sqlx = { version = "=0.8.6", default-features = false, features = [ "runtime-tokio", "tls-native-tls" , "sqlite", "derive", "chrono", "uuid"] }
 csrf = "0.5.0"
 argon2 = "0.5.3"
-reqwest = { version = "0.12.19", features = ["json"] }
+reqwest = { version = "0.12.20", features = ["json"] }
 rust_decimal = { version = "1.37",  features = ["serde-with-float"] }
 rust_decimal_macros = "1.37"
 envconfig = "0.11.0"
+# Logfire to instrument Rust code.
+logfire = "0.5.0"
+tracing = "0.1.41"
+opentelemetry = "0.29.1"
 
 # Tools app
 derive_more = { version = "2.0.1", features = ["display", "error"] }
@@ -49,8 +54,8 @@ base64 = "0.22.1"
 futures = "0.3.31"
 simplelog = "0.12.2"
 log = "0.4.27"
-aws-config = { version = "1.6.3", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.91.0"
-aws-sdk-sfn = "1.76.0"
+aws-config = { version = "1.8.0", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.93.0"
+aws-sdk-sfn = "1.77.0"
 chrono-tz = "0.10.3"
 
