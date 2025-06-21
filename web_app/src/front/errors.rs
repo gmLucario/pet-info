@@ -14,7 +14,6 @@ pub enum UserError {
 impl web::error::WebResponseError for UserError {
     fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
         let mut context = tera::Context::new();
-        error!("{:#?}", self);
 
         let template_name = match self {
             UserError::UrlNotFound => {
@@ -81,7 +80,7 @@ impl ServerError {
 
 impl web::error::WebResponseError for ServerError {
     fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
-        error!("{}", self.get_error_message());
+        logfire::error!("error={error}", error = self.get_error_message());
 
         let template_name = match self {
             // will be a success status code cause it htmx should render something

@@ -1,10 +1,9 @@
 use anyhow::bail;
 use chrono::Utc;
-use log::error;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crate::{config, models, repo, utils};
+use crate::{config, metric, models, repo, utils};
 
 #[derive(Debug)]
 pub struct PaymentSubsRequest {
@@ -32,6 +31,8 @@ pub async fn create_subscription(
     payment_request: PaymentSubsRequest,
     pet_balance: u32,
 ) -> anyhow::Result<(usize, bool)> {
+    let _span = logfire::span!("create_subscription").entered();
+
     let payment_idempotency_h = Uuid::new_v4().to_string();
     let response = utils::REQUEST_CLIENT
         .post("https://api.mercadopago.com/v1/payments")
@@ -45,7 +46,15 @@ pub async fn create_subscription(
         .unwrap();
 
     if !response.status().is_success() {
-        error!("{:#?}", response.json::<serde_json::Value>().await);
+        logfire::error!(
+            "mp_response={mp_response}",
+            mp_response = response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap_or_default()
+                .to_string()
+        );
+
         bail!("mercado pago api is returning an error");
     }
 
@@ -72,5 +81,6 @@ pub async fn create_subscription(
     repo.set_pet_balance(subs_payment.user_id, pet_balance + u32::from(is_subscribed))
         .await?;
 
+    metric::incr_payment_status_statds(&subs_payment.status.to_string().to_lowercase());
     Ok((subs_payment.mp_paym_id, is_subscribed))
 }
