@@ -14,6 +14,8 @@ async fn update_or_create_pet(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
+    let _span = logfire::span!("update_or_create_pet").entered();
+
     if let Some(external_id) = pet_info.pet_external_id {
         let is_external_id_valid = repo
             .is_pet_external_id_linked(&external_id)

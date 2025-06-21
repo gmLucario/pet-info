@@ -1,4 +1,4 @@
-use crate::{models, repo};
+use crate::{metric, models, repo};
 use uuid::Uuid;
 
 pub async fn get_or_create_app_user_by_email(
@@ -12,6 +12,7 @@ pub async fn get_or_create_app_user_by_email(
     let mut user = models::user_app::User::create_default_from_email(email);
     user.id = repo.insert_user_app(&user).await?;
 
+    metric::incr_user_action_statds("create_user");
     Ok(user)
 }
 

@@ -1,8 +1,7 @@
-use crate::{config, models, repo, services, utils};
+use crate::{config, metric, models, repo, services, utils};
 use anyhow::bail;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use log::error;
 use serde_json::json;
 
 pub async fn send_verification(phone_number: &str) -> anyhow::Result<()> {
@@ -48,7 +47,7 @@ pub async fn send_verification(phone_number: &str) -> anyhow::Result<()> {
             .await
             .unwrap_or_default();
 
-        error!("{response:#?}");
+        logfire::error!("response={response}", response = response.to_string());
     }
 
     bail!("error sending otp to phone number")
@@ -87,13 +86,16 @@ pub async fn schedule_reminder(
     repo: &repo::ImplAppRepo,
     notification_service: &services::ImplNotificationService,
 ) -> anyhow::Result<()> {
+    let execution_id = notification_service
+        .send_reminder_to_phone_number(&reminder_info)
+        .await?;
+    metric::incr_reminder_action_statds("schedule");
+
     let reminder = models::reminder::Reminder {
         id: 0,
         user_app_id: reminder_info.user_id,
         body: reminder_info.body.to_string(),
-        execution_id: notification_service
-            .send_reminder_to_phone_number(&reminder_info)
-            .await?,
+        execution_id,
         notification_type: models::reminder::ReminderNotificationType::WhatsApp,
         user_timezone: reminder_info.when.timezone().name().to_string(),
         send_at: reminder_info.when.to_utc(),
@@ -122,6 +124,8 @@ pub async fn delete_reminder(
         notification_service
             .cancel_reminder_to_phone_number(&execution_id)
             .await?;
+
+        metric::incr_reminder_action_statds("cancel");
     }
 
     repo.delete_user_reminder(reminder_id, user_id).await

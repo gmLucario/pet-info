@@ -5,12 +5,14 @@ pub mod config;
 pub mod consts;
 pub mod front;
 pub mod logger;
+pub mod metric;
 pub mod models;
 pub mod repo;
 pub mod services;
 pub mod utils;
 
 use csrf::AesGcmCsrfProtection;
+use logfire::config::MetricsOptions;
 use ntex::web;
 use ntex_cors::Cors;
 use ntex_identity::{CookieIdentityPolicy, IdentityService};
@@ -20,7 +22,11 @@ use rust_decimal::prelude::ToPrimitive;
 
 #[ntex::main]
 async fn main() -> anyhow::Result<()> {
-    logger::setup_simple_logger()?;
+    let shutdown_handler = logfire::configure()
+        .install_panic_handler()
+        .with_metrics(Some(MetricsOptions::default()))
+        .send_to_logfire(logfire::config::SendToLogfire::Yes)
+        .finish()?;
 
     let db_pool = utils::setup_sqlite_db_pool(config::APP_CONFIG.is_prod()).await?;
 
@@ -117,5 +123,9 @@ async fn main() -> anyhow::Result<()> {
         server.bind(server_addr)
     };
 
-    Ok(server?.run().await?)
+    server?.run().await?;
+
+    shutdown_handler.shutdown()?;
+
+    Ok(())
 }

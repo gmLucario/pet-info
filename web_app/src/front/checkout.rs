@@ -60,6 +60,8 @@ async fn process_payment(
     request_body: web::types::Json<forms::payment::CardFormData>,
     identity: Identity,
 ) -> Result<impl web::Responder, web::Error> {
+    let _span = logfire::span!("process_payment").entered();
+
     let (mp_paym_id, is_subscribed) = api::payment::create_subscription(
         &app_state.repo,
         api::payment::PaymentSubsRequest {

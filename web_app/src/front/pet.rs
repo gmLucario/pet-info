@@ -53,6 +53,8 @@ fn get_filename_extension(content_disposition: &str) -> anyhow::Result<String> {
 async fn deserialize_pet_form(
     mut payload: ntex_multipart::Multipart,
 ) -> anyhow::Result<super::forms::pet::CreatePetForm> {
+    let _span = logfire::span!("deserialize_pet_form").entered();
+
     let mut form = forms::pet::CreatePetForm::default();
     let mut cropper_box: Option<forms::pet::CropperBox> = None;
     let mut pet_pic: Option<forms::pet::Pic> = None;
@@ -109,12 +111,7 @@ async fn deserialize_pet_form(
     if let (Some(cropper_box), Some(pet_pic)) = (cropper_box, pet_pic) {
         form.pet_pic = Some(forms::pet::PetPic {
             filename_extension: pet_pic.filename_extension.to_string(),
-            body: utils::crop_circle(
-                &pet_pic,
-                cropper_box.x,
-                cropper_box.y,
-                cropper_box.diameter,
-            )?,
+            body: utils::crop_circle(&pet_pic, cropper_box.x, cropper_box.y, cropper_box.diameter)?,
         })
     }
 
@@ -225,6 +222,8 @@ async fn create_pet_request(
     payload: ntex_multipart::Multipart,
     identity: ntex_identity::Identity,
 ) -> Result<impl web::Responder, web::Error> {
+    let _span = logfire::span!("create_pet_request").entered();
+
     let pet_form = deserialize_pet_form(payload)
         .await
         .map_err(|e| errors::UserError::FormInputValueError(e.to_string()))?;
@@ -447,6 +446,8 @@ async fn edit_pet_details(
     payload: ntex_multipart::Multipart,
     path: web::types::Path<(i64,)>,
 ) -> Result<impl web::Responder, web::Error> {
+    let _span = logfire::span!("edit_pet_details").entered();
+
     let pet_form = forms::pet::CreatePetForm {
         id: path.0,
         ..deserialize_pet_form(payload)
