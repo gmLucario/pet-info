@@ -184,6 +184,7 @@ pub struct PetPublicInfoSchema {
     pub is_spaying_neutering: bool,
     pub is_lost: bool,
     pub about_pet: String,
+    pub has_pic: bool,
 }
 
 impl From<models::pet::Pet> for PetPublicInfoSchema {
@@ -195,6 +196,7 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
+            has_pic: val.pic.is_some(),
             pet_breed: val.breed,
             last_weight: val.last_weight,
             fmt_age: front::utils::fmt_dates_difference(
