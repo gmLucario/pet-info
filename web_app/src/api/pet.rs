@@ -1,3 +1,9 @@
+//! # Pet API Module
+//!
+//! This module contains all pet-related business logic including pet management,
+//! health records, profiles, and public information handling. It serves as the
+//! core domain logic for pet operations in the application.
+
 use crate::{front, models, repo, services};
 use anyhow::bail;
 use chrono::{NaiveDate, NaiveDateTime, Utc};
@@ -6,6 +12,35 @@ use serde::Serialize;
 use std::path::Path;
 use uuid::Uuid;
 
+/// Updates an existing pet or creates a new one based on the insert flag.
+///
+/// This internal function handles both pet creation and updates with a unified
+/// interface. It validates external IDs, processes pet information, and manages
+/// file uploads for pet pictures.
+///
+/// # Arguments
+/// * `user_id` - ID of the user who owns the pet
+/// * `user_email` - Email of the user (used for file storage paths)
+/// * `insert` - True for creation, false for update
+/// * `pet_info` - Pet form data including all pet details
+/// * `repo` - Repository instance for database operations
+/// * `storage_service` - Service for handling file uploads
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
+///
+/// # Process
+/// 1. Validate external ID if provided (for creation only)
+/// 2. Convert form data to pet model
+/// 3. Insert or update pet in database
+/// 4. Handle pet picture upload if provided
+/// 5. Update user subscription status if creating
+///
+/// # Errors
+/// Returns an error if:
+/// - External ID validation fails
+/// - Database operations fail
+/// - File upload fails
 async fn update_or_create_pet(
     user_id: i64,
     user_email: &str,
@@ -55,14 +90,42 @@ async fn update_or_create_pet(
     Ok(())
 }
 
+/// State information required for adding a new pet to a user.
+///
+/// Contains user context and balance information needed to process
+/// new pet creation, including balance verification and deduction.
 pub struct UserStateAddNewPet {
+    /// ID of the user adding the pet
     pub user_id: i64,
+    /// Email address of the user (used for file storage paths)
     pub user_email: String,
+    /// Current pet balance available for creating new pets
     pub pet_balance: u32,
 }
 
-/// Flow to add a new pet to a user
-/// Calling this function will reduce the user pet balance 1 unit value
+/// Adds a new pet to a user's account and decrements their pet balance.
+///
+/// This is the main flow for pet creation that handles both the pet creation
+/// process and balance management. It ensures the user has sufficient balance
+/// and decrements it by 1 upon successful pet creation.
+///
+/// # Arguments
+/// * `user_state` - User context and balance information
+/// * `pet_info` - Pet form data with all pet details
+/// * `repo` - Repository instance for database operations
+/// * `storage_service` - Service for handling file uploads
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
+///
+/// # Process
+/// 1. Create the pet using the internal update_or_create_pet function
+/// 2. Decrement user's pet balance by 1 if balance is available
+///
+/// # Errors
+/// Returns an error if:
+/// - Pet creation fails (validation, database, file upload)
+/// - Balance update fails
 pub async fn add_new_pet_to_user(
     user_state: UserStateAddNewPet,
     pet_info: front::forms::pet::CreatePetForm,
@@ -87,6 +150,20 @@ pub async fn add_new_pet_to_user(
     Ok(())
 }
 
+/// Updates an existing pet's information.
+///
+/// Modifies pet details without affecting the user's pet balance.
+/// This function handles pet updates including picture changes.
+///
+/// # Arguments
+/// * `user_id` - ID of the user who owns the pet
+/// * `user_email` - Email of the user (used for file storage paths)
+/// * `pet_info` - Updated pet form data
+/// * `repo` - Repository instance for database operations
+/// * `storage_service` - Service for handling file uploads
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn update_pet_to_user(
     user_id: i64,
     user_email: &str,
@@ -97,6 +174,10 @@ pub async fn update_pet_to_user(
     update_or_create_pet(user_id, user_email, false, pet_info, repo, storage_service).await
 }
 
+/// Pet sex/gender enumeration.
+///
+/// Represents the biological sex of a pet with appropriate serialization
+/// for Spanish language display and male/female display formats.
 #[derive(Debug, Display, Default, Serialize)]
 pub enum Sex {
     #[serde(rename(serialize = "macho"))]
@@ -108,16 +189,30 @@ pub enum Sex {
     Female,
 }
 
+/// Schema for displaying pets in a list format.
+///
+/// Contains essential pet information optimized for list views,
+/// including formatted age and basic identification details.
 #[derive(Debug, Serialize)]
 pub struct PetListSchema {
+    /// Internal pet database ID
     pub id: i64,
+    /// Public UUID for external references
     pub external_id: Uuid,
+    /// Pet's name
     pub name: String,
+    /// Pet's breed
     pub breed: String,
+    /// Pet's biological sex
     pub sex: Sex,
+    /// Human-readable formatted age string
     pub fmt_age: String,
 }
 
+/// Converts a Pet model to PetListSchema for display.
+///
+/// Transforms database pet data into a format suitable for list views,
+/// including age calculation and sex conversion.
 impl From<models::pet::Pet> for PetListSchema {
     fn from(val: models::pet::Pet) -> Self {
         PetListSchema {
@@ -137,6 +232,17 @@ impl From<models::pet::Pet> for PetListSchema {
     }
 }
 
+/// Retrieves all pets belonging to a user in list format.
+///
+/// Gets all pets owned by the specified user and converts them
+/// to PetListSchema format for display in pet lists.
+///
+/// # Arguments
+/// * `user_id` - ID of the user to get pets for
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<Vec<PetListSchema>>` - List of pets in display format
 pub async fn get_user_pets_cards(
     user_id: i64,
     repo: &repo::ImplAppRepo,
@@ -149,6 +255,18 @@ pub async fn get_user_pets_cards(
         .collect())
 }
 
+/// Retrieves pet data formatted for editing forms.
+///
+/// Gets a specific pet owned by the user and converts it to
+/// form format suitable for editing interfaces.
+///
+/// # Arguments
+/// * `pet_id` - ID of the pet to retrieve
+/// * `user_id` - ID of the user who owns the pet
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<front::forms::pet::CreatePetForm>` - Pet data in form format
 pub async fn get_pet_user_to_edit(
     pet_id: i64,
     user_id: i64,
@@ -173,20 +291,38 @@ pub async fn get_pet_user_to_edit(
     })
 }
 
+/// Schema for displaying pet information on public profiles.
+///
+/// Contains comprehensive pet information suitable for public viewing,
+/// including health status and contact-enabling details.
 #[derive(Debug, Serialize)]
 pub struct PetPublicInfoSchema {
+    /// Public UUID as string for external references
     pub external_id: String,
+    /// Pet's name
     pub name: String,
+    /// Pet's biological sex
     pub sex: Sex,
+    /// Pet's breed information
     pub pet_breed: String,
+    /// Most recent weight record if available
     pub last_weight: Option<f64>,
+    /// Human-readable formatted age string
     pub fmt_age: String,
+    /// Whether the pet is spayed/neutered
     pub is_spaying_neutering: bool,
+    /// Whether the pet is currently lost
     pub is_lost: bool,
+    /// Description and additional information about the pet
     pub about_pet: String,
+    /// Whether the pet has a picture available
     pub has_pic: bool,
 }
 
+/// Converts a Pet model to PetPublicInfoSchema for public display.
+///
+/// Transforms database pet data into a format suitable for public
+/// viewing, including all relevant information for found pet scenarios.
 impl From<models::pet::Pet> for PetPublicInfoSchema {
     fn from(val: models::pet::Pet) -> Self {
         PetPublicInfoSchema {
@@ -210,6 +346,17 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
     }
 }
 
+/// Retrieves public pet information by external ID.
+///
+/// Gets pet data using the public external ID and formats it
+/// for public display. Used for QR code scanning and public access.
+///
+/// # Arguments
+/// * `pet_external_id` - Public UUID of the pet
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<PetPublicInfoSchema>` - Pet information for public display
 pub async fn get_pet_public_info(
     pet_external_id: Uuid,
     repo: &repo::ImplAppRepo,
@@ -218,6 +365,17 @@ pub async fn get_pet_public_info(
     Ok(pet.into())
 }
 
+/// Retrieves metadata about a pet's external ID.
+///
+/// Checks if an external ID exists and whether it's linked to a pet.
+/// Used for validation during pet creation and external ID verification.
+///
+/// # Arguments
+/// * `pet_external_id` - External UUID to check
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<Option<models::pet::ExternalIdMetadata>>` - Metadata if ID exists
 pub async fn get_pet_external_id_metadata(
     pet_external_id: &Uuid,
     repo: &repo::ImplAppRepo,
@@ -232,12 +390,30 @@ pub async fn get_pet_external_id_metadata(
     Ok(None)
 }
 
+/// Structure for pet picture data with file extension.
+///
+/// Contains the raw image bytes and file extension information
+/// for serving pet pictures in public contexts.
 #[derive(Debug, Serialize, Default)]
 pub struct PetPublicPic {
+    /// Raw image file bytes
     pub body: Vec<u8>,
+    /// File extension (jpg, png, etc.)
     pub extension: String,
 }
 
+/// Retrieves a pet's picture for public display.
+///
+/// Gets the pet's picture file from storage using the external ID.
+/// Returns the image bytes and file extension for serving to clients.
+///
+/// # Arguments
+/// * `pet_external_id` - Public UUID of the pet
+/// * `repo` - Repository instance for database operations
+/// * `storage_service` - Service for file retrieval
+///
+/// # Returns
+/// * `anyhow::Result<Option<PetPublicPic>>` - Picture data if available
 pub async fn get_public_pic(
     pet_external_id: Uuid,
     repo: &repo::ImplAppRepo,
@@ -264,13 +440,23 @@ pub async fn get_public_pic(
     Ok(None)
 }
 
+/// Unified structure for pet health records.
+///
+/// Represents health records (weight, vaccines, deworms) in a consistent
+/// format for display and API responses.
 #[derive(Default, serde::Serialize, Debug)]
 pub struct PetHealthRecord {
+    /// Record ID for deletion and updates
     pub id: i64,
+    /// Record value (weight amount, vaccine name, etc.)
     pub value: String,
+    /// Date when the record was created
     pub date: NaiveDateTime,
 }
 
+/// Converts a PetWeight model to PetHealthRecord.
+///
+/// Formats weight values to 2 decimal places for consistent display.
 impl From<models::pet::PetWeight> for PetHealthRecord {
     fn from(val: models::pet::PetWeight) -> Self {
         PetHealthRecord {
@@ -281,6 +467,9 @@ impl From<models::pet::PetWeight> for PetHealthRecord {
     }
 }
 
+/// Converts a PetHealth model to PetHealthRecord.
+///
+/// Used for vaccine and deworming records.
 impl From<models::pet::PetHealth> for PetHealthRecord {
     fn from(val: models::pet::PetHealth) -> Self {
         PetHealthRecord {
@@ -291,6 +480,19 @@ impl From<models::pet::PetHealth> for PetHealthRecord {
     }
 }
 
+/// Retrieves health records for a pet by type.
+///
+/// Gets specific types of health records (weight, vaccine, deworm)
+/// for a pet, with optional user ownership verification.
+///
+/// # Arguments
+/// * `pet_external_id` - Public UUID of the pet
+/// * `health_record` - Type of health record to retrieve
+/// * `user_id` - Optional user ID for ownership verification
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<Vec<PetHealthRecord>>` - List of health records
 pub async fn get_pet_health_records(
     pet_external_id: Uuid,
     health_record: &models::pet::PetHealthType,
@@ -313,6 +515,18 @@ pub async fn get_pet_health_records(
     }
 }
 
+/// Deletes a pet and all associated information.
+///
+/// Removes the pet and all related data (health records, notes, etc.)
+/// from the database. This operation is irreversible.
+///
+/// # Arguments
+/// * `pet_id` - ID of the pet to delete
+/// * `user_id` - ID of the user who owns the pet
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn delete_pet_and_its_info(
     pet_id: i64,
     user_id: i64,
@@ -322,6 +536,21 @@ pub async fn delete_pet_and_its_info(
     Ok(())
 }
 
+/// Adds a new health record to a pet.
+///
+/// Creates a new health record (weight, vaccine, or deworm) for the specified
+/// pet with the provided information and date.
+///
+/// # Arguments
+/// * `pet_external_id` - Public UUID of the pet
+/// * `health_record` - Type of health record to create
+/// * `user_id` - ID of the user who owns the pet
+/// * `desc` - Record description/value (weight amount, vaccine name, etc.)
+/// * `date` - Date for the health record
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<PetHealthRecord>` - The created health record
 pub async fn insert_pet_health_record(
     pet_external_id: Uuid,
     health_record: &models::pet::PetHealthType,
@@ -351,6 +580,20 @@ pub async fn insert_pet_health_record(
     }
 }
 
+/// Deletes a specific health record from a pet.
+///
+/// Removes a health record (weight, vaccine, or deworm) from the pet's
+/// health history. Requires ownership verification.
+///
+/// # Arguments
+/// * `record_id` - ID of the health record to delete
+/// * `pet_external_id` - Public UUID of the pet
+/// * `user_id` - ID of the user who owns the pet
+/// * `health_record` - Type of health record being deleted
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn delete_pet_health_record(
     record_id: i64,
     pet_external_id: Uuid,
@@ -371,6 +614,18 @@ pub async fn delete_pet_health_record(
     }
 }
 
+/// Retrieves all notes for a specific pet.
+///
+/// Gets all user-created notes associated with the pet.
+/// Notes are private to the pet owner.
+///
+/// # Arguments
+/// * `user_id` - ID of the user who owns the pet
+/// * `pet_id` - ID of the pet to get notes for
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<Vec<models::pet::PetNote>>` - List of pet notes
 pub async fn get_pet_notes(
     user_id: i64,
     pet_id: i64,
@@ -379,11 +634,19 @@ pub async fn get_pet_notes(
     repo.get_pet_notes(user_id, pet_id).await
 }
 
+/// Information for creating a new pet note.
+///
+/// Contains the title and content for a new note to be added to a pet.
 pub struct PetNoteInfo {
+    /// Title of the note
     pub title: String,
+    /// Main content/body of the note
     pub body: String,
 }
 
+/// Converts a PetNoteForm to PetNoteInfo.
+///
+/// Transforms form data into the structure needed for note creation.
 impl From<front::forms::pet::PetNoteForm> for PetNoteInfo {
     fn from(val: front::forms::pet::PetNoteForm) -> Self {
         PetNoteInfo {
@@ -393,6 +656,19 @@ impl From<front::forms::pet::PetNoteForm> for PetNoteInfo {
     }
 }
 
+/// Adds a new note to a pet.
+///
+/// Creates a new note with the provided title and content,
+/// associating it with the specified pet and user.
+///
+/// # Arguments
+/// * `user_id` - ID of the user creating the note
+/// * `pet_id` - ID of the pet to add the note to
+/// * `note_info` - Note title and content
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn add_new_note(
     user_id: i64,
     pet_id: i64,
@@ -414,6 +690,19 @@ pub async fn add_new_note(
     Ok(())
 }
 
+/// Deletes a specific note from a pet.
+///
+/// Removes a note from the pet's note collection. Requires ownership
+/// verification to ensure only the pet owner can delete notes.
+///
+/// # Arguments
+/// * `note_id` - ID of the note to delete
+/// * `pet_id` - ID of the pet the note belongs to
+/// * `user_id` - ID of the user who owns the pet
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn delete_note(
     note_id: i64,
     pet_id: i64,
@@ -424,14 +713,35 @@ pub async fn delete_note(
     Ok(())
 }
 
+/// Complete pet information including all related data.
+///
+/// Aggregates all pet-related information including the pet details,
+/// health records, and notes for comprehensive display or export.
 pub struct PetFullInfo {
+    /// Core pet information
     pub pet: models::pet::Pet,
+    /// All vaccine records for the pet
     pub vaccines: Vec<models::pet::PetHealth>,
+    /// All deworming records for the pet
     pub deworms: Vec<models::pet::PetHealth>,
+    /// All weight records for the pet
     pub weights: Vec<models::pet::PetWeight>,
+    /// All notes associated with the pet
     pub notes: Vec<models::pet::PetNote>,
 }
 
+/// Retrieves complete pet information with all related data.
+///
+/// Gets the pet details along with all health records, notes, and other
+/// associated information for comprehensive display or data export.
+///
+/// # Arguments
+/// * `pet_id` - ID of the pet to get information for
+/// * `user_id` - ID of the user who owns the pet
+/// * `repo` - Repository instance for database operations
+///
+/// # Returns
+/// * `anyhow::Result<PetFullInfo>` - Complete pet information structure
 pub async fn get_full_info(
     pet_id: i64,
     user_id: i64,
