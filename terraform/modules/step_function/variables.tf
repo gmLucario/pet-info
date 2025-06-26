@@ -3,14 +3,12 @@ variable "step_function_name" {
   description = "step function name"
 }
 
-variable "aws_lambda_arn" {
-  type        = string
-  description = "lambda arn step function will trigger"
-  sensitive   = true
+variable "policy_document" {
+  type        = any
+  description = "IAM policy document object (will be JSON encoded)"
 }
 
-variable "account_id" {
-  type        = string
-  sensitive   = true
-  description = "AWS Account ID number"
+variable "step_function_definition" {
+  type        = any
+  description = "document defining the step function steps (will be JSON encoded)"
 }
