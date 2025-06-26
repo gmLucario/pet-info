@@ -13,7 +13,7 @@ resource "aws_instance" "app_instance" {
   ami                  = data.aws_ami.amazon_arm.id
   instance_type        = "t4g.small"
   key_name             = aws_key_pair.web_app_key.key_name
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  iam_instance_profile = var.instance_profile_name
   availability_zone    = aws_ebs_volume.db.availability_zone
 
   vpc_security_group_ids      = [aws_security_group.web_app_sg.id]
@@ -56,33 +56,6 @@ resource "aws_eip_association" "ip_ec2" {
   instance_id   = aws_instance.app_instance.id
   allocation_id = aws_eip.this.id
 }
-
-resource "aws_iam_role" "ec2_app_role" {
-  name = "${var.ec2_name}-app-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    "Statement" : [{
-      "Action" : "sts:AssumeRole",
-      "Principal" : {
-        "Service" : "ec2.amazonaws.com"
-      },
-      "Effect" : "Allow",
-      "Sid" : ""
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "policy_attachment" {
-  role       = aws_iam_role.ec2_app_role.name
-  policy_arn = var.ec2_policy_arn
-}
-
-resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "${var.ec2_name}-profile"
-  role = aws_iam_role.ec2_app_role.name
-}
-
 
 resource "aws_security_group" "web_app_sg" {
   name        = "${var.ec2_name}-security-group"
