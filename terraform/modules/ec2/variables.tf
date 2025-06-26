@@ -3,10 +3,9 @@ variable "ec2_name" {
   description = "name ec2 instance"
 }
 
-variable "ec2_policy_arn" {
+variable "instance_profile_name" {
   type        = string
-  description = "policy ec2 to allow instance to perform action"
-  sensitive   = true
+  description = "IAM instance profile name for EC2 instance"
 }
 
 variable "availability_zone" {
