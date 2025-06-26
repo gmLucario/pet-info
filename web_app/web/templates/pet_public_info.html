@@ -54,6 +54,16 @@ perfil de ...
 
     <hr />
 
+    <!-- Add to Apple Wallet Button (iOS Only) -->
+    <div id="apple-wallet-container" style="display: none; text-align: center; margin: 20px 0;">
+        <a href="/pet/{{pet.external_id}}/ios-pass" 
+           style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            📱 Add to Apple Wallet
+        </a>
+    </div>
+
+    <hr />
+
     <details>
         <summary>Salud</summary>
         <fieldset style="text-align: center;">
@@ -72,3 +82,28 @@ perfil de ...
 </article>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+// iOS Detection and Apple Wallet Button Display
+(function() {
+    'use strict';
+    
+    // Detect iOS devices
+    function isIOS() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        
+        // Check for iOS
+        return /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    }
+    
+    // Show Apple Wallet button only on iOS devices
+    if (isIOS()) {
+        const walletContainer = document.getElementById('apple-wallet-container');
+        if (walletContainer) {
+            walletContainer.style.display = 'block';
+        }
+    }
+})();
+</script>
+{% endblock extra_js %}
