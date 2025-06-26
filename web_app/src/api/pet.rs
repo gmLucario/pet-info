@@ -316,7 +316,7 @@ pub struct PetPublicInfoSchema {
     /// Description and additional information about the pet
     pub about_pet: String,
     /// Whether the pet has a picture available
-    pub has_pic: bool,
+    pub pic: Option<String>,
 }
 
 /// Converts a Pet model to PetPublicInfoSchema for public display.
@@ -332,7 +332,7 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
-            has_pic: val.pic.is_some(),
+            pic: val.pic,
             pet_breed: val.breed,
             last_weight: val.last_weight,
             fmt_age: front::utils::fmt_dates_difference(
@@ -432,7 +432,7 @@ pub async fn get_public_pic(
             extension: pic_path
                 .extension()
                 .and_then(|p| p.to_str())
-                .unwrap_or("jpg")
+                .unwrap_or("png")
                 .to_string(),
         }));
     }
