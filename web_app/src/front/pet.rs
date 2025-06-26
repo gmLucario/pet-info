@@ -286,12 +286,12 @@ async fn get_profile_qr_code(
     path: web::types::Path<(Uuid,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_external_id = path.0;
-    let qr_code = super::utils::get_qr_code(format!(
+    let url = format!(
         "{base_url}/info/{external_id}",
         base_url = APP_CONFIG.base_url(),
         external_id = pet_external_id
-    ))
-    .map_err(|e| {
+    );
+    let qr_code = super::utils::get_qr_code(&url).map_err(|e| {
         errors::ServerError::InternalServerError(format!("qr_code could not be generated: {}", e))
     })?;
 
@@ -397,6 +397,42 @@ async fn get_pet_public_pic(
     }
 
     Ok(web::HttpResponse::NoContent().into())
+}
+
+/// Downloads Apple Wallet pass for a pet's public information.
+///
+/// Generates and serves a .pkpass file that can be added to iOS Wallet.
+/// The pass contains essential pet information for quick access.
+#[web::get("pass/{pet_external_id}")]
+async fn download_pet_pass(
+    path: web::types::Path<(Uuid,)>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let pet_external_id = path.0;
+
+    // Get pet public information
+    let pet_info = api::pet::get_pet_public_info(pet_external_id, &app_state.repo)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("Failed to get pet info: {e}"))
+        })?;
+
+    // Generate the pass
+    let pass_data = api::passes::generate_pet_pass(&pet_info, &app_state.storage_service)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("Failed to generate pass: {e}"))
+        })?;
+
+    let body = once(ok::<_, web::Error>(Bytes::from_iter(&pass_data)));
+
+    Ok(web::HttpResponse::Ok()
+        .content_type("application/vnd.apple.pkpass")
+        .set_header(
+            "Content-Disposition",
+            "attachment; filename=\"pet_info.pkpass\"",
+        )
+        .streaming(body))
 }
 
 /// Renders the form to edit a pet info data. If the field was
