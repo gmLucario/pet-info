@@ -12,7 +12,7 @@ perfil de ...
 {% endblock mid_nav_content %}
 
 {% block extra_css %}
-{% if pet.has_pic %}
+{% if pet.pic %}
 <style>
     img {
         height: 30vh;
@@ -23,7 +23,7 @@ perfil de ...
 
 {% block content %}
 <div style="text-align:center;">
-    {% if pet.has_pic %}
+    {% if pet.pic %}
     <img src="/pet/public_pic/{{pet.external_id}}"/>
     {% endif %}
     <h4 style="margin-top:var(--pico-typography-spacing-vertical);">
