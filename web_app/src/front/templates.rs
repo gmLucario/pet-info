@@ -6,3 +6,5 @@ pub static WEB_TEMPLATES: LazyLock<Tera> =
 
 pub static PDF_REPORT_TEMPLATES: LazyLock<Tera> =
     LazyLock::new(|| Tera::new("web/reports/**/*.typ").unwrap());
+
+pub static BLOG_TEMPLATES: LazyLock<Tera> = LazyLock::new(|| Tera::new("web/blog/*.md").unwrap());
