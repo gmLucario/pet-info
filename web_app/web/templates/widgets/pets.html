@@ -37,9 +37,10 @@
             <li><a href="/pet/note/{{pet.id}}">nota(s)</a></li>
         </ul>
 
-        <footer>
-            {% set delete_url = "/pet/delete/" ~ pet.id %}
-            {% include "widgets/trash_icon.html" %}
+        <footer style="text-align: center;">
+            <button class="outline contrast">
+                <a href="/pet/pass/{{pet.external_id}}" >📱 Agregar a Wallet</a>
+            </button>
         </footer>
     </article>
     {% endfor %}

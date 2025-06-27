@@ -5,7 +5,7 @@
 //! with full iOS 18.5 compatibility.
 //!
 //! ## Overview
-//! 
+//!
 //! Apple Wallet passes are digital cards that can be stored in the iOS Wallet app.
 //! This module generates `.pkpass` files containing pet information that can be:
 //! - Downloaded and added to iOS Wallet
@@ -26,7 +26,7 @@
 //!
 //! Passes are cryptographically signed using:
 //! - Apple Developer Pass Type ID Certificate (`pass_certificate.pem`)
-//! - Private key (`pass_private_key.pem`) 
+//! - Private key (`pass_private_key.pem`)
 //! - Apple WWDR G4 intermediate certificate (included automatically)
 //!
 //! ## iOS 18.5 Compatibility
@@ -44,32 +44,32 @@ use passes::{Package, resource, sign};
 use std::{io::Cursor, path::Path};
 
 /// Configuration constants for Apple Wallet passes
-/// 
+///
 /// These constants define the core configuration for generating Apple Wallet passes.
 /// They must match the values configured in your Apple Developer account.
 mod pass_config {
     /// The pass type identifier registered with Apple Developer Program.
     /// Must match the Pass Type ID created in your Apple Developer account.
     pub const PASS_TYPE_IDENTIFIER: &str = "pass.com.petinfo.link";
-    
+
     /// Your Apple Developer Team ID.
     /// Found in your Apple Developer account under Membership details.
     pub const TEAM_IDENTIFIER: &str = "S89P27T8CF";
-    
+
     /// Organization name displayed on the pass.
     pub const ORGANIZATION_NAME: &str = "Pet Info";
-    
+
     /// Path to the Apple Developer Pass Type ID certificate file.
     /// This certificate is downloaded from Apple Developer Portal.
     pub const CERT_PATH: &str = "pass_certificate.pem";
-    
+
     /// Path to the private key file corresponding to the certificate.
     /// Generated during certificate creation process.
     pub const KEY_PATH: &str = "pass_private_key.pem";
-    
+
     /// Path to the default pass icon (PNG format, recommended 29x29pt).
     pub const ICON_PATH: &str = "pass_icon.png";
-    
+
     /// ISO 8601 date format required by Apple Wallet.
     pub const DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 
@@ -78,7 +78,7 @@ mod pass_config {
     pub const FOREGROUND_COLOR: &str = "rgb(255, 255, 255)";
     /// Background color for the pass
     pub const BACKGROUND_COLOR: &str = "rgb(60, 60, 60)";
-    /// Label text color 
+    /// Label text color
     pub const LABEL_COLOR: &str = "rgb(255, 255, 255)";
 }
 
@@ -293,7 +293,6 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
     package.add_certificates(sign_config);
     Ok(package)
 }
-
 
 /// Adds visual resources to the pass package.
 ///

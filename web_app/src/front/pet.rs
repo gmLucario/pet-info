@@ -405,6 +405,7 @@ async fn get_pet_public_pic(
 /// The pass contains essential pet information for quick access.
 #[web::get("pass/{pet_external_id}")]
 async fn download_pet_pass(
+    _: middleware::logged_user::CheckUserCanAccessService,
     path: web::types::Path<(Uuid,)>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
