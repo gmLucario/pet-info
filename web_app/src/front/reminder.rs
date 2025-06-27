@@ -137,7 +137,7 @@ async fn verify_reminder_phone(
     }))
     .unwrap_or_default();
 
-    if api::reminder::validate_otp(&form.otp_value).await {
+    if api::reminder::validate_otp(&form.otp_value) {
         if let Ok(Some(phone_number)) = cookie.get::<String>(consts::OTP_PHONE_COOKIE_NAME) {
             if api::reminder::add_verified_phone_to_user(
                 user_session.user.id,

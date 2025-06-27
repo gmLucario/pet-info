@@ -69,7 +69,7 @@ async fn get_bytes_as_str(
     x: Result<ntex::util::Bytes, ntex_multipart::MultipartError>,
 ) -> Option<String> {
     if let Ok(bytes) = x {
-        return std::str::from_utf8(&bytes).ok().map(String::from)
+        return std::str::from_utf8(&bytes).ok().map(String::from);
     }
 
     None
@@ -126,11 +126,11 @@ pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::
     let header_value = request_headers
         .get("timezone")
         .context("Missing 'timezone' header")?;
-    
+
     let timezone_str = header_value
         .to_str()
         .context("Invalid UTF-8 in timezone header")?;
-    
+
     timezone_str
         .parse::<Tz>()
         .with_context(|| format!("Invalid timezone: '{}'", timezone_str))
@@ -142,6 +142,7 @@ pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::
 /// representation in Spanish. The calculation uses approximate values:
 /// - 365 days per year (leap years not considered)
 /// - 30 days per month (average month length)
+///
 /// Optimized to minimize string allocations and use const values.
 ///
 /// # Arguments
@@ -165,9 +166,9 @@ pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::
 pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> String {
     const DAYS_PER_YEAR: i64 = 365;
     const DAYS_PER_MONTH: i64 = 30;
-    
+
     let num_days = end_date.signed_duration_since(start_date).abs().num_days();
-    
+
     if num_days < 1 {
         return "0 días".to_string();
     }
@@ -178,19 +179,19 @@ pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> Strin
     let days = remaining_days % DAYS_PER_MONTH;
 
     let mut parts = Vec::with_capacity(3);
-    
+
     if years > 0 {
         parts.push(format!("{} años", years));
     }
-    
+
     if months > 0 {
         parts.push(format!("{} meses", months));
     }
-    
+
     if days > 0 {
         parts.push(format!("{} días", days));
     }
-    
+
     if parts.is_empty() {
         "0 días".to_string()
     } else {
@@ -245,10 +246,8 @@ pub fn get_qr_code(info_url: &str) -> anyhow::Result<Vec<u8>> {
     const QR_WIDTH: u32 = 600;
     const BACKGROUND_COLOR: &str = "#ffffff";
     const MODULE_COLOR: &str = "#000000";
-    
-    let qr_code = QRBuilder::new(info_url.as_bytes())
-        .ecl(ECL::H)
-        .build()?;
+
+    let qr_code = QRBuilder::new(info_url.as_bytes()).ecl(ECL::H).build()?;
 
     Ok(ImageBuilder::default()
         .shape(Shape::Square)
@@ -278,9 +277,7 @@ pub fn get_qr_code(info_url: &str) -> anyhow::Result<Vec<u8>> {
 /// ```
 pub fn filter_only_alphanumeric_chars(s: &str) -> String {
     // Direct collection is more efficient than intermediate Vec
-    s.chars()
-        .filter(|c| c.is_alphanumeric())
-        .collect()
+    s.chars().filter(|c| c.is_alphanumeric()).collect()
 }
 
 /// Crops an image into a circular shape with optimized performance.
@@ -416,7 +413,10 @@ mod tests {
         assert_eq!(response.headers().get("location").unwrap(), "/login");
 
         let response = redirect_to("https://example.com").unwrap();
-        assert_eq!(response.headers().get("location").unwrap(), "https://example.com");
+        assert_eq!(
+            response.headers().get("location").unwrap(),
+            "https://example.com"
+        );
     }
 
     /// Tests date difference formatting with various scenarios.
@@ -460,7 +460,7 @@ mod tests {
     fn test_get_utc_now_with_default_time() {
         let dt = get_utc_now_with_default_time();
         assert_eq!(dt.time(), chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        
+
         // Should be today's date
         let today = chrono::Utc::now().date_naive();
         assert_eq!(dt.date_naive(), today);
@@ -472,15 +472,16 @@ mod tests {
         // Test with simple URL
         let result = get_qr_code("https://example.com");
         assert!(result.is_ok());
-        
+
         let qr_data = result.unwrap();
         assert!(!qr_data.is_empty());
-        
+
         // Verify it's PNG format (starts with PNG signature)
         assert_eq!(&qr_data[0..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
 
         // Test with longer URL
-        let long_url = "https://example.com/very/long/path/with/parameters?param1=value1&param2=value2";
+        let long_url =
+            "https://example.com/very/long/path/with/parameters?param1=value1&param2=value2";
         let result = get_qr_code(long_url);
         assert!(result.is_ok());
     }
@@ -490,19 +491,25 @@ mod tests {
     fn test_filter_only_alphanumeric_chars() {
         // Basic test
         assert_eq!(filter_only_alphanumeric_chars("Hello123"), "Hello123");
-        
+
         // With special characters
-        assert_eq!(filter_only_alphanumeric_chars("Hello, World! 123"), "HelloWorld123");
-        
+        assert_eq!(
+            filter_only_alphanumeric_chars("Hello, World! 123"),
+            "HelloWorld123"
+        );
+
         // Only special characters
         assert_eq!(filter_only_alphanumeric_chars("!@#$%^&*()"), "");
-        
+
         // Empty string
         assert_eq!(filter_only_alphanumeric_chars(""), "");
-        
+
         // Mixed case with numbers and symbols
-        assert_eq!(filter_only_alphanumeric_chars("Test@Email123.com"), "TestEmail123com");
-        
+        assert_eq!(
+            filter_only_alphanumeric_chars("Test@Email123.com"),
+            "TestEmail123com"
+        );
+
         // Unicode characters (non-ASCII alphanumeric keep é as it's alphanumeric)
         assert_eq!(filter_only_alphanumeric_chars("café123"), "café123");
     }
@@ -512,7 +519,7 @@ mod tests {
     fn test_extract_usertimezone_missing_header() {
         let vec = vec![("Accept", "text/html"), ("User-Agent", "test")];
         let map = ntex::http::HeaderMap::from_iter(vec);
-        
+
         let result = extract_usertimezone(&map);
         assert!(result.is_err());
     }
@@ -520,16 +527,19 @@ mod tests {
     /// Tests invalid UTF-8 in timezone header.
     #[test]
     fn test_extract_usertimezone_invalid_utf8() {
-        use ntex::http::{HeaderMap, header::{HeaderName, HeaderValue}};
-        
+        use ntex::http::{
+            HeaderMap,
+            header::{HeaderName, HeaderValue},
+        };
+
         let mut map = HeaderMap::new();
         // This would simulate invalid UTF-8, but HeaderValue validates UTF-8
         // So we test with a malformed timezone instead
         map.insert(
             HeaderName::from_static("timezone"),
-            HeaderValue::from_static("Invalid/Timezone_Name")
+            HeaderValue::from_static("Invalid/Timezone_Name"),
         );
-        
+
         let result = extract_usertimezone(&map);
         assert!(result.is_err());
     }
@@ -541,8 +551,11 @@ mod tests {
         let mut img_data = Vec::new();
         {
             let img = image::RgbImage::from_fn(10, 10, |_, _| image::Rgb([255, 0, 0]));
-            img.write_to(&mut std::io::Cursor::new(&mut img_data), image::ImageFormat::Png)
-                .unwrap();
+            img.write_to(
+                &mut std::io::Cursor::new(&mut img_data),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
         }
 
         let pic = crate::front::forms::pet::Pic {
@@ -553,10 +566,10 @@ mod tests {
         // Test basic cropping
         let result = crop_circle(&pic, 5, 5, 6);
         assert!(result.is_ok());
-        
+
         let cropped_data = result.unwrap();
         assert!(!cropped_data.is_empty());
-        
+
         // Verify it's PNG format
         assert_eq!(&cropped_data[0..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
     }
@@ -565,7 +578,7 @@ mod tests {
     #[test]
     fn test_crop_circle_invalid_format() {
         let pic = crate::front::forms::pet::Pic {
-            body: vec![1, 2, 3, 4], // Invalid image data
+            body: vec![1, 2, 3, 4],                // Invalid image data
             filename_extension: "xyz".to_string(), // Invalid extension
         };
 
@@ -598,8 +611,11 @@ mod tests {
                     image::Rgb([0, 255, 0]) // Green elsewhere
                 }
             });
-            img.write_to(&mut std::io::Cursor::new(&mut img_data), image::ImageFormat::Png)
-                .unwrap();
+            img.write_to(
+                &mut std::io::Cursor::new(&mut img_data),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
         }
 
         let pic = crate::front::forms::pet::Pic {
@@ -624,15 +640,15 @@ mod tests {
     #[test]
     fn test_fmt_dates_difference_performance() {
         use chrono::NaiveDate;
-        
+
         let start_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
         let end_date = NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
-        
+
         // Run multiple times to ensure consistent performance
         for _ in 0..1000 {
             let _result = fmt_dates_difference(start_date, end_date);
         }
-        
+
         // If we get here without timing out, performance is acceptable
         assert!(true);
     }
