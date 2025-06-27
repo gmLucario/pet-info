@@ -1,3 +1,8 @@
+//! # Pet Info Web Application
+//!
+//! Main entry point for the pet information management web application.
+//! Configures SSL, middleware, cryptographic keys, and route handling.
+
 #![recursion_limit = "256"]
 
 pub mod api;
@@ -22,18 +27,19 @@ use rust_decimal::prelude::ToPrimitive;
 
 #[ntex::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize logging and metrics
     let shutdown_handler = logfire::configure()
         .install_panic_handler()
         .with_metrics(Some(MetricsOptions::default()))
         .send_to_logfire(logfire::config::SendToLogfire::Yes)
         .finish()?;
 
-    let db_pool = utils::setup_sqlite_db_pool(config::APP_CONFIG.is_prod()).await?;
-
+    // Initialize database connection pool
     let sqlite_repo = repo::sqlite::SqlxSqliteRepo {
-        db_pool: db_pool.clone(),
+        db_pool: utils::setup_sqlite_db_pool(config::APP_CONFIG.is_prod()).await?,
     };
 
+    // Initialize AWS services
     let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .region(aws_config::Region::new("us-east-2"))
         .load()
@@ -46,8 +52,85 @@ async fn main() -> anyhow::Result<()> {
         client: aws_sdk_sfn::Client::new(&aws_config),
     };
 
+    // Generate cryptographically secure keys for application security
+    // All keys are derived from configured password and salt using Argon2
     let csrf_key =
         utils::build_csrf_key(&config::APP_CONFIG.csrf_pass, &config::APP_CONFIG.csrf_salt)?;
+    let session_key = utils::build_random_csrf_key()?;
+    let identity_key = utils::build_random_csrf_key()?;
+
+    // Configure and start the web server
+    configure_and_run_server(
+        csrf_key,
+        session_key,
+        identity_key,
+        sqlite_repo,
+        storage_service,
+        notification_service,
+    )
+    .await?;
+
+    shutdown_handler.shutdown()?;
+
+    Ok(())
+}
+
+/// Configures SSL acceptor for production environments
+fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
+    let mut ssl_acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())
+        .map_err(|e| anyhow::anyhow!("Failed to create SSL acceptor: {}", e))?;
+
+    ssl_acceptor
+        .set_private_key_file(&config::APP_CONFIG.private_key_path, SslFiletype::PEM)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load private key from {}: {}",
+                config::APP_CONFIG.private_key_path,
+                e
+            )
+        })?;
+
+    ssl_acceptor
+        .set_certificate_file(&config::APP_CONFIG.certificate_path, SslFiletype::PEM)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load certificate from {}: {}",
+                config::APP_CONFIG.certificate_path,
+                e
+            )
+        })?;
+
+    Ok(ssl_acceptor)
+}
+
+/// Creates application state from the provided services
+fn create_app_state(
+    csrf_key: [u8; 32],
+    sqlite_repo: repo::sqlite::SqlxSqliteRepo,
+    storage_service: services::storage::StorageHandler,
+    notification_service: services::notification::NotificationHandler,
+) -> front::AppState {
+    front::AppState {
+        csrf_protec: AesGcmCsrfProtection::from_key(csrf_key),
+        repo: Box::new(sqlite_repo),
+        storage_service: Box::new(storage_service),
+        notification_service: Box::new(notification_service),
+    }
+}
+
+/// Configures and starts the web server with appropriate SSL settings
+async fn configure_and_run_server(
+    csrf_key: [u8; 32],
+    session_key: [u8; 32],
+    identity_key: [u8; 32],
+    sqlite_repo: repo::sqlite::SqlxSqliteRepo,
+    storage_service: services::storage::StorageHandler,
+    notification_service: services::notification::NotificationHandler,
+) -> anyhow::Result<()> {
+    let server_addr = (
+        "0.0.0.0",
+        config::APP_CONFIG.wep_server_port.to_u16().unwrap_or(443),
+    );
 
     let server = web::server(move || {
         web::App::new()
@@ -67,14 +150,14 @@ async fn main() -> anyhow::Result<()> {
                     .finish(),
             )
             .wrap(
-                CookieSession::private(&[0; 64])
+                CookieSession::private(&session_key)
                     .secure(config::APP_CONFIG.is_prod())
                     .domain(config::APP_CONFIG.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
                     .name("pet-info-session"),
             )
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&[0; 64])
+                CookieIdentityPolicy::new(&identity_key)
                     .name("user_id")
                     .domain(config::APP_CONFIG.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
@@ -82,12 +165,12 @@ async fn main() -> anyhow::Result<()> {
             ))
             .wrap(web::middleware::Logger::default())
             .wrap(web::middleware::Compress::default())
-            .state(front::AppState {
-                csrf_protec: AesGcmCsrfProtection::from_key(csrf_key),
-                repo: Box::new(sqlite_repo.clone()),
-                storage_service: Box::new(storage_service.clone()),
-                notification_service: Box::new(notification_service.clone()),
-            })
+            .state(create_app_state(
+                csrf_key,
+                sqlite_repo.clone(),
+                storage_service.clone(),
+                notification_service.clone(),
+            ))
             .configure(front::routes::pet_public_profile)
             .configure(front::routes::pet)
             .configure(front::routes::user_profile)
@@ -109,23 +192,15 @@ async fn main() -> anyhow::Result<()> {
             )
     });
 
-    let server_addr = (
-        "0.0.0.0",
-        config::APP_CONFIG.wep_server_port.to_u16().unwrap_or(443),
-    );
-    let server = if config::APP_CONFIG.is_prod() {
-        let mut ssl_server = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())?;
-        ssl_server.set_private_key_file(&config::APP_CONFIG.private_key_path, SslFiletype::PEM)?;
-        ssl_server.set_certificate_file(&config::APP_CONFIG.certificate_path, SslFiletype::PEM)?;
-
-        server.bind_openssl(server_addr, ssl_server)
+    let bound_server = if config::APP_CONFIG.is_prod() {
+        let ssl_acceptor = setup_ssl_acceptor()?;
+        server.bind_openssl(server_addr, ssl_acceptor)?
     } else {
-        server.bind(server_addr)
+        server.bind(server_addr)?
     };
 
-    server?.run().await?;
-
-    shutdown_handler.shutdown()?;
-
-    Ok(())
+    bound_server
+        .run()
+        .await
+        .map_err(|e| anyhow::anyhow!("Server error: {}", e))
 }

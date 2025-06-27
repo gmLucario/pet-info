@@ -45,6 +45,10 @@ pub fn build_csrf_key(pwd: &str, salt: &str) -> anyhow::Result<[u8; 32]> {
     Ok(csrf_key)
 }
 
+pub fn build_random_csrf_key() -> anyhow::Result<[u8; 32]> {
+    build_csrf_key(&Uuid::new_v4().to_string(), &Uuid::new_v4().to_string())
+}
+
 /// Client to make http requests
 pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
