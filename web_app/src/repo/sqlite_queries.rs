@@ -86,10 +86,10 @@ RETURNING id,pet_id,health_record,description,created_at;
 
 pub const QUERY_GET_PET_HEALTH_RECORD: &str = r#"
 SELECT ph.id,ph.pet_id,ph.health_record,ph.description,ph.created_at
-FROM pet_health AS ph
-LEFT JOIN pet AS p ON (p.id=ph.pet_id)
-LEFT JOIN pet_linked AS pidlink ON (p.id=pidlink.pet_id)
-LEFT JOIN pet_external_id AS peid ON (peid.id=pidlink.id_pet_external_id)
+FROM pet_external_id AS peid
+INNER JOIN pet_linked AS pidlink ON (peid.id = pidlink.id_pet_external_id)
+INNER JOIN pet AS p ON (p.id = pidlink.pet_id)
+INNER JOIN pet_health AS ph ON (p.id = ph.pet_id)
 WHERE 
     peid.external_id = $1 
     AND p.user_app_id = $2
@@ -99,10 +99,10 @@ ORDER BY ph.created_at DESC;
 
 pub const QUERY_GET_PET_PUBLIC_HEALTH_RECORD: &str = r#"
 SELECT ph.id,ph.pet_id,ph.health_record,ph.description,ph.created_at
-FROM pet_health AS ph
-LEFT JOIN pet AS p ON (p.id=ph.pet_id)
-LEFT JOIN pet_linked AS pidlink ON (p.id=pidlink.pet_id)
-LEFT JOIN pet_external_id AS peid ON (peid.id=pidlink.id_pet_external_id)
+FROM pet_external_id AS peid
+INNER JOIN pet_linked AS pidlink ON (peid.id = pidlink.id_pet_external_id)
+INNER JOIN pet AS p ON (p.id = pidlink.pet_id)
+INNER JOIN pet_health AS ph ON (p.id = ph.pet_id)
 WHERE 
     peid.external_id = $1
     AND ph.health_record = $2
@@ -139,13 +139,19 @@ LIMIT 1;
 
 pub const QUERY_GET_ALL_PETS_USER_ID: &str = r#"
 SELECT
-    pet.id,peid.external_id,null AS last_weight,user_app_id,pet_name,birthday,breed,
+    pet.id,peid.external_id,pw.weight AS last_weight,user_app_id,pet_name,birthday,breed,
     about,is_female,is_lost,is_spaying_neutering,pic,
     pet.created_at,pet.updated_at
 FROM pet
 LEFT JOIN pet_linked AS pl ON (pl.pet_id=pet.id)
 LEFT JOIN pet_external_id AS peid ON (peid.id=pl.id_pet_external_id)
-WHERE user_app_id = $1;
+LEFT JOIN (
+    SELECT pet_id, weight, 
+           ROW_NUMBER() OVER (PARTITION BY pet_id ORDER BY created_at DESC) as rn
+    FROM pet_weight
+) pw ON (pw.pet_id = pet.id AND pw.rn = 1)
+WHERE user_app_id = $1
+ORDER BY pet.created_at DESC;
 "#;
 
 pub const QUERY_UPDATE_PET: &str = r#"
@@ -164,10 +170,10 @@ WHERE id = $1 AND user_app_id = $2;
 pub const QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_AND_USER_ID: &str = r#"
 SELECT 
     pw.id,pw.pet_id,pw.weight AS value,pw.created_at 
-FROM pet_weight AS pw
-LEFT JOIN pet AS p on  (p.id=pw.pet_id)
-LEFT JOIN pet_linked AS plinked ON (p.id=plinked.pet_id)
-LEFT JOIN pet_external_id AS peid ON (peid.id=plinked.id_pet_external_id)
+FROM pet_external_id AS peid
+INNER JOIN pet_linked AS plinked ON (peid.id = plinked.id_pet_external_id)
+INNER JOIN pet AS p ON (p.id = plinked.pet_id)
+INNER JOIN pet_weight AS pw ON (p.id = pw.pet_id)
 WHERE 
     peid.external_id = $1 AND
     p.user_app_id = $2
@@ -185,22 +191,22 @@ WHERE peid.external_id = $1;
 pub const QUERY_GET_PET_WEIGHTS_BY_EXTERNAL_ID: &str = r#"
 SELECT 
     pw.id,pw.pet_id,pw.weight AS value,pw.created_at 
-FROM pet_weight AS pw 
-LEFT JOIN pet AS p on (p.id=pw.pet_id)
-LEFT JOIN pet_linked AS plinked ON (p.id=plinked.pet_id)
-LEFT JOIN pet_external_id AS peid ON (peid.id=plinked.id_pet_external_id)
+FROM pet_external_id AS peid
+INNER JOIN pet_linked AS plinked ON (peid.id = plinked.id_pet_external_id)
+INNER JOIN pet AS p ON (p.id = plinked.pet_id)
+INNER JOIN pet_weight AS pw ON (p.id = pw.pet_id)
 WHERE peid.external_id = $1
 ORDER BY pw.created_at DESC;
 "#;
 
 pub const QUERY_DELETE_PET_WEIGHT: &str = r#"
-DELETE FROM pet_weight AS pw
-WHERE pw.id = $1
-AND pw.pet_id IN (
+DELETE FROM pet_weight 
+WHERE id = $1
+AND pet_id = (
     SELECT p.id
-    FROM pet AS p
-    LEFT JOIN pet_linked AS plinked ON (p.id=plinked.pet_id)
-    LEFT JOIN pet_external_id AS peid ON (peid.id=plinked.id_pet_external_id)
+    FROM pet_external_id AS peid
+    INNER JOIN pet_linked AS plinked ON (peid.id = plinked.id_pet_external_id)
+    INNER JOIN pet AS p ON (p.id = plinked.pet_id)
     WHERE 
         peid.external_id = $2 AND
         p.user_app_id = $3
@@ -209,15 +215,15 @@ AND pw.pet_id IN (
 "#;
 
 pub const QUERY_DELETE_PET_HEALTH_RECORD: &str = r#"
-DELETE FROM pet_health AS ph
+DELETE FROM pet_health 
 WHERE 
-    ph.id = $1
-    AND ph.health_record = $2
-    AND ph.pet_id IN (
+    id = $1
+    AND health_record = $2
+    AND pet_id = (
         SELECT p.id
-        FROM pet AS p
-        LEFT JOIN pet_linked AS plinked ON (p.id=plinked.pet_id)
-        LEFT JOIN pet_external_id AS peid ON (peid.id=plinked.id_pet_external_id)
+        FROM pet_external_id AS peid
+        INNER JOIN pet_linked AS plinked ON (peid.id = plinked.id_pet_external_id)
+        INNER JOIN pet AS p ON (p.id = plinked.pet_id)
         WHERE 
             peid.external_id = $3 AND
             p.user_app_id = $4
@@ -306,7 +312,6 @@ FROM reminder AS r
 WHERE r.user_app_id = $1 AND r.send_at>=$2
 "#;
 
-// TODO: Stop reminder executions
 pub const QUERY_DELETE_USER_APP_DATA: &str = r#"
 DELETE FROM pet_external_id AS pexid WHERE pexid.id IN (
     SELECT plink.id_pet_external_id FROM pet_linked AS plink

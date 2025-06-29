@@ -39,18 +39,24 @@ impl FromRow<'_, SqliteRow> for models::payment::Payment {
     fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
         Ok(Self {
             user_id: row.try_get("user_id")?,
-            mp_paym_id: from_str::<usize>(row.try_get::<&str, &str>("mp_paym_id")?)
-                .unwrap_or_default(),
+            mp_paym_id: from_str::<usize>(row.try_get::<&str, &str>("mp_paym_id")?).map_err(
+                |e| sqlx::Error::ColumnDecode {
+                    index: "mp_paym_id".to_string(),
+                    source: Box::new(e),
+                },
+            )?,
             payment_idempotency_h: row.try_get("payment_idempotency_h")?,
             transaction_amount: row.try_get("transaction_amount")?,
             installments: row.try_get("installments")?,
             payment_method_id: row.try_get("payment_method_id")?,
             issuer_id: row.try_get("issuer_id")?,
-            status: serde_json::from_str::<models::payment::PaymentStatus>(&format!(
-                "\"{}\"",
-                row.try_get::<String, &str>("status")?
+            status: serde_json::from_value(serde_json::Value::String(
+                row.try_get::<String, &str>("status")?,
             ))
-            .unwrap_or_default(),
+            .map_err(|e| sqlx::Error::ColumnDecode {
+                index: "status".to_string(),
+                source: Box::new(e),
+            })?,
             created_at: row.try_get("created_at")?,
             updated_at: row.try_get("updated_at")?,
         })
@@ -62,7 +68,10 @@ impl FromRow<'_, SqliteRow> for models::user_app::User {
         let account_role = serde_json::from_value(serde_json::Value::String(
             row.try_get::<String, &str>("account_role")?,
         ))
-        .unwrap_or_default();
+        .map_err(|e| sqlx::Error::ColumnDecode {
+            index: "account_role".to_string(),
+            source: Box::new(e),
+        })?;
 
         Ok(models::user_app::User {
             id: row.try_get("id")?,
@@ -409,13 +418,17 @@ impl AppRepo for SqlxSqliteRepo {
         };
 
         return Ok(query
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetHealth {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id: row.try_get("pet_id").unwrap_or(-1),
-                health_record: health_type.clone(),
-                description: row.try_get("description").unwrap_or_default(),
-                created_at: row.try_get("created_at").unwrap_or_default(),
-            })
+            .try_map(
+                |row: sqlx::sqlite::SqliteRow| -> sqlx::Result<models::pet::PetHealth> {
+                    Ok(models::pet::PetHealth {
+                        id: row.try_get("id")?,
+                        pet_id: row.try_get("pet_id")?,
+                        health_record: health_type.clone(),
+                        description: row.try_get("description")?,
+                        created_at: row.try_get("created_at")?,
+                    })
+                },
+            )
             .fetch_all(&self.db_pool)
             .await?);
     }
@@ -436,13 +449,17 @@ impl AppRepo for SqlxSqliteRepo {
             .bind(health_record.to_string())
             .bind(&desc)
             .bind(date)
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetHealth {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id: row.try_get("pet_id").unwrap_or(-1),
-                health_record: health_record.clone(),
-                description: desc.to_string(),
-                created_at: date,
-            })
+            .try_map(
+                |row: sqlx::sqlite::SqliteRow| -> sqlx::Result<models::pet::PetHealth> {
+                    Ok(models::pet::PetHealth {
+                        id: row.try_get("id")?,
+                        pet_id: row.try_get("pet_id")?,
+                        health_record: health_record.clone(),
+                        description: desc.to_string(),
+                        created_at: date,
+                    })
+                },
+            )
             .fetch_one(&self.db_pool)
             .await?;
 
@@ -465,13 +482,17 @@ impl AppRepo for SqlxSqliteRepo {
             .bind(health_record.to_string())
             .bind(&desc)
             .bind(date)
-            .map(|row: sqlx::sqlite::SqliteRow| models::pet::PetHealth {
-                id: row.try_get("id").unwrap_or(-1),
-                pet_id: row.try_get("pet_id").unwrap_or(-1),
-                health_record: health_record.clone(),
-                description: desc.to_string(),
-                created_at: date,
-            })
+            .try_map(
+                |row: sqlx::sqlite::SqliteRow| -> sqlx::Result<models::pet::PetHealth> {
+                    Ok(models::pet::PetHealth {
+                        id: row.try_get("id")?,
+                        pet_id: row.try_get("pet_id")?,
+                        health_record: health_record.clone(),
+                        description: desc.to_string(),
+                        created_at: date,
+                    })
+                },
+            )
             .fetch_one(&self.db_pool)
             .await?;
 
