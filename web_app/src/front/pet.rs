@@ -33,6 +33,7 @@ use crate::{
     config::APP_CONFIG,
     consts,
     front::{AppState, errors, forms, middleware, session, templates, utils},
+    models::pet::PetNote,
 };
 
 /// Safely extracts header value as string from HTTP headers
@@ -462,6 +463,15 @@ struct WeightReport {
     pub fmt_age: String,
 }
 
+/// Converts HTML content in pet notes to plain text
+fn convert_html_to_text(note: &PetNote) -> PetNote {
+    PetNote {
+        content: html2text::from_read(note.content.as_bytes(), 20)
+            .unwrap_or(note.content.to_string()),
+        ..note.clone()
+    }
+}
+
 /// Generates and streams a comprehensive PDF report for a pet
 ///
 /// Creates a formatted PDF document containing:
@@ -522,7 +532,7 @@ async fn get_pdf_report(
                     created_at: w.created_at,
                     fmt_age: utils::fmt_dates_difference(pet_full_info.pet.birthday, w.created_at.into()),
                 }).collect::<Vec<WeightReport>>(),
-                "notes": pet_full_info.notes,
+                "notes": pet_full_info.notes.iter().map(convert_html_to_text).collect::<Vec<_>>(),
             }))
             .unwrap_or_default(),
         )
