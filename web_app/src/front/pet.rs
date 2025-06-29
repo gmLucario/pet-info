@@ -36,11 +36,11 @@ use crate::{
 };
 
 /// Safely extracts header value as string from HTTP headers
-/// 
+///
 /// # Arguments
 /// * `headers` - HTTP headers map
 /// * `key` - Header key to extract
-/// 
+///
 /// # Returns
 /// String value of the header or empty string if not found/invalid
 fn get_header_str_value(headers: &ntex::http::HeaderMap, key: &str) -> String {
@@ -55,14 +55,14 @@ fn get_header_str_value(headers: &ntex::http::HeaderMap, key: &str) -> String {
 }
 
 /// Extracts file extension from Content-Disposition header
-/// 
+///
 /// # Arguments
 /// * `content_disposition` - Content-Disposition header value
-/// 
+///
 /// # Returns
 /// * `Ok(String)` - File extension in lowercase
 /// * `Err(anyhow::Error)` - If extension cannot be parsed
-/// 
+///
 /// # Example
 /// ```
 /// let header = "form-data; name=\"file\"; filename=\"image.jpg\"";
@@ -92,18 +92,44 @@ fn get_filename_extension(content_disposition: &str) -> anyhow::Result<String> {
     bail!("filename extension couldnt be found in the request content_disposition form")
 }
 
+/// Checks if the field contains an image for pet picture upload
+fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> bool {
+    field.content_type().essence_str().contains("image") && content_disposition.contains("pet_pic")
+}
+
+/// Processes an image field, validating size and extracting file data
+async fn process_image_field(
+    field: ntex_multipart::Field,
+    content_disposition: &str,
+) -> anyhow::Result<forms::pet::Pic> {
+    let body = utils::get_bytes_value(field).await;
+
+    // Validate image size
+    if body.len() > consts::PIC_PET_MAX_SIZE_BYTES {
+        bail!(
+            "Image is too big. Maximum size: {} bytes",
+            consts::PIC_PET_MAX_SIZE_BYTES
+        );
+    }
+
+    Ok(forms::pet::Pic {
+        filename_extension: get_filename_extension(content_disposition)?,
+        body,
+    })
+}
+
 /// Deserializes multipart form data into a pet creation form
-/// 
+///
 /// Handles both text fields and image uploads with cropping support.
 /// Validates image size and applies circular cropping if cropper data is provided.
-/// 
+///
 /// # Arguments
 /// * `payload` - Multipart form data from HTTP request
-/// 
+///
 /// # Returns
 /// * `Ok(CreatePetForm)` - Parsed and validated form data
 /// * `Err(anyhow::Error)` - If parsing fails or image is too large
-/// 
+///
 /// # Image Processing
 /// - Validates image size against `PIC_PET_MAX_SIZE_BYTES` limit
 /// - Applies circular cropping if cropper coordinates are provided
@@ -122,24 +148,8 @@ async fn deserialize_pet_form(
 
         let content_disposition = get_header_str_value(headers, "content-disposition");
 
-        if field.content_type().essence_str().contains("image")
-            && content_disposition.contains("pet_pic")
-        {
-            let body = utils::get_bytes_value(field).await;
-            let body_size = body.len();
-
-            if body_size > consts::PIC_PET_MAX_SIZE_BYTES {
-                bail!(
-                    "image is to big. max size: {}",
-                    consts::PIC_PET_MAX_SIZE_BYTES
-                )
-            }
-
-            pet_pic = Some(forms::pet::Pic {
-                filename_extension: get_filename_extension(&content_disposition)?,
-                body,
-            });
-
+        if is_image_field(&field, &content_disposition) {
+            pet_pic = Some(process_image_field(field, &content_disposition).await?);
             continue;
         }
 
@@ -177,15 +187,15 @@ async fn deserialize_pet_form(
 }
 
 /// Main pet dashboard page displaying all user's pets
-/// 
+///
 /// Renders the complete pet management interface with:
 /// - List of all user's pets with basic information
 /// - Pet balance information
 /// - Navigation to pet creation and editing
-/// 
+///
 /// # Authentication
 /// Requires valid user session
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - Rendered HTML page with pets list
 /// * `Err(web::Error)` - Server error if database operation fails
@@ -219,13 +229,13 @@ async fn get_pet_view(
 }
 
 /// HTMX endpoint returning pets list widget HTML
-/// 
+///
 /// Returns only the pets list portion for dynamic updates.
 /// Used by HTMX to refresh the pets display without full page reload.
-/// 
+///
 /// # Authentication
 /// Requires valid user session
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - HTML widget with pets list
 /// * `Err(web::Error)` - Server error if database operation fails
@@ -266,13 +276,13 @@ struct PetFormQueryParams {
 }
 
 /// Renders the pet creation form
-/// 
+///
 /// Displays an empty form for creating new pets or a form pre-filled
 /// with external pet ID if provided via query parameters.
-/// 
+///
 /// # Query Parameters
 /// * `pet_external_id` - Optional UUID for linking with physical pet tags
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - Rendered pet creation form
 /// * `Err(web::Error)` - Template rendering error
@@ -303,21 +313,21 @@ async fn render_pet_details_form(
 }
 
 /// Handles pet creation form submission
-/// 
+///
 /// Creates a new pet if the user has sufficient balance or is linking
 /// an existing pet via external ID. Updates user session with new balance.
-/// 
+///
 /// # Security
 /// - Requires CSRF token
 /// - Validates user subscription and pet balance
 /// - Sanitizes all form inputs
-/// 
+///
 /// # Form Processing
 /// - Handles multipart form with image upload
 /// - Applies image cropping if provided
 /// - Uploads image to S3 storage
 /// - Updates user session state
-/// 
+///
 /// # Returns
 /// * `Ok(Redirect)` - Redirects to pet dashboard on success
 /// * `Err(web::Error)` - User error for invalid input or server error
@@ -366,22 +376,22 @@ async fn create_pet_request(
 }
 
 /// Deletes a pet and all associated data
-/// 
+///
 /// Removes the pet and cascades deletion to all related records:
 /// - Health records (vaccines, deworms)
 /// - Weight measurements
 /// - Notes
 /// - External ID linkage
-/// 
+///
 /// # Security
 /// - Requires service access (subscription)
 /// - Requires CSRF token
 /// - Validates user ownership
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - Success response with HTMX trigger
 /// * `Err(web::Error)` - Server error if deletion fails
-/// 
+///
 /// # Note
 /// Does not restore pet balance - deletion is permanent
 #[web::delete("/delete/{pet_id}")]
@@ -403,20 +413,20 @@ async fn delete_pet(
 }
 
 /// Generates and streams QR code for pet's public profile
-/// 
+///
 /// Creates a QR code containing the URL to the pet's public information page.
 /// The QR code can be printed on physical pet tags for easy scanning.
-/// 
+///
 /// # Path Parameters
 /// * `pet_external_id` - UUID of the pet's external identifier
-/// 
+///
 /// # Security
 /// Requires service access (subscription)
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - JPEG image stream of the QR code
 /// * `Err(web::Error)` - Server error if QR generation fails
-/// 
+///
 /// # Generated URL Format
 /// `{base_url}/info/{external_id}`
 #[web::get("qr_code/{pet_external_id}")]
@@ -453,25 +463,25 @@ struct WeightReport {
 }
 
 /// Generates and streams a comprehensive PDF report for a pet
-/// 
+///
 /// Creates a formatted PDF document containing:
 /// - Pet basic information (name, breed, age, etc.)
 /// - Complete health records (vaccines, deworms)
 /// - Weight history with age calculations
 /// - Pet notes
 /// - QR code link to public profile
-/// 
+///
 /// # Path Parameters
 /// * `pet_id` - Internal database ID of the pet
-/// 
+///
 /// # Security
 /// - Requires service access (subscription)
 /// - Validates user ownership of the pet
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - PDF document stream
 /// * `Err(web::Error)` - Server error if PDF generation fails
-/// 
+///
 /// # Template
 /// Uses Typst template engine for professional formatting
 #[web::get("pdf_report/{pet_id}")]
@@ -536,18 +546,18 @@ async fn get_pdf_report(
 }
 
 /// Serves the pet's public profile picture
-/// 
+///
 /// Returns the pet's image from S3 storage for display on public profiles.
 /// No authentication required - this endpoint serves public pet information.
-/// 
+///
 /// # Path Parameters
 /// * `pet_external_id` - UUID of the pet's external identifier
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - Image stream with appropriate content-type
 /// * `Ok(NoContent)` - If no image is available for the pet
 /// * `Err(web::Error)` - Server error if storage access fails
-/// 
+///
 /// # Content Types
 /// Supports various image formats based on stored file extension
 #[web::get("public_pic/{pet_external_id}")]
@@ -577,23 +587,23 @@ async fn get_pet_public_pic(
 }
 
 /// Generates and downloads Apple Wallet pass for pet information
-/// 
+///
 /// Creates a .pkpass file that can be added to iOS Wallet containing:
 /// - Pet name and basic information
 /// - QR code for quick profile access
 /// - Emergency contact information
 /// - Professional styling with pet photo
-/// 
+///
 /// # Path Parameters
 /// * `pet_external_id` - UUID of the pet's external identifier
-/// 
+///
 /// # Security
 /// Requires service access (subscription)
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - .pkpass file download
 /// * `Err(web::Error)` - Server error if pass generation fails
-/// 
+///
 /// # Apple Wallet Integration
 /// The generated pass follows Apple's PKPass format specification
 /// and includes proper signing for iOS compatibility
@@ -631,22 +641,22 @@ async fn download_pet_pass(
 }
 
 /// Renders the pet editing form with existing data
-/// 
+///
 /// Displays a form pre-populated with the pet's current information
 /// for editing. All fields are editable including image upload.
-/// 
+///
 /// # Path Parameters
 /// * `pet_id` - Internal database ID of the pet to edit
-/// 
+///
 /// # Security
 /// - Requires service access (subscription)
 /// - Requires CSRF token
 /// - Validates user ownership of the pet
-/// 
+///
 /// # Returns
 /// * `Ok(HttpResponse)` - Rendered edit form with current pet data
 /// * `Err(web::Error)` - Server error if pet retrieval fails
-/// 
+///
 /// # Features
 /// - Pre-fills all form fields with existing pet data
 /// - Supports image upload and cropping
@@ -687,28 +697,28 @@ async fn get_pet_details_form(
 }
 
 /// Processes pet information update form submission
-/// 
+///
 /// Updates an existing pet's information including:
 /// - Basic details (name, breed, birthday, etc.)
 /// - Behavioral flags (lost status, spay/neuter)
 /// - Pet description
 /// - Profile picture with cropping support
-/// 
+///
 /// # Path Parameters
 /// * `pet_id` - Internal database ID of the pet to update
-/// 
+///
 /// # Security
 /// - Requires service access (subscription)
 /// - Requires CSRF token
 /// - Validates user ownership of the pet
 /// - Sanitizes all form inputs
-/// 
+///
 /// # Form Processing
 /// - Handles multipart form with optional image upload
 /// - Applies image cropping if coordinates provided
 /// - Updates S3 storage with new images
 /// - Preserves existing data for unchanged fields
-/// 
+///
 /// # Returns
 /// * `Ok(Redirect)` - Redirects to pet dashboard on success
 /// * `Err(web::Error)` - User error for invalid input or server error
