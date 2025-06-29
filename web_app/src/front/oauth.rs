@@ -4,7 +4,8 @@ use oauth2::{
 };
 use std::sync::LazyLock;
 
-use crate::{config::APP_CONFIG, consts};
+use crate::{config, consts};
+use anyhow::Context;
 
 pub type GoogleOauthClient = Client<
     StandardErrorResponse<oauth2::basic::BasicErrorResponseType>,
@@ -39,27 +40,48 @@ pub fn get_google_outh_scopes() -> Vec<Scope> {
     )]
 }
 
-fn build_redirect_url(redirect_url: &str) -> String {
-    format!(
+fn build_redirect_url(redirect_url: &str) -> anyhow::Result<String> {
+    Ok(format!(
         "{base_path}/{redirect_url}",
-        base_path = APP_CONFIG.base_url(),
+        base_path = config::APP_CONFIG
+            .get()
+            .context("failed to get app config")?
+            .base_url(),
         redirect_url = redirect_url,
-    )
+    ))
 }
 
 fn build_google_oauth_client() -> anyhow::Result<GoogleOauthClient> {
-    Ok(
-        BasicClient::new(ClientId::new(APP_CONFIG.google_oauth_client_id.to_string()))
-            .set_client_secret(ClientSecret::new(
-                APP_CONFIG.google_oauth_client_secret.to_string(),
-            ))
-            .set_auth_uri(AuthUrl::new(APP_CONFIG.google_oauth_auth_uri.to_string())?)
-            .set_token_uri(TokenUrl::new(
-                APP_CONFIG.google_oauth_token_uri.to_string(),
-            )?)
-            .set_redirect_uri(RedirectUrl::new(build_redirect_url("google_callback"))?)
-            .set_revocation_url(RevocationUrl::new(
-                consts::GOOGLE_ENDPOINT_REVOKE_TOKEN.to_string(),
-            )?),
-    )
+    Ok(BasicClient::new(ClientId::new(
+        config::APP_CONFIG
+            .get()
+            .context("failed to get app config")?
+            .google_oauth_client_id
+            .to_string(),
+    ))
+    .set_client_secret(ClientSecret::new(
+        config::APP_CONFIG
+            .get()
+            .context("failed to get app config")?
+            .google_oauth_client_secret
+            .to_string(),
+    ))
+    .set_auth_uri(AuthUrl::new(
+        config::APP_CONFIG
+            .get()
+            .context("failed to get app config")?
+            .google_oauth_auth_uri
+            .to_string(),
+    )?)
+    .set_token_uri(TokenUrl::new(
+        config::APP_CONFIG
+            .get()
+            .context("failed to get app config")?
+            .google_oauth_token_uri
+            .to_string(),
+    )?)
+    .set_redirect_uri(RedirectUrl::new(build_redirect_url("google_callback")?)?)
+    .set_revocation_url(RevocationUrl::new(
+        consts::GOOGLE_ENDPOINT_REVOKE_TOKEN.to_string(),
+    )?))
 }

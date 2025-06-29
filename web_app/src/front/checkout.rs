@@ -5,6 +5,7 @@ use crate::{
     front::{AppState, errors, forms, middleware, session, templates, utils},
     models,
 };
+use anyhow::Context;
 use ntex::web;
 use ntex_identity::Identity;
 use serde_json::json;
@@ -20,11 +21,16 @@ async fn get_checkout_view(
         return utils::redirect_to("pet/new");
     }
 
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")
+        .map_err(|e| web::error::ErrorInternalServerError(e))?;
+
     let context = tera::Context::from_value(json!({
         "service_price": format!("{:.2}", consts::ADD_PET_PRICE),
         "email": &user_session.user.email,
-        "mercado_pago_public_key": &config::APP_CONFIG.mercado_pago_public_key,
-        "back_url": format!("{}/pet", config::APP_CONFIG.base_url()),
+        "mercado_pago_public_key": &app_config.mercado_pago_public_key,
+        "back_url": format!("{}/pet", app_config.base_url()),
     }))
     .unwrap_or_default();
 

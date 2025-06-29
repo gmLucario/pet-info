@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::{api, config::APP_CONFIG};
+use crate::{api, config};
+use anyhow::Context;
 
 #[derive(Clone)]
 pub struct NotificationHandler {
@@ -17,7 +18,12 @@ impl crate::services::NotificationService for NotificationHandler {
         let rsp = self
             .client
             .start_execution()
-            .state_machine_arn(&APP_CONFIG.aws_sfn_arn_wb_notifications)
+            .state_machine_arn(
+                &config::APP_CONFIG
+                    .get()
+                    .context("failed to get app config")?
+                    .aws_sfn_arn_wb_notifications,
+            )
             .input(
                 json!({
                     "when": info.when.to_rfc3339(),

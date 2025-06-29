@@ -16,6 +16,7 @@ pub mod repo;
 pub mod services;
 pub mod utils;
 
+use anyhow::Context;
 use csrf::AesGcmCsrfProtection;
 use logfire::config::MetricsOptions;
 use ntex::web;
@@ -27,6 +28,9 @@ use rust_decimal::prelude::ToPrimitive;
 
 #[ntex::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize configuration
+    config::init_config().await?;
+
     // Initialize logging and metrics
     let shutdown_handler = logfire::configure()
         .install_panic_handler()
@@ -34,9 +38,13 @@ async fn main() -> anyhow::Result<()> {
         .send_to_logfire(logfire::config::SendToLogfire::Yes)
         .finish()?;
 
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
+
     // Initialize database connection pool
     let sqlite_repo = repo::sqlite::SqlxSqliteRepo {
-        db_pool: utils::setup_sqlite_db_pool(config::APP_CONFIG.is_prod()).await?,
+        db_pool: utils::setup_sqlite_db_pool(app_config.is_prod()).await?,
     };
 
     // Initialize AWS services
@@ -54,8 +62,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Generate cryptographically secure keys for application security
     // All keys are derived from configured password and salt using Argon2
-    let csrf_key =
-        utils::build_csrf_key(&config::APP_CONFIG.csrf_pass, &config::APP_CONFIG.csrf_salt)?;
+    let csrf_key = utils::build_csrf_key(&app_config.csrf_pass, &app_config.csrf_salt)?;
     let session_key = utils::build_random_csrf_key()?;
     let identity_key = utils::build_random_csrf_key()?;
 
@@ -80,22 +87,25 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
     let mut ssl_acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())
         .map_err(|e| anyhow::anyhow!("Failed to create SSL acceptor: {}", e))?;
 
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
     ssl_acceptor
-        .set_private_key_file(&config::APP_CONFIG.private_key_path, SslFiletype::PEM)
+        .set_private_key_file(&app_config.private_key_path, SslFiletype::PEM)
         .map_err(|e| {
             anyhow::anyhow!(
                 "Failed to load private key from {}: {}",
-                config::APP_CONFIG.private_key_path,
+                app_config.private_key_path,
                 e
             )
         })?;
 
     ssl_acceptor
-        .set_certificate_file(&config::APP_CONFIG.certificate_path, SslFiletype::PEM)
+        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
         .map_err(|e| {
             anyhow::anyhow!(
                 "Failed to load certificate from {}: {}",
-                config::APP_CONFIG.certificate_path,
+                app_config.certificate_path,
                 e
             )
         })?;
@@ -127,9 +137,12 @@ async fn configure_and_run_server(
     storage_service: services::storage::StorageHandler,
     notification_service: services::notification::NotificationHandler,
 ) -> anyhow::Result<()> {
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
     let server_addr = (
         "0.0.0.0",
-        config::APP_CONFIG.wep_server_port.to_u16().unwrap_or(443),
+        app_config.wep_server_port.to_u16().unwrap_or(443),
     );
 
     let server = web::server(move || {
@@ -151,17 +164,17 @@ async fn configure_and_run_server(
             )
             .wrap(
                 CookieSession::private(&session_key)
-                    .secure(config::APP_CONFIG.is_prod())
-                    .domain(config::APP_CONFIG.wep_server_host.to_string())
+                    .secure(app_config.is_prod())
+                    .domain(app_config.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
                     .name("pet-info-session"),
             )
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&identity_key)
                     .name("user_id")
-                    .domain(config::APP_CONFIG.wep_server_host.to_string())
+                    .domain(app_config.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
-                    .secure(config::APP_CONFIG.is_prod()),
+                    .secure(app_config.is_prod()),
             ))
             .wrap(web::middleware::Logger::default())
             .wrap(web::middleware::Compress::default())
@@ -192,7 +205,7 @@ async fn configure_and_run_server(
             )
     });
 
-    let bound_server = if config::APP_CONFIG.is_prod() {
+    let bound_server = if app_config.is_prod() {
         let ssl_acceptor = setup_ssl_acceptor()?;
         server.bind_openssl(server_addr, ssl_acceptor)?
     } else {

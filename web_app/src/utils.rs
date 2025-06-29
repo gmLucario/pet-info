@@ -1,7 +1,7 @@
 //! Helper functions could be used in api/, front/, ...
 
 use crate::config;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use argon2::Argon2;
 use sqlx::{
     SqlitePool,
@@ -12,10 +12,13 @@ use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
     if encrypted {
         return Ok(SqlitePool::connect_with(
-            SqliteConnectOptions::from_str(&config::APP_CONFIG.db_host)?
-                .pragma("key", &config::APP_CONFIG.db_pass_encrypt)
+            SqliteConnectOptions::from_str(&app_config.db_host)?
+                .pragma("key", &app_config.db_pass_encrypt)
                 .pragma("cipher_page_size", "1024")
                 .pragma("kdf_iter", "64000")
                 .pragma("cipher_hmac_algorithm", "HMAC_SHA1")
@@ -27,7 +30,7 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
     }
 
     Ok(SqlitePool::connect_with(
-        SqliteConnectOptions::from_str(&config::APP_CONFIG.db_host)?.pragma("foreign_keys", "ON"),
+        SqliteConnectOptions::from_str(&app_config.db_host)?.pragma("foreign_keys", "ON"),
     )
     .await?)
 }

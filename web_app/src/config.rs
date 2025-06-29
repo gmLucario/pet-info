@@ -9,8 +9,10 @@
 //! - Production environments should use secure secret management systems
 //! - All sensitive data should be stored using encryption at rest
 
+use anyhow::Context;
 use envconfig::Envconfig;
 use std::sync::LazyLock;
+use tokio::sync::OnceCell;
 
 /// Application configuration with security-aware field management.
 ///
@@ -98,20 +100,26 @@ pub struct AppConfig {
     pub google_oauth_project_id: String,
 
     /// Google OAuth authorization URI (NON-SENSITIVE)
-    /// Standard value: "https://accounts.google.com/o/oauth2/auth"
+    #[envconfig(default = "https://accounts.google.com/o/oauth2/auth")]
     pub google_oauth_auth_uri: String,
 
     /// Google OAuth token URI (NON-SENSITIVE)
-    /// Standard value: "https://oauth2.googleapis.com/token"
+    #[envconfig(default = "https://oauth2.googleapis.com/token")]
     pub google_oauth_token_uri: String,
 
     /// Google OAuth certificate URL (NON-SENSITIVE)
-    /// Standard value: "https://www.googleapis.com/oauth2/v1/certs"
+    #[envconfig(default = "https://www.googleapis.com/oauth2/v1/certs")]
     pub google_oauth_auth_provider_x509_cert_url: String,
 
     /// 🔒 SENSITIVE: Google OAuth client secret
     /// Security: Store in secure secret management system
     pub google_oauth_client_secret: String,
+
+    #[envconfig(default = "pass_certificate.pem")]
+    pub pass_cert_path: String,
+
+    #[envconfig(default = "pass_private_key.pem")]
+    pub pass_key_path: String,
 }
 
 impl AppConfig {
@@ -159,10 +167,19 @@ impl AppConfig {
 ///
 /// This configuration is validated on first access to ensure security requirements.
 /// If validation fails, the application will panic with a descriptive error message.
-pub static APP_CONFIG: LazyLock<AppConfig> = LazyLock::new(|| {
-    AppConfig::init_from_env()
-        .expect("Failed to load and validate application configuration. Check environment variables and security requirements.")
-});
+pub static APP_CONFIG: OnceCell<AppConfig> = OnceCell::const_new();
+
+/// Initialize the application configuration
+pub async fn init_config() -> anyhow::Result<()> {
+    let config = AppConfig::init_from_env()
+        .context("Failed to load and validate application configuration. Check environment variables and security requirements.")?;
+
+    APP_CONFIG
+        .set(config)
+        .map_err(|_| anyhow::anyhow!("Configuration already initialized"))?;
+
+    Ok(())
+}
 
 /// 🔒 SENSITIVE: One-Time Password secret (regenerated on each application start)
 ///

@@ -20,7 +20,7 @@
 //! Most routes require authentication and user ownership validation.
 //! CSRF protection is enabled for state-changing operations.
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use chrono::NaiveDateTime;
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
@@ -29,9 +29,7 @@ use std::{path::Path, str::FromStr};
 use uuid::Uuid;
 
 use crate::{
-    api,
-    config::APP_CONFIG,
-    consts,
+    api, config, consts,
     front::{AppState, errors, forms, middleware, session, templates, utils},
     models::pet::PetNote,
 };
@@ -436,9 +434,13 @@ async fn get_profile_qr_code(
     path: web::types::Path<(Uuid,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_external_id = path.0;
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")
+        .map_err(|e| web::error::ErrorInternalServerError(e))?;
     let url = format!(
         "{base_url}/info/{external_id}",
-        base_url = APP_CONFIG.base_url(),
+        base_url = app_config.base_url(),
         external_id = pet_external_id
     );
     let qr_code = super::utils::get_qr_code(&url).map_err(|e| {

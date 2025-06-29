@@ -37,7 +37,7 @@
 //! - Spanish to English text conversion for better compatibility
 //! - Unicode character sanitization
 
-use crate::{api::pet::PetPublicInfoSchema, services};
+use crate::{api::pet::PetPublicInfoSchema, config, services};
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
 use passes::{Package, resource, sign};
@@ -58,14 +58,6 @@ mod pass_config {
 
     /// Organization name displayed on the pass.
     pub const ORGANIZATION_NAME: &str = "Pet Info";
-
-    /// Path to the Apple Developer Pass Type ID certificate file.
-    /// This certificate is downloaded from Apple Developer Portal.
-    pub const CERT_PATH: &str = "pass_certificate.pem";
-
-    /// Path to the private key file corresponding to the certificate.
-    /// Generated during certificate creation process.
-    pub const KEY_PATH: &str = "pass_private_key.pem";
 
     /// Path to the default pass icon (PNG format, recommended 29x29pt).
     pub const ICON_PATH: &str = "pass_icon.png";
@@ -284,9 +276,12 @@ fn create_back_fields(pet_info: &PetPublicInfoSchema) -> Vec<serde_json::Value> 
 /// - Invalid certificate format
 fn create_signed_package(pass: passes::Pass) -> Result<Package> {
     let mut package = Package::new(pass);
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
 
-    let cert_data = load_file(pass_config::CERT_PATH)?;
-    let key_data = load_file(pass_config::KEY_PATH)?;
+    let cert_data = load_file(&app_config.pass_cert_path)?;
+    let key_data = load_file(&app_config.pass_key_path)?;
 
     let sign_config = sign::SignConfig::new(sign::WWDR::G4, &cert_data, &key_data)?;
 
