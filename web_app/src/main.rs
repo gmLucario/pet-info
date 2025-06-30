@@ -31,16 +31,17 @@ async fn main() -> anyhow::Result<()> {
     // Initialize configuration
     config::init_config().await?;
 
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
+
     // Initialize logging and metrics
     let shutdown_handler = logfire::configure()
         .install_panic_handler()
         .with_metrics(Some(MetricsOptions::default()))
         .send_to_logfire(logfire::config::SendToLogfire::Yes)
+        .with_token(&app_config.logfire_token)
         .finish()?;
-
-    let app_config = config::APP_CONFIG
-        .get()
-        .context("failed to get app config")?;
 
     // Initialize database connection pool
     let sqlite_repo = repo::sqlite::SqlxSqliteRepo {

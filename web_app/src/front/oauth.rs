@@ -52,36 +52,21 @@ fn build_redirect_url(redirect_url: &str) -> anyhow::Result<String> {
 }
 
 fn build_google_oauth_client() -> anyhow::Result<GoogleOauthClient> {
-    Ok(BasicClient::new(ClientId::new(
-        config::APP_CONFIG
-            .get()
-            .context("failed to get app config")?
-            .google_oauth_client_id
-            .to_string(),
-    ))
-    .set_client_secret(ClientSecret::new(
-        config::APP_CONFIG
-            .get()
-            .context("failed to get app config")?
-            .google_oauth_client_secret
-            .to_string(),
-    ))
-    .set_auth_uri(AuthUrl::new(
-        config::APP_CONFIG
-            .get()
-            .context("failed to get app config")?
-            .google_oauth_auth_uri
-            .to_string(),
-    )?)
-    .set_token_uri(TokenUrl::new(
-        config::APP_CONFIG
-            .get()
-            .context("failed to get app config")?
-            .google_oauth_token_uri
-            .to_string(),
-    )?)
-    .set_redirect_uri(RedirectUrl::new(build_redirect_url("google_callback")?)?)
-    .set_revocation_url(RevocationUrl::new(
-        consts::GOOGLE_ENDPOINT_REVOKE_TOKEN.to_string(),
-    )?))
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
+    Ok(
+        BasicClient::new(ClientId::new(app_config.google_oauth_client_id.to_string()))
+            .set_client_secret(ClientSecret::new(
+                app_config.google_oauth_client_secret.to_string(),
+            ))
+            .set_auth_uri(AuthUrl::new(app_config.google_oauth_auth_uri.to_string())?)
+            .set_token_uri(TokenUrl::new(
+                app_config.google_oauth_token_uri.to_string(),
+            )?)
+            .set_redirect_uri(RedirectUrl::new(build_redirect_url("google_callback")?)?)
+            .set_revocation_url(RevocationUrl::new(
+                consts::GOOGLE_ENDPOINT_REVOKE_TOKEN.to_string(),
+            )?),
+    )
 }
