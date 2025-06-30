@@ -5,6 +5,18 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+module "ssm_items" {
+  source = "./modules/ssm"
+
+  parameters = var.sensitive_instance_envs
+  kms_key_id = "alias/aws/ssm"
+
+  common_tags = {
+    Project   = "pet-info"
+    ManagedBy = "terraform"
+  }
+}
+
 module "pet_info_bucket" {
   source = "./modules/s3"
 
@@ -24,8 +36,8 @@ module "lambda_send_reminders" {
 
 
   env = {
-    WHATSAPP_BUSINESS_PHONE_NUMBER_ID = var.whatsapp_business_phone_number_id
-    WHATSAPP_BUSINESS_AUTH            = var.whatsapp_business_auth
+    WHATSAPP_BUSINESS_PHONE_NUMBER_ID = var.sensitive_instance_envs["WHATSAPP_BUSINESS_PHONE_NUMBER_ID"].value
+    WHATSAPP_BUSINESS_AUTH            = var.sensitive_instance_envs["WHATSAPP_BUSINESS_AUTH"].value
   }
   lambda_details = {
     name         = "send_reminders"
@@ -141,6 +153,31 @@ module "pet_info_role" {
         Resource = [
           "${module.pet_info_bucket.info.arn}/*"
         ]
+      },
+      {
+        Sid    = "SSMParameterAccess"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = [
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/pet-info/*"
+        ]
+      },
+      {
+        Sid    = "KMSDecryptAccess"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com"
+          }
+        }
       }
     ]
   }
