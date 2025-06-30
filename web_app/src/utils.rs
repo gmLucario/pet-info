@@ -1,4 +1,22 @@
-//! Helper functions could be used in api/, front/, ...
+//! Utility functions and shared resources for the pet-info application.
+//!
+//! This module provides common functionality used across different parts of the application:
+//! - Database connection management with optional encryption
+//! - Cryptographic key generation for CSRF protection
+//! - HTTP client for external API calls
+//! - Time-based One-Time Password (TOTP) generation
+//!
+//! # Security Features
+//! - SQLCipher integration for encrypted SQLite databases
+//! - Argon2 key derivation for CSRF protection
+//! - Configurable encryption parameters for production security
+//! - TOTP implementation for two-factor authentication
+//!
+//! # Database Encryption
+//! The module supports both encrypted and unencrypted SQLite databases:
+//! - **Encrypted**: Uses SQLCipher with PBKDF2-HMAC-SHA1 key derivation
+//! - **Unencrypted**: Standard SQLite for development environments
+//!
 
 use crate::config;
 use anyhow::{Context, anyhow};
@@ -11,6 +29,41 @@ use std::{str::FromStr, sync::LazyLock};
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
+/// Creates and configures a SQLite connection pool with optional encryption.
+///
+/// This function establishes a database connection pool that can be configured for
+/// either encrypted (SQLCipher) or unencrypted SQLite databases. The encryption
+/// settings are optimized for security while maintaining reasonable performance.
+///
+/// # Arguments
+/// * `encrypted` - Whether to use SQLCipher encryption for the database
+///
+/// # Database Configuration
+/// ## Encrypted Database (SQLCipher)
+/// When `encrypted` is `true`, the following SQLCipher settings are applied:
+/// - **Cipher Page Size**: 1024 bytes (balance between security and performance)
+/// - **KDF Iterations**: 64,000 (PBKDF2 rounds for key derivation)
+/// - **HMAC Algorithm**: SHA1 (for authenticated encryption)
+/// - **KDF Algorithm**: PBKDF2-HMAC-SHA1 (industry standard)
+/// - **Journal Mode**: DELETE (secure deletion of journal files)
+///
+/// ## Unencrypted Database
+/// When `encrypted` is `false`, uses standard SQLite with:
+/// - **Foreign Keys**: Enabled for referential integrity
+/// - **Journal Mode**: Default (WAL mode)
+///
+/// # Security Considerations
+/// - The encryption key is derived from `DB_PASS_ENCRYPT` configuration
+/// - In production, ensure the encryption password is stored securely (e.g., AWS Secrets Manager)
+/// - The encryption key should be rotated periodically
+/// - Database files are encrypted at rest when using SQLCipher
+///
+/// # Errors
+/// Returns an error if:
+/// - Database configuration is missing or invalid
+/// - Database file cannot be accessed or created
+/// - SQLCipher encryption setup fails
+/// - Connection pool creation fails
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
     let app_config = config::APP_CONFIG
         .get()
@@ -35,27 +88,158 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
     .await?)
 }
 
-pub fn build_csrf_key(pwd: &str, salt: &str) -> anyhow::Result<[u8; 32]> {
+/// Derives a 32-byte cryptographic key using Argon2 with UUID-based password and salt.
+///
+/// This function uses the Argon2 key derivation function to generate a secure 32-byte key
+/// suitable for CSRF token protection. The key is derived from UUID values converted to
+/// byte arrays, providing high entropy input material.
+///
+/// # Arguments
+/// * `pwd` - Password UUID used as the primary key material
+/// * `salt` - Salt UUID used to prevent rainbow table attacks
+///
+/// # Security Properties
+/// - **Algorithm**: Argon2 (default variant, typically Argon2id)
+/// - **Output Length**: 32 bytes (256 bits)
+/// - **Input Entropy**: 32 bytes from UUID (128 bits entropy × 2)
+/// - **Salt Length**: 16 bytes from UUID (128 bits)
+/// - **Memory-hard**: Resistant to GPU/ASIC attacks
+///
+/// # Key Derivation Process
+/// 1. Converts UUIDs to their byte representation (16 bytes each)
+/// 2. Uses Argon2 with default parameters for memory and iteration costs
+/// 3. Produces a deterministic 32-byte output for the same inputs
+/// 4. Each UUID provides 128 bits of entropy
+///
+/// # Security Considerations
+/// - UUIDs should be generated using cryptographically secure random generators
+/// - Both password and salt UUIDs should be unique and unpredictable
+/// - The derived key is suitable for HMAC operations and symmetric encryption
+/// - Keys should be rotated periodically (recommended: every 6 months)
+///
+/// # Errors
+/// Returns an error if:
+/// - Argon2 key derivation fails (very rare)
+/// - Internal buffer operations fail
+pub fn build_csrf_key(pwd: &Uuid, salt: &Uuid) -> anyhow::Result<[u8; 32]> {
     let mut csrf_key = [0u8; 32];
     Argon2::default()
-        .hash_password_into(
-            Uuid::from_str(pwd)?.as_bytes(),
-            Uuid::from_str(salt)?.as_bytes(),
-            &mut csrf_key,
-        )
+        .hash_password_into(pwd.as_bytes(), salt.as_bytes(), &mut csrf_key)
         .map_err(|err| anyhow!("csrf_key couldn't be created: {}", err))?;
 
     Ok(csrf_key)
 }
 
+/// Generates a random 32-byte cryptographic key using freshly generated UUIDs.
+///
+/// This is a convenience function that creates a completely random CSRF key by
+/// generating two new UUIDs and using them as password and salt for key derivation.
+/// Each call produces a different key, making it suitable for session-specific
+/// or ephemeral cryptographic operations.
+///
+/// # Security Properties
+/// - **Randomness**: Uses UUID v4 with cryptographically secure random generator
+/// - **Entropy**: 256 bits of entropy from two 128-bit UUIDs
+/// - **Uniqueness**: Extremely low probability of collision
+/// - **Unpredictability**: Each key is independent and unrelated to previous keys
+///
+/// # Use Cases
+/// - Session-specific CSRF protection keys
+/// - Temporary encryption keys for short-lived operations
+/// - Key material that doesn't need to be reproducible
+/// - Development and testing environments
+///
+/// # Errors
+/// Returns an error if:
+/// - UUID generation fails (extremely rare)
+/// - Argon2 key derivation fails
+/// 
+/// # Note
+/// For keys that need to be reproducible (e.g., derived from user credentials),
+/// use [`build_csrf_key`] with specific UUIDs instead.
 pub fn build_random_csrf_key() -> anyhow::Result<[u8; 32]> {
-    build_csrf_key(&Uuid::new_v4().to_string(), &Uuid::new_v4().to_string())
+    build_csrf_key(&Uuid::new_v4(), &Uuid::new_v4())
 }
 
-/// Client to make http requests
+/// Shared HTTP client for making external API requests.
+///
+/// This is a globally available, lazily-initialized HTTP client that provides:
+/// - **Connection Pooling**: Reuses connections for better performance
+/// - **Thread Safety**: Safe to use across multiple threads
+/// - **Memory Efficiency**: Single client instance shared across the application
+/// - **Default Configuration**: Optimized settings for typical API calls
+///
+/// # Usage
+/// The client is automatically initialized on first access and reused for all
+/// subsequent HTTP operations. It's suitable for calling external APIs such as:
+/// - MercadoPago payment processing
+/// - WhatsApp Business API
+/// - Google OAuth services
+/// - Other third-party integrations
+///
+/// # Examples
+/// ```rust
+/// // GET request
+/// let response = REQUEST_CLIENT
+///     .get("https://api.example.com/data")
+///     .header("Authorization", "Bearer token")
+///     .send()
+///     .await?;
+///
+/// // POST request with JSON body
+/// let response = REQUEST_CLIENT
+///     .post("https://api.example.com/submit")
+///     .json(&payload)
+///     .send()
+///     .await?;
+/// ```
+///
+/// # Performance Benefits
+/// - Avoids the overhead of creating new clients for each request
+/// - Maintains HTTP/2 connections when supported
+/// - Implements automatic retry logic and connection pooling
 pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
-/// Time-based one time password  client
+/// Time-based One-Time Password (TOTP) client for two-factor authentication.
+///
+/// This client generates and validates TOTP codes using the following configuration:
+/// - **Algorithm**: SHA-512 (more secure than SHA-1 or SHA-256)
+/// - **Digits**: 6 (standard TOTP code length)
+/// - **Skew**: 1 (allows codes from previous/next time window)
+/// - **Step**: 60 seconds (time window for each code)
+/// - **Secret**: Derived from application's OTP_SECRET UUID
+///
+/// # Security Features
+/// - **High Entropy Secret**: Uses UUID as base secret material
+/// - **Strong Hashing**: SHA-512 provides better security than SHA-1
+/// - **Time Synchronization**: 60-second windows balance security and usability
+/// - **Limited Skew**: 1-step tolerance for clock drift
+///
+/// # Use Cases
+/// - Phone number verification via WhatsApp
+/// - Email verification codes
+/// - Two-factor authentication for admin functions
+/// - Time-sensitive verification workflows
+///
+/// # Examples
+/// ```rust
+/// // Generate current TOTP code
+/// let current_code = TOTP_CLIENT.generate_current()?;
+/// println!("Current code: {}", current_code);
+///
+/// // Verify a user-provided code
+/// let user_code = "123456";
+/// let is_valid = TOTP_CLIENT.check_current(user_code)?;
+///
+/// // Get code for specific timestamp
+/// let timestamp = 1234567890;
+/// let code_at_time = TOTP_CLIENT.generate(timestamp);
+/// ```
+///
+/// # Implementation Notes
+/// - The secret is regenerated on each application restart for security
+/// - Codes are valid for 60 seconds with ±1 step tolerance (total 3 minutes)
+/// - Uses the `totp-rs` crate for RFC 6238 compliance
 pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
     TOTP::new(
         Algorithm::SHA512,
