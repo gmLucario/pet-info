@@ -3,7 +3,7 @@
 //! This module handles all payment-related operations including subscription
 //! management, payment processing through MercadoPago, and user balance tracking.
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use chrono::Utc;
 use rust_decimal::Decimal;
 use uuid::Uuid;
@@ -87,7 +87,12 @@ async fn call_mercado_pago_api(
         .header("accept", "application/json")
         .header("content-type", "application/json")
         .header("X-Idempotency-Key", idempotency_key)
-        .bearer_auth(&config::APP_CONFIG.mercado_token)
+        .bearer_auth(
+            &config::APP_CONFIG
+                .get()
+                .context("failed to get app config")?
+                .mercado_token,
+        )
         .json(payment_info)
         .send()
         .await?;

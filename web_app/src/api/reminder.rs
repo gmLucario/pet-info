@@ -5,7 +5,7 @@
 //! delivery for pet health and care reminders.
 
 use crate::{config, metric, models, repo, services, utils};
-use anyhow::bail;
+use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use serde_json::json;
@@ -62,11 +62,15 @@ fn create_whatsapp_verification_payload(phone_number: &str, otp: &str) -> serde_
 
 /// Sends a message via WhatsApp Business API.
 async fn send_whatsapp_message(payload: serde_json::Value) -> anyhow::Result<reqwest::Response> {
+    let app_config = config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
+
     utils::REQUEST_CLIENT
-        .post(config::APP_CONFIG.whatsapp_send_msg_endpoint())
+        .post(app_config.whatsapp_send_msg_endpoint())
         .header("accept", "application/json")
         .header("content-type", "application/json")
-        .bearer_auth(&config::APP_CONFIG.whatsapp_business_auth)
+        .bearer_auth(&app_config.whatsapp_business_auth)
         .json(&payload)
         .send()
         .await

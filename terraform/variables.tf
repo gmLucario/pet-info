@@ -1,15 +1,3 @@
-variable "whatsapp_business_phone_number_id" {
-  type        = string
-  description = "whatsapp business phone number id"
-  sensitive   = true
-}
-
-variable "whatsapp_business_auth" {
-  type        = string
-  description = "whatsapp business auth"
-  sensitive   = true
-}
-
 variable "domain_owner_contact" {
   type = object({
     address_line_1    = string
@@ -52,7 +40,17 @@ variable "cert_key_path" {
   type = string
 }
 
+variable "sensitive_instance_envs" {
+  type = map(object({
+    value       = string
+    type        = string
+    description = string
+  }))
+  sensitive = true
+}
+
 variable "instance_envs" {
   type      = map(string)
   sensitive = true
 }
+

@@ -7,7 +7,7 @@ WORKDIR /build
 
 COPY . .
 
-RUN cargo build -r
+RUN cargo build -r --features ssm
 
 FROM scratch
 ARG SOURCE_NAME
