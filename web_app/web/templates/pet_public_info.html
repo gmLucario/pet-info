@@ -24,7 +24,7 @@ perfil de ...
 {% block content %}
 <div style="text-align:center;">
     {% if pet.pic %}
-    <img src="/pet/public_pic/{{pet.external_id}}"/>
+    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy"/>
     {% endif %}
     <h4 style="margin-top:var(--pico-typography-spacing-vertical);">
         {{ pet.name | title }}
