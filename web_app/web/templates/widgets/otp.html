@@ -1,25 +1,17 @@
 {% if otp_step == 'OTP_VERIFICATION' %}
-<form hx-post="/reminder/verify-otp" hx-target="this" hx-swap="outerHTML">
-    <fieldset class="grid">
-        <input type="text" name="otp_value" placeholder="ingrese el valor que recibio por whats"
-            aria-describedby="otp-value-helper" required />
-        <input type="submit" value="verificar" />
-    </fieldset>
-    <small id="otp-value-helper"><i>El código puede tardar hasta 1min</i></small>
-</form>
+    {% include "widgets/otp_verification.html" %}
 {% elif otp_step == 'OTP_SUCCESS' %}
 {% set delete_url = "/reminder/verified-phone" %}
 <p hx-target="this" hx-swap="outerHTML">{% include "widgets/trash_icon.html" %} {{phone_reminder}}
     <mark>verificado</mark>
 </p>
-{% elif otp_step == 'OTP_WAIT_PERIOD' %}
-<p>Espere a que</p>
 {% elif otp_step == 'OTP_FAILURE' %}
 <u style="cursor: pointer;" hx-get="/reminder/send-verification-code" hx-target="closest u" hx-swap="outerHTML">
     <p>no se pudo verificar su whats. Intentar de nuevo</p>
 </u>
 {% else %}
-<form id="reminders-phone-add" hx-post="/reminder/send-verification-code" hx-target="this" hx-swap="outerHTML">
+<form id="reminders-phone-add" hx-post="/reminder/send-verification-code" hx-target="this" hx-swap="outerHTML"
+    hx-disabled-elt="find input[type='submit']" hx-indicator="find #spinner">
     <fieldset class="grid">
         <select name="country_phone_code" required>
             <option selected data-countryCode="MX" value="52">Mexico (+52)</option>
