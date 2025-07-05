@@ -10,6 +10,39 @@ datos del perfil
 
 {% block mid_nav_summary %}Perfil{% endblock mid_nav_summary %}
 
+{% block extra_css %}
+<style>
+    .otp-inputs {
+        display: flex;
+        gap: 0.2rem;
+        justify-content: center;
+    }
+
+    .otp-input {
+        width: 3rem;
+        height: 3rem;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border: 2px solid #ccc;
+        border-radius: var(--pico-border-radius);
+        padding: 0;
+    }
+
+    @media (max-width: 768px) {
+        .otp-input {
+            width: 2.5rem;
+            height: 2.5rem;
+            font-size: 1.2rem;
+        }
+
+        .otp-inputs {
+            gap: 0.1rem;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
 {% block content %}
 <nav style="padding-bottom: 2em; padding-right: 1em;">
     <ul></ul>
@@ -98,3 +131,81 @@ datos del perfil
     </blockquote>
 </article>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+    function initOTPInputs() {
+        const otpInputs = document.querySelectorAll('.otp-input');
+        const form = document.getElementById('otpForm');
+        
+        if (otpInputs.length === 0 || !form) return;
+
+        // Auto-focus and navigation
+        otpInputs.forEach((input, index) => {
+            input.addEventListener('input', function () {
+                if (this.value.length === 1) {
+                    this.classList.add('filled');
+                    if (index < otpInputs.length - 1) {
+                        otpInputs[index + 1].focus();
+                    }
+                } else {
+                    this.classList.remove('filled');
+                }
+
+                // Auto-submit when all fields are filled
+                if (Array.from(otpInputs).every(input => input.value.length === 1)) {
+                    setTimeout(() => form.dispatchEvent(new Event('submit')), 100);
+                }
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                    otpInputs[index - 1].focus();
+                    otpInputs[index - 1].value = '';
+                    otpInputs[index - 1].classList.remove('filled');
+                }
+            });
+
+            input.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').slice(0, 6);
+                pastedData.split('').forEach((char, i) => {
+                    if (i < otpInputs.length && /[0-9]/.test(char)) {
+                        otpInputs[i].value = char;
+                        otpInputs[i].classList.add('filled');
+                    }
+                });
+            });
+        });
+
+        form.addEventListener('formdata', (event) => {
+            const otp = Array.from(otpInputs).map(input => input.value).join('');
+            event.formData.append('otp_value', otp);
+        });
+
+        // Focus first input on load
+        if (otpInputs.length > 0) {
+            otpInputs[0].focus();
+        }
+    }
+
+    // Use MutationObserver to watch for OTP form being added to DOM
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1 && (node.id === 'otpForm' || node.querySelector('#otpForm'))) { // Element node
+                        initOTPInputs();
+                    }
+                });
+            }
+        });
+    });
+
+    // Start observing
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+</script>
+{% endblock extra_js %}
