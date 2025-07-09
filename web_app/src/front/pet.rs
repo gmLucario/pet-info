@@ -437,7 +437,7 @@ async fn get_profile_qr_code(
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")
-        .map_err(|e| web::error::ErrorInternalServerError(e))?;
+        .map_err(web::error::ErrorInternalServerError)?;
     let url = format!(
         "{base_url}/info/{external_id}",
         base_url = app_config.base_url(),

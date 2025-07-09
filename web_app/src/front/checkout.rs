@@ -24,7 +24,7 @@ async fn get_checkout_view(
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")
-        .map_err(|e| web::error::ErrorInternalServerError(e))?;
+        .map_err(web::error::ErrorInternalServerError)?;
 
     let context = tera::Context::from_value(json!({
         "service_price": format!("{:.2}", consts::ADD_PET_PRICE),
