@@ -269,7 +269,7 @@ pub async fn init_config() -> anyhow::Result<()> {
 ///
 /// # AWS Requirements
 /// - AWS credentials must be available (via IAM role, environment variables, or AWS config)
-/// - IAM permissions for `ssm:GetParametersByPath` on `/pet-info/*` 
+/// - IAM permissions for `ssm:GetParametersByPath` on `/pet-info/*`
 /// - IAM permissions for `kms:Decrypt` to decrypt SecureString parameters
 /// - Parameters must exist in SSM Parameter Store under `/pet-info/` path
 ///
@@ -318,7 +318,7 @@ mod ssm_env {
 
     /// The SSM parameter path prefix for all application parameters.
     const PARAMS_PATH: &str = "/pet-info/";
-    
+
     /// AWS region where SSM parameters are stored.
     const REGION: &str = "us-east-2";
 
@@ -343,7 +343,7 @@ mod ssm_env {
         let client = create_ssm_client().await;
         let parameters = fetch_all_parameters(&client).await?;
         let config_map = build_config_map(&parameters)?;
-        
+
         Ok(serde_json::Value::Object(config_map.into_iter().collect()))
     }
 
@@ -420,8 +420,11 @@ mod ssm_env {
                 let key = name
                     .strip_prefix(PARAMS_PATH)
                     .context("Parameter name doesn't start with expected prefix")?;
-                
-                Ok((key.to_string(), serde_json::Value::String(value.to_string())))
+
+                Ok((
+                    key.to_string(),
+                    serde_json::Value::String(value.to_string()),
+                ))
             })
             .collect()
     }

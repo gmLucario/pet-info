@@ -5,18 +5,6 @@
 //! - Cryptographic key generation for CSRF protection
 //! - HTTP client for external API calls
 //! - Time-based One-Time Password (TOTP) generation
-//!
-//! # Security Features
-//! - SQLCipher integration for encrypted SQLite databases
-//! - Argon2 key derivation for CSRF protection
-//! - Configurable encryption parameters for production security
-//! - TOTP implementation for two-factor authentication
-//!
-//! # Database Encryption
-//! The module supports both encrypted and unencrypted SQLite databases:
-//! - **Encrypted**: Uses SQLCipher with PBKDF2-HMAC-SHA1 key derivation
-//! - **Unencrypted**: Standard SQLite for development environments
-//!
 
 use crate::config;
 use anyhow::{Context, anyhow};
@@ -51,19 +39,6 @@ use uuid::Uuid;
 /// When `encrypted` is `false`, uses standard SQLite with:
 /// - **Foreign Keys**: Enabled for referential integrity
 /// - **Journal Mode**: Default (WAL mode)
-///
-/// # Security Considerations
-/// - The encryption key is derived from `DB_PASS_ENCRYPT` configuration
-/// - In production, ensure the encryption password is stored securely (e.g., AWS Secrets Manager)
-/// - The encryption key should be rotated periodically
-/// - Database files are encrypted at rest when using SQLCipher
-///
-/// # Errors
-/// Returns an error if:
-/// - Database configuration is missing or invalid
-/// - Database file cannot be accessed or created
-/// - SQLCipher encryption setup fails
-/// - Connection pool creation fails
 pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool> {
     let app_config = config::APP_CONFIG
         .get()
@@ -116,11 +91,6 @@ pub async fn setup_sqlite_db_pool(encrypted: bool) -> anyhow::Result<SqlitePool>
 /// - Both password and salt UUIDs should be unique and unpredictable
 /// - The derived key is suitable for HMAC operations and symmetric encryption
 /// - Keys should be rotated periodically (recommended: every 6 months)
-///
-/// # Errors
-/// Returns an error if:
-/// - Argon2 key derivation fails (very rare)
-/// - Internal buffer operations fail
 pub fn build_csrf_key(pwd: &Uuid, salt: &Uuid) -> anyhow::Result<[u8; 32]> {
     let mut csrf_key = [0u8; 32];
     Argon2::default()
@@ -148,15 +118,6 @@ pub fn build_csrf_key(pwd: &Uuid, salt: &Uuid) -> anyhow::Result<[u8; 32]> {
 /// - Temporary encryption keys for short-lived operations
 /// - Key material that doesn't need to be reproducible
 /// - Development and testing environments
-///
-/// # Errors
-/// Returns an error if:
-/// - UUID generation fails (extremely rare)
-/// - Argon2 key derivation fails
-/// 
-/// # Note
-/// For keys that need to be reproducible (e.g., derived from user credentials),
-/// use [`build_csrf_key`] with specific UUIDs instead.
 pub fn build_random_csrf_key() -> anyhow::Result<[u8; 32]> {
     build_csrf_key(&Uuid::new_v4(), &Uuid::new_v4())
 }
@@ -200,6 +161,15 @@ pub fn build_random_csrf_key() -> anyhow::Result<[u8; 32]> {
 /// - Implements automatic retry logic and connection pooling
 pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
+/// TOTP algorithm for cryptographic hashing
+const TOTP_HASH_ALGORITHM: Algorithm = Algorithm::SHA512;
+/// Number of digits in generated TOTP codes
+const TOTP_CODE_DIGITS: usize = 6;
+/// Time window tolerance for TOTP validation (allows previous/next window)
+const TOTP_VALIDATION_SKEW: u8 = 1;
+/// Time duration in seconds for each TOTP code validity window
+const TOTP_TIME_STEP_SECONDS: u64 = 60;
+
 /// Time-based One-Time Password (TOTP) client for two-factor authentication.
 ///
 /// This client generates and validates TOTP codes using the following configuration:
@@ -214,12 +184,6 @@ pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Cl
 /// - **Strong Hashing**: SHA-512 provides better security than SHA-1
 /// - **Time Synchronization**: 60-second windows balance security and usability
 /// - **Limited Skew**: 1-step tolerance for clock drift
-///
-/// # Use Cases
-/// - Phone number verification via WhatsApp
-/// - Email verification codes
-/// - Two-factor authentication for admin functions
-/// - Time-sensitive verification workflows
 ///
 /// # Examples
 /// ```rust
@@ -242,10 +206,10 @@ pub static REQUEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Cl
 /// - Uses the `totp-rs` crate for RFC 6238 compliance
 pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
     TOTP::new(
-        Algorithm::SHA512,
-        6,
-        1,
-        60,
+        TOTP_HASH_ALGORITHM,
+        TOTP_CODE_DIGITS,
+        TOTP_VALIDATION_SKEW,
+        TOTP_TIME_STEP_SECONDS,
         Secret::Raw(config::OTP_SECRET.as_bytes().to_vec())
             .to_bytes()
             .unwrap(),
