@@ -45,8 +45,10 @@ pub struct Payment {
 
 impl Payment {
     pub fn create_external_reference(&self) -> String {
-        format!("PetInfoSubsPayment{}", self.user_id)
+        let user_id = self.user_id;
+        format!("PetInfoSubsPayment{user_id}")
     }
+
     pub fn is_approved(&self) -> bool {
         self.status.eq(&PaymentStatus::Approved)
     }
