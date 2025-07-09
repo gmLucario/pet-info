@@ -12,6 +12,8 @@
 
     <link rel="stylesheet" href="/static/css/pico.min.css" />
     <link rel="stylesheet" href="/static/css/pico.colors.min.css">
+    <link rel="stylesheet" href="/static/css/toggle_theme.css">
+
     {% block extra_css %}
     {% endblock extra_css %}
 </head>
@@ -43,9 +45,12 @@
                 {% endblock mid_nav_content %}
                 <ul>
                     <li>
-                        <fieldset>
-                            <input name="theme" type="checkbox" role="switch" id="theme-toggle" />
-
+                        <fieldset class="theme-toggle-container">
+                            <input name="theme" type="checkbox" id="theme-toggle" />
+                            <label for="theme-toggle" class="theme-toggle-label">
+                                <span class="sun-icon">☀️</span>
+                                <span class="moon-icon">🌙</span>
+                            </label>
                         </fieldset>
                     </li>
                 </ul>
