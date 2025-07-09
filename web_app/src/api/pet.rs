@@ -771,3 +771,201 @@ pub async fn get_full_info(
         notes: repo.get_pet_notes(user_id, pet_id).await?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repo::{AppRepo, MockAppRepo};
+    use crate::services::StorageService;
+    use async_trait::async_trait;
+    use chrono::{NaiveDate, Utc};
+    use mockall::predicate::*;
+    use uuid::Uuid;
+
+    struct MockStorageService;
+
+    impl MockStorageService {
+        fn new() -> Self {
+            Self
+        }
+    }
+
+    #[async_trait]
+    impl StorageService for MockStorageService {
+        async fn save_pic(
+            &self,
+            _user_email: &str,
+            _file_name: &str,
+            _body: Vec<u8>,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        async fn get_pic_as_bytes(&self, _file_name: &str) -> anyhow::Result<Vec<u8>> {
+            Ok(vec![1, 2, 3, 4])
+        }
+    }
+
+    fn create_test_pet() -> models::pet::Pet {
+        models::pet::Pet {
+            id: 1,
+            external_id: Uuid::new_v4(),
+            user_app_id: 123,
+            pet_name: "Buddy".to_string(),
+            birthday: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+            breed: "Golden Retriever".to_string(),
+            about: "A friendly dog".to_string(),
+            is_female: false,
+            is_lost: false,
+            is_spaying_neutering: true,
+            last_weight: Some(25.5),
+            pic: Some("test.jpg".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn create_test_pet_form() -> front::forms::pet::CreatePetForm {
+        front::forms::pet::CreatePetForm {
+            id: 0,
+            pet_full_name: "Buddy".to_string(),
+            pet_birthday: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+            pet_breed: "Golden Retriever".to_string(),
+            is_lost: false,
+            is_spaying_neutering: true,
+            is_female: false,
+            about_pet: "A friendly dog".to_string(),
+            pet_pic: None,
+            pet_external_id: None,
+        }
+    }
+
+    fn create_test_user_state() -> UserStateAddNewPet {
+        UserStateAddNewPet {
+            user_id: 123,
+            user_email: "test@example.com".to_string(),
+            pet_balance: 5,
+        }
+    }
+
+    #[ntex::test]
+    async fn test_add_new_pet_to_user_success() {
+        let mut mock_repo = MockAppRepo::new();
+        let storage_service: Box<dyn StorageService> = Box::new(MockStorageService::new());
+        let user_state = create_test_user_state();
+        let pet_form = create_test_pet_form();
+
+        mock_repo
+            .expect_is_pet_external_id_linked()
+            .returning(|_| Box::pin(async move { Ok(None) }));
+
+        mock_repo
+            .expect_save_pet()
+            .with(always())
+            .times(1)
+            .returning(|_| Box::pin(async move { Ok(1) }));
+
+        mock_repo
+            .expect_set_user_as_subscribed()
+            .with(eq(123))
+            .times(1)
+            .returning(|_| Box::pin(async move { Ok(()) }));
+
+        mock_repo
+            .expect_set_pet_balance()
+            .with(eq(123), eq(4))
+            .times(1)
+            .returning(|_, _| Box::pin(async move { Ok(()) }));
+
+        let repo: Box<dyn AppRepo> = Box::new(mock_repo);
+        let result = add_new_pet_to_user(user_state, pet_form, &repo, &storage_service).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[ntex::test]
+    async fn test_add_new_pet_to_user_with_external_id_validation_error() {
+        let mut mock_repo = MockAppRepo::new();
+        let storage_service: Box<dyn StorageService> = Box::new(MockStorageService::new());
+        let user_state = create_test_user_state();
+        let mut pet_form = create_test_pet_form();
+        pet_form.pet_external_id = Some(Uuid::new_v4());
+
+        mock_repo
+            .expect_is_pet_external_id_linked()
+            .returning(|_| Box::pin(async move { Ok(Some(true)) }));
+
+        let repo: Box<dyn AppRepo> = Box::new(mock_repo);
+        let result = add_new_pet_to_user(user_state, pet_form, &repo, &storage_service).await;
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("invalid pet_external_id")
+        );
+    }
+
+    #[ntex::test]
+    async fn test_get_user_pets_cards_success() {
+        let mut mock_repo = MockAppRepo::new();
+        let user_id = 123;
+
+        mock_repo
+            .expect_get_all_pets_user_id()
+            .with(eq(user_id))
+            .times(1)
+            .returning(move |_| {
+                let pet = create_test_pet();
+                Box::pin(async move { Ok(vec![pet]) })
+            });
+
+        let repo: Box<dyn AppRepo> = Box::new(mock_repo);
+        let result = get_user_pets_cards(user_id, &repo).await;
+
+        assert!(result.is_ok_and(|pets| {
+            pets.len() == 1 && pets[0].name == "Buddy" && pets[0].breed == "Golden Retriever"
+        }));
+    }
+
+    #[ntex::test]
+    async fn test_get_pet_public_info_success() {
+        let mut mock_repo = MockAppRepo::new();
+        let external_id = Uuid::new_v4();
+
+        mock_repo
+            .expect_get_pet_by_external_id()
+            .with(eq(external_id))
+            .times(1)
+            .returning(move |_| {
+                let pet = create_test_pet();
+                Box::pin(async move { Ok(pet) })
+            });
+
+        let repo: Box<dyn AppRepo> = Box::new(mock_repo);
+        let result = get_pet_public_info(external_id, &repo).await;
+
+        assert!(result.is_ok_and(|pet_info| {
+            pet_info.name == "Buddy" && pet_info.pet_breed == "Golden Retriever"
+        }));
+    }
+
+    #[ntex::test]
+    async fn test_delete_pet_and_its_info_success() {
+        let mut mock_repo = MockAppRepo::new();
+        let pet_id = 1;
+        let user_id = 123;
+
+        mock_repo
+            .expect_delete_pet()
+            .with(eq(pet_id), eq(user_id))
+            .times(1)
+            .returning(|_, _| Box::pin(async move { Ok(()) }));
+
+        let repo: Box<dyn AppRepo> = Box::new(mock_repo);
+        let result = delete_pet_and_its_info(pet_id, user_id, &repo).await;
+
+        assert!(result.is_ok());
+    }
+}
