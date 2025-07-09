@@ -1,0 +1,71 @@
+.theme-toggle-label {
+    position: relative;
+    display: inline-block;
+    width: 3.75rem;
+    height: 1.875rem;
+    background: var(--pico-primary);
+    border-radius: 1.875rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    overflow: hidden;
+}
+
+.theme-toggle-label:hover {
+    background: var(--pico-primary-hover);
+}
+
+#theme-toggle {
+    display: none;
+}
+
+.sun-icon,
+.moon-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+.sun-icon {
+    left: 0.5rem;
+    opacity: 1;
+}
+
+.moon-icon {
+    right: 0.5rem;
+    opacity: 0;
+}
+
+.toggle-ball {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: var(--pico-color);
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    z-index: 2;
+}
+
+#theme-toggle:checked+.theme-toggle-label .sun-icon {
+    opacity: 0;
+}
+
+#theme-toggle:checked+.theme-toggle-label .moon-icon {
+    opacity: 1;
+}
+
+#theme-toggle:checked+.theme-toggle-label .toggle-ball {
+    transform: translateX(1.875rem);
+}
+
+#theme-toggle:checked+.theme-toggle-label {
+    background: var(--pico-secondary);
+}
+
+#theme-toggle:checked+.theme-toggle-label:hover {
+    background: var(--pico-secondary-hover);
+}
