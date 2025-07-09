@@ -20,6 +20,7 @@ use uuid::Uuid;
 /// All methods return `anyhow::Result` for error handling and are async to
 /// support non-blocking database operations.
 #[async_trait]
+#[cfg_attr(test, mockall::automock)]
 pub trait AppRepo {
     // User Management
 

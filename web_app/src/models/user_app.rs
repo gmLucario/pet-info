@@ -16,7 +16,7 @@ pub enum AccountRole {
     Unknown,
 }
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub struct User {
     pub id: i64,
     pub email: String,
@@ -48,7 +48,7 @@ impl User {
     }
 }
 
-#[derive(serde::Serialize, sqlx::FromRow)]
+#[derive(serde::Serialize, sqlx::FromRow, Clone)]
 pub struct OwnerContact {
     pub id: i64,
     pub user_app_id: i64,
