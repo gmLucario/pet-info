@@ -178,3 +178,106 @@ pub async fn create_subscription(
     metric::incr_payment_status_statds(&subs_payment.status.to_string().to_lowercase());
     Ok((subs_payment.mp_paym_id, is_subscribed))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repo::MockAppRepo;
+    use mockall::predicate::*;
+
+    fn create_test_payment() -> models::payment::Payment {
+        models::payment::Payment {
+            user_id: 123,
+            mp_paym_id: 456,
+            payment_idempotency_h: "test_idempotency".to_string(),
+            transaction_amount: "29.99".to_string(),
+            installments: 1,
+            payment_method_id: "visa".to_string(),
+            issuer_id: "test_issuer".to_string(),
+            status: models::payment::PaymentStatus::Approved,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[ntex::test]
+    async fn test_user_has_orphan_payment_true() {
+        let mut mock_repo = MockAppRepo::new();
+        let user_id = 123;
+
+        mock_repo
+            .expect_get_user_payments()
+            .with(
+                eq(user_id),
+                eq(Some(models::payment::PaymentStatus::Approved)),
+            )
+            .times(1)
+            .returning(|_, _| {
+                Box::pin(async move { Ok(vec![create_test_payment(), create_test_payment()]) })
+            });
+
+        mock_repo
+            .expect_get_all_pets_user_id()
+            .with(eq(user_id))
+            .times(1)
+            .returning(|_| Box::pin(async move { Ok(vec![models::pet::Pet::default()]) }));
+
+        let mock_repo: repo::ImplAppRepo = Box::new(mock_repo);
+        let result = user_has_orphan_payment(&mock_repo, user_id).await;
+        assert!(result.is_ok_and(|has_orphan_payment| has_orphan_payment));
+    }
+
+    #[ntex::test]
+    async fn test_user_has_orphan_payment_false() {
+        let mut mock_repo = MockAppRepo::new();
+        let user_id = 123;
+
+        mock_repo
+            .expect_get_user_payments()
+            .with(
+                eq(user_id),
+                eq(Some(models::payment::PaymentStatus::Approved)),
+            )
+            .times(1)
+            .returning(|_, _| {
+                Box::pin(async move { Ok(vec![create_test_payment(), create_test_payment()]) })
+            });
+
+        mock_repo
+            .expect_get_all_pets_user_id()
+            .with(eq(user_id))
+            .times(1)
+            .returning(|_| {
+                Box::pin(async move {
+                    Ok(vec![
+                        models::pet::Pet::default(),
+                        models::pet::Pet::default(),
+                    ])
+                })
+            });
+
+        let mock_repo: repo::ImplAppRepo = Box::new(mock_repo);
+        let result = user_has_orphan_payment(&mock_repo, user_id).await;
+        assert!(result.is_ok_and(|has_orphan_payment| !has_orphan_payment));
+    }
+
+    // Note: Testing call_mercado_pago_api and create_subscription functions would require
+    // mocking the HTTP client and config, which is more complex due to the use of
+    // global statics (utils::REQUEST_CLIENT and config::APP_CONFIG).
+    //
+    // For comprehensive testing of these functions, consider:
+    // 1. Refactoring to use dependency injection for HTTP client and config
+    // 2. Using integration tests with test servers
+    // 3. Creating wrapper functions that accept these dependencies as parameters
+    //
+    // Example of how you might refactor for better testability:
+    //
+    // async fn call_mercado_pago_api_with_client(
+    //     client: &reqwest::Client,
+    //     config: &AppConfig,
+    //     payment_info: &models::mp_paym::MercadoPagoPaymentRequest,
+    //     idempotency_key: &str,
+    // ) -> anyhow::Result<models::mp_paym::PaymentResponse> {
+    //     // Implementation using injected dependencies
+    // }
+}
