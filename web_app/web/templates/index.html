@@ -7,60 +7,102 @@ inicio
 {% block mid_nav_content %}
 {% endblock mid_nav_content %}
 
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/landing.css">
+{% endblock extra_css %}
+
+
 {% block content %}
 
-<section id="about">
-    <h1>Acerca de ...</h1>
-    <p>Esta plataforma te ayudara a gestionar lo relacionado a tu mascota <a href="/blog/about">mas información</a></p>
+<section class="hero">
+    <h1>Placas QR Pet-Info</h1>
+    <p>
+        Placas para mascotas con códigos QR, perfil digital, notificaciones por WhatsApp y
+        gestión integral de la información de tu mascota
+    </p>
+    <a href="{{google_outh_auth_url}}" class="my-account-button">
+        Mi Cuenta
+    </a>
 </section>
 
-<section>
-    <h1>Suscripción</h1>
-    <div class="grid">
-        <div>
-            <article>
-                <header style="text-align: center;"><b>Placa PetInfo</b></header>
-                Beneficios
-                <ul>
-                    <li>Una placa de identificación para collar</li>
-                    <li>Registrar una mascota en nuestra plataforma</li>
-                    <li>Registrar Vacunas y Desparasitaciones</li>
-                    <li>Registrar pesos</li>
-                    <li>Crear un perfil público</li>
-                    <li>Codigo qr al perfil de tu mascota</li>
-                    <li>Exportar su informacion: pdf</li>
-                    <li>Recibir recordatorios por whats app</li>
-                </ul>
-                <footer style="text-align: center;"><a
-                        href="https://wa.me/525586455912?text=Quiero%20comprar%20una%20placa%20PetInfo"
-                        target="_blank">Comprar</a></footer>
-            </article>
-        </div>
-        <div>
-            <article>
-                <header style="text-align: center;"><b>Registro Mascota</b></header>
-                Beneficios:
-                <ul>
-                    <li><del>Una placa de identificación para collar</del></li>
-                    <li>Registrar una mascota en nuestra plataforma</li>
-                    <li>Registrar Vacunas y Desparasitaciones</li>
-                    <li>Registrar pesos</li>
-                    <li>Crear un perfil público</li>
-                    <li>Codigo qr al perfil de tu mascota</li>
-                    <li>Exportar su informacion: pdf</li>
-                    <li>Recibir recordatorios por whats app</li>
-                </ul>
-                <footer style="text-align: center;"><b>${{service_price}} mxn</b></footer>
-            </article>
-        </div>
+
+<section class="features" id="features">
+    <h2>Características</h2>
+    <div class="features-grid">
+        <article class="feature-card">
+            <div class="feature-icon">「」</div>
+            <h3>Perfil Digital con código QR</h3>
+            <p>
+                Acceso instantáneo a la información de tu mascota con un simple escaneo de código QR.
+                Sin la necesidad de tener una app instalada.
+            </p>
+        </article>
+        <article class="feature-card">
+            <div class="feature-icon">🪪</div>
+            <h3>Integración con Wallet</h3>
+            <p>
+                Tarjetas de identificación digitales que se integran perfectamente
+                con Wallet para fácil acceso.
+            </p>
+        </article>
+        <article class="feature-card">
+            <div class="feature-icon">📲</div>
+            <h3>Notificaciones por WhatsApp</h3>
+            <p>Agenda recordatorios para nunca olvidar citas, medicamentos, etc.</p>
+        </article>
+        <article class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Reporte en PDF</h3>
+            <p>Genera un reporte de toda la información almacenada de tu mascota.</p>
+        </article>
+        <article class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Seguro y Privado</h3>
+            <p>
+                Autenticación con Google OAuth y Almacenamiento Seguro en la nube para
+                la foto de perfil de tu mascota.
+            </p>
+        </article>
     </div>
+</section>
 
+<section class="pricing" id="pricing">
+    <h2>Un Solo Pago, Todas las Características Incluidas</h2>
+    <p class="pricing-subtitle">
+        En la Compra de una placa obtienes acceso de por vida a todas las características
+    </p>
+    <div class="pricing-card">
+        <div class="price">$300.00</div>
+        <ul class="features-list" style="list-style-type: none;">
+            <li>Placa resistente con el nombre de tu mascota y un código QR</li>
+            <li>Creación de perfil digital de mascota</li>
+            <li>Integración con Wallet</li>
+            <li>Reportes en PDF de la información de tu mascota</li>
+            <li>Agendar Recordatorios y Notificaciones por WhatsApp</li>
+            <li>Sin cuotas mensuales</li>
+        </ul>
+        <a href="https://wa.me/525586455912?text=Quiero%20comprar%20una%20placa%20PetInfo" class="cta-button"
+            target="_blank">
+            Ordena tu Placa Ahora
+        </a>
+    </div>
+</section>
 
-    Pasos a seguir:
-    <ol>
-        <li><a href="{{google_outh_auth_url}}">Iniciar sesión usando Google</a></li>
-        <li>Disfrutar de los beneficios</li>
-    </ol>
+<section class="how-it-works" id="how-it-works">
+    <h2>Cómo Funciona?</h2>
+    <div class="steps">
+        <article class="step">
+            <div class="step-number">1</div>
+            <h3>Compra tu Placa</h3>
+            <p>Ordena tu placa: Llevará el nombre de tu mascota y un código QR.</p>
+        </article>
+        <article class="step">
+            <div class="step-number">2</div>
+            <h3>Crea el Perfil de tu Mascota</h3>
+            <p>Cuando recibas tu placa, escanea el QR y crea un perfil digital para tu mascota.</p>
+        </article>
+    </div>
 </section>
 
 {% endblock content %}

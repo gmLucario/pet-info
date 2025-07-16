@@ -14,11 +14,25 @@
     <link rel="stylesheet" href="/static/css/pico.colors.min.css">
     <link rel="stylesheet" href="/static/css/toggle_theme.css">
 
+    <style>
+        /* Footer */
+        footer {
+            padding: 3rem 0;
+            margin-top: auto;
+        }
+
+        .footer-bottom {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            text-align: center;
+        }
+    </style>
+
     {% block extra_css %}
     {% endblock extra_css %}
 </head>
 
-<body>
+<body style="display: flex; flex-direction: column; min-height: 100vh;">
     <header>
         <div class="container">
             <nav>
@@ -63,11 +77,18 @@
         {% endblock content %}
     </div>
 
+    <footer>
+        <div class="footer-bottom">
+            <p>
+                &copy; 2025 Pet Info. Todos los derechos reservados.
+            </p>
+        </div>
+    </footer>
+
     <script src="/static/js/minimal-theme-switcher.js"></script>
     <script src="/static/js/htmx.min.js"></script>
     {% block extra_js %}
     {% endblock extra_js %}
-
 </body>
 
 </html>
