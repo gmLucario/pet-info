@@ -16,7 +16,36 @@ perfil de ...
 <style>
     img {
         height: 30vh;
-    }    
+    }
+
+    .health-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .health-actions a:hover {
+        background-color: var(--pico-primary-background);
+        color: var(--pico-primary-inverse);
+        border-color: var(--pico-primary);
+    }
+
+    .health-status {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background-color: var(--pico-ins-background-color);
+        border-radius: var(--pico-border-radius);
+        margin: 1rem 0;
+    }
+
+    @media (max-width: 768px) {
+        .health-actions {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endif %}
 {% endblock extra_css %}
@@ -24,17 +53,20 @@ perfil de ...
 {% block content %}
 <div style="text-align:center;">
     {% if pet.pic %}
-    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy"/>
+    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy" />
     {% endif %}
-    <h4 style="margin-top:var(--pico-typography-spacing-vertical);">
+    <h1 style="margin-top:var(--pico-typography-spacing-vertical); color: var(--pico-primary);">
         {{ pet.name | title }}
-    </h4>
+    </h1>
 
     {% if pet.is_lost %}
     <article class="pico-background-red-250">Mascota perdida!</article>
     {% endif %}
-    <p><i>{{pet.pet_breed}} {{ pet.sex }} {% if pet.last_weight %} <code>[{{pet.last_weight}} kg]</code> {% endif %} {{
-            pet.fmt_age }}</p>
+    <p>
+        <i>{{pet.pet_breed}} {{ pet.sex }}</i>
+        {% if pet.last_weight %} • <code>[{{pet.last_weight}} kg]</code> {% endif %}
+        • {{pet.fmt_age }}
+    </p>
 
 </div>
 
@@ -46,6 +78,7 @@ perfil de ...
 
     <hr />
 
+    {% if pet.is_lost %}
     <details>
         <summary>Contacto</summary>
         <ul>
@@ -54,20 +87,30 @@ perfil de ...
     </details>
 
     <hr />
+    {% endif %}
 
     <details>
         <summary>Salud</summary>
-        <fieldset style="text-align: center;">
+        <hgroup>
             <label style="display:inline;">
-                <input type="checkbox" aria-disabled="true" disabled {% if pet and pet.is_spaying_neutering %} checked
-                    {% endif %} role="switch" />
+                <input type="checkbox" aria-disabled="true" disabled {% if pet.is_spaying_neutering %} checked {% endif
+                    %} role="switch" />
                 Esterilizada
             </label>
-        </fieldset>
-        <ul>
-            <li><a href="/pet/health/{{pet.external_id}}/vaccine">vacunas</a></li>
-            <li><a href="/pet/health/{{pet.external_id}}/deworm">Desparasitaciones</a></li>
-        </ul>
+            <p style="margin: 0; color: var(--pico-muted-color);">
+                <i>
+                    {{ pet.name | lower }}
+                    {% if pet.is_spaying_neutering %} ha sido esterilizada {% else %} <b>NO</b> esta esterilizada {%
+                    endif %}
+                </i>
+            </p>
+        </hgroup>
+
+        <div class="health-actions">
+            <a href="/pet/health/{{pet.external_id}}/deworm" role="button"
+                class="outline contrast">Desparasitaciones</a>
+            <a href="/pet/health/{{pet.external_id}}/vaccine" role="button" class="outline contrast">Vacunas</a>
+        </div>
     </details>
 
 </article>
