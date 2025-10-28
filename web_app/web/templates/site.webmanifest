@@ -1,0 +1,26 @@
+{
+    "name": "Pet-Info",
+    "short_name": "pet-info",
+    "start_url": "/info/{{external_id}}?source=pwa",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "/static/images/icon-192.png",
+            "sizes": "192x147",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon-512.png",
+            "sizes": "512x356",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

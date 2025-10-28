@@ -14,6 +14,21 @@
     <link rel="stylesheet" href="/static/css/pico.colors.min.css">
     <link rel="stylesheet" href="/static/css/toggle_theme.css">
 
+    {% block extra_meta %}
+    {% endblock extra_meta %}
+
+    <!-- Icon Android/Chrome:-->
+    <link rel="icon" href="/static/images/favicon.ico" sizes="any"/>
+    <link rel="icon" type="image/png" href="/static/images/icon-192.png" sizes="192x147"/>
+    <link rel="icon" type="image/png" href="/static/images/icon-512.png" sizes="512x356"/>
+    <link rel="icon" type="image/png" href="/static/images/maskable-512.png" sizes="512x512"/>
+
+    <!-- Icon IOS:-->
+    <link rel="apple-touch-icon" href="/static/images/maskable-512.png" sizes="512x512"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-title" content="Pet-Info"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+
     <style>
         /* Footer */
         footer {
@@ -87,6 +102,11 @@
 
     <script src="/static/js/minimal-theme-switcher.js"></script>
     <script src="/static/js/htmx.min.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {navigator.serviceWorker.register('/static/js/sw.js')});
+        }
+    </script>
     {% block extra_js %}
     {% endblock extra_js %}
 </body>

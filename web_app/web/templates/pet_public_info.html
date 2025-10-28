@@ -8,6 +8,13 @@ info
 perfil de ...
 {% endblock meta_desc %}
 
+{% block extra_meta %}
+    <!-- PWA:-->
+    <meta name="application-name" content="Pet-Info"/>
+    <meta name="theme-color" content="#0f172a"/>
+    <link rel="manifest" href="/pet/site.webmanifest/{{pet.external_id}}"/>
+{% endblock extra_meta %}
+
 {% block mid_nav_content %}
 {% endblock mid_nav_content %}
 
