@@ -60,7 +60,7 @@ perfil de ...
 {% block content %}
 <div style="text-align:center;">
     {% if pet.pic %}
-    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy" />
+    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy" id="pet-pic"/>
     {% endif %}
     <h1 style="margin-top:var(--pico-typography-spacing-vertical); color: var(--pico-primary);">
         {{ pet.name | title }}
@@ -123,3 +123,45 @@ perfil de ...
 </article>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+    async function waitImg(img) {
+        if (!img) return null;
+        if (img.complete && img.naturalWidth >0) return img;
+        if (img.decode) {await img.decode(); return img;}
+
+        await new Promise(resolve=>{
+            img.addEventListener('load',resolve,{once:true});
+            img.addEventListener('error',resolve,{once:true});
+        });
+
+        return img;
+    }
+
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+        window.addEventListener('load', async function () {
+            const registration = await navigator.serviceWorker.register('/static/js/sw.js', { scope: '/info/' });
+            await navigator.serviceWorker.ready;
+
+            const cache = await caches.open('pet-info');
+            const toCache = [
+                location.pathname + location.search,
+                '/static/css/pico.min.css',
+                '/static/css/pico.colors.min.css',
+                '/static/css/toggle_theme.css',
+                '/static/js/minimal-theme-switcher.js',
+                '/static/js/htmx.min.js',
+            ];
+
+            const img = document.getElementById('pet-pic');
+            await waitImg(img);
+            if (img) {
+                toCache.push(new URL(img.src).pathname);
+            }
+
+            await cache.addAll(toCache);            
+        });
+    }
+</script>
+{% endblock extra_js %}
