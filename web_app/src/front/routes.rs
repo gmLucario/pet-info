@@ -56,6 +56,7 @@ pub fn pet(cfg: &mut web::ServiceConfig) {
         pet::get_profile_qr_code,
         pet::get_pdf_report,
         pet::get_pet_public_pic,
+        pet::serve_webmanifest,
         pet::download_pet_pass,
         pet::delete_pet,
         pet::get_pet_details_form,

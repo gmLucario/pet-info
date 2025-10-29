@@ -598,6 +598,27 @@ async fn get_pet_public_pic(
     Ok(web::HttpResponse::NoContent().into())
 }
 
+/// Serve `webmanifest`
+#[web::get("/site.webmanifest/{pet_external_id}")]
+async fn serve_webmanifest(
+    path: web::types::Path<(Uuid,)>,
+) -> Result<impl web::Responder, web::Error> {
+    let body = templates::WEB_MANIFESTS
+        .render(
+            "site.webmanifest",
+            &tera::Context::from_value(json!({"external_id": path.0})).unwrap_or_default(),
+        )
+        .map_err(|e| {
+            errors::ServerError::TemplateError(format!(
+                "at /pet/site.webmanifest endpoint the template couldnt be rendered: {e}"
+            ))
+        })?;
+
+    Ok(web::HttpResponse::Ok()
+        .content_type("application/json; charset=utf-8")
+        .body(body))
+}
+
 /// Generates and downloads Apple Wallet pass for pet information
 ///
 /// Creates a .pkpass file that can be added to iOS Wallet containing:

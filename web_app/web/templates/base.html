@@ -14,6 +14,19 @@
     <link rel="stylesheet" href="/static/css/pico.colors.min.css">
     <link rel="stylesheet" href="/static/css/toggle_theme.css">
 
+    {% block extra_meta %}
+    {% endblock extra_meta %}
+
+    <!-- Icon Android/Chrome:-->
+    <link rel="icon" href="/static/images/favicon.ico" sizes="any"/>
+    <link rel="icon" type="image/png" href="/static/images/maskable-512.png" sizes="512x512"/>
+
+    <!-- Icon IOS:-->
+    <link rel="apple-touch-icon" href="/static/images/maskable-512.png" sizes="512x512"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-title" content="Pet-Info"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+
     <style>
         /* Footer */
         footer {
