@@ -61,7 +61,7 @@ datos del perfil
         <tbody>
             {% for payment in payments | default(value=[]) %}
             <tr>
-                <td>{{ payment.created_at | date(format="%d-%m-%Y") }}</td>
+                <td>{{ payment.created_at | date(format="%v", locale="es_MX") }}</td>
                 <td>{{ payment.status }}</td>
             </tr>
             {% endfor %}

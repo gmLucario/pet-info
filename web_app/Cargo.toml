@@ -14,7 +14,7 @@ ntex-files = "2.1.0"
 ntex-multipart = "2.0.0"
 ntex-identity = "2.0.0"
 ntex-session = { version = "2.0.0", features = [] }
-tera = { version = "1.20.0", default-features = false, features = [ "builtins" ]}
+tera = { version = "1.20.1", default-features = false, features = [ "builtins", "date-locale" ]}
 oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
 fast_qr = { version = "0.12.7", features = ["image"]}
 # pinning image cause fast_qr is using a specific version
@@ -63,10 +63,10 @@ tokio = { version = "1.48", features = ["sync"] }
 chrono-tz = "0.10.4"
 
 # aws
-aws-config = { version = "1.8.8", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.108.0"
-aws-sdk-ssm = { version = "1.97.0", optional = true }
-aws-sdk-sfn = "1.91.0"
+aws-config = { version = "1.8.10", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.110.0"
+aws-sdk-ssm = { version = "1.98.0", optional = true }
+aws-sdk-sfn = "1.92.0"
 
 [dev-dependencies]
 mockall = "0.13.1"

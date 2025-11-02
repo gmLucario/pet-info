@@ -51,7 +51,7 @@ health record table
       {% else %}
       <th scope="col">Descripcion</th>
       {% endif %}
-      <th scope="col">Fecha (<i>dd-mm-yyy</i>)</th>
+      <th scope="col">Fecha</th>
     </tr>
   </thead>
   <tbody hx-get="/pet/health/{{pet_external_id}}/{{record_type}}/tbody" hx-trigger="healthRecordUpdated from:body">

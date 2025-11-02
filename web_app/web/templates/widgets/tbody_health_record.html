@@ -7,6 +7,6 @@
     </td>
     {% endif %}
     <td>{{ record.value }}</td>
-    <td>{{ record.date | date(format="%d-%m-%Y") }}</td>
+    <td>{{ record.date | date(format="%v", locale="es_MX") }}</td>
 </tr>
 {% endfor %}
