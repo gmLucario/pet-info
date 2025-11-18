@@ -1,0 +1,14 @@
+[Unit]
+Description=Renew Let's Encrypt certificates for pet-info.link
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/pet-info/scripts/renew-certs.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
