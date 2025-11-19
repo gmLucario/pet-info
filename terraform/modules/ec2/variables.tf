@@ -51,11 +51,9 @@ variable "git_branch" {
 variable "pass_cert_path" {
   type        = string
   description = "Path to Apple Wallet Pass certificate file"
-  default     = ""
 }
 
 variable "pass_key_path" {
   type        = string
   description = "Path to Apple Wallet Pass private key file"
-  default     = ""
 }

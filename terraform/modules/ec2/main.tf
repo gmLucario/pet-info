@@ -102,10 +102,8 @@ resource "null_resource" "deploy_app" {
   }
 }
 
-# Upload Apple Wallet Pass certificate files if provided
+# Upload Apple Wallet Pass certificate files
 resource "null_resource" "upload_pass_certificates" {
-  count = var.pass_cert_path != "" && var.pass_key_path != "" ? 1 : 0
-
   depends_on = [null_resource.wait_for_instance]
 
   # Upload pass certificate

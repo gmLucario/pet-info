@@ -41,13 +41,11 @@ variable "cert_key_path" {
 }
 
 variable "pass_cert_path" {
-  type    = string
-  default = ""
+  type = string
 }
 
 variable "pass_key_path" {
-  type    = string
-  default = ""
+  type = string
 }
 
 variable "sensitive_instance_envs" {
