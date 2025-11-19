@@ -46,11 +46,22 @@ source /home/ec2-user/.bashrc
 
 # Clone repository
 log "Cloning pet-info repository..."
-VOLUME_UUID=$(lsblk -o UUID -n "/dev/xvdf")
 cd /home/ec2-user
 git clone https://github.com/gmLucario/pet-info.git --depth 1
 chown -R ec2-user:ec2-user pet-info/
 cd pet-info
+
+# Wait for EBS volume to be attached
+log "Waiting for EBS volume to be attached..."
+while [ ! -b /dev/xvdf ]; do
+    log "  EBS volume /dev/xvdf not yet available, waiting..."
+    sleep 5
+done
+log "✓ EBS volume detected"
+
+# Get volume UUID
+VOLUME_UUID=$(lsblk -o UUID -n "/dev/xvdf")
+log "Volume UUID: $VOLUME_UUID"
 
 # Mount data volume
 log "Setting up data volume..."
