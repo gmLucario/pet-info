@@ -101,6 +101,19 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")?;
+
+    // Load certificate first (best practice)
+    ssl_acceptor
+        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load certificate from {}: {}",
+                app_config.certificate_path,
+                e
+            )
+        })?;
+
+    // Load private key second
     ssl_acceptor
         .set_private_key_file(&app_config.private_key_path, SslFiletype::PEM)
         .map_err(|e| {
@@ -111,15 +124,14 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
             )
         })?;
 
+    // Explicitly verify that the private key matches the certificate
     ssl_acceptor
-        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load certificate from {}: {}",
-                app_config.certificate_path,
-                e
-            )
-        })?;
+        .check_private_key()
+        .map_err(|e| anyhow::anyhow!("Private key does not match certificate: {}", e))?;
+
+    log::info!("✓ SSL certificates loaded and validated successfully");
+    log::info!("  Certificate: {}", app_config.certificate_path);
+    log::info!("  Private key: {}", app_config.private_key_path);
 
     Ok(ssl_acceptor)
 }
