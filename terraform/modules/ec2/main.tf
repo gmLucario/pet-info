@@ -102,6 +102,61 @@ resource "null_resource" "deploy_app" {
   }
 }
 
+# Upload Apple Wallet Pass certificate files if provided
+resource "null_resource" "upload_pass_certificates" {
+  count = var.pass_cert_path != "" && var.pass_key_path != "" ? 1 : 0
+
+  depends_on = [null_resource.wait_for_instance]
+
+  # Upload pass certificate
+  provisioner "file" {
+    source      = var.pass_cert_path
+    destination = "/tmp/pass_certificate.pem"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Upload pass private key
+  provisioner "file" {
+    source      = var.pass_key_path
+    destination = "/tmp/pass_private_key.pem"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move pass files to final location
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mv /tmp/pass_certificate.pem /opt/pet-info/pass_certificate.pem",
+      "sudo mv /tmp/pass_private_key.pem /opt/pet-info/pass_private_key.pem",
+      "sudo chown ec2-user:ec2-user /opt/pet-info/pass_certificate.pem /opt/pet-info/pass_private_key.pem",
+      "sudo chmod 644 /opt/pet-info/pass_certificate.pem",
+      "sudo chmod 600 /opt/pet-info/pass_private_key.pem",
+      "sudo systemctl restart pet-info.service"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
 data "aws_ami" "amazon_arm" {
   most_recent = true
   owners      = ["amazon"]
