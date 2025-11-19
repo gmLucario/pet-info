@@ -13,16 +13,6 @@ log "Installing system dependencies..."
 sudo dnf update -y
 sudo dnf install -y git
 
-# Set up SSL certificates (provided by Terraform)
-log "Setting up SSL certificates..."
-sudo mkdir -p /opt/pet-info
-echo "${certificate}" | sudo tee /opt/pet-info/server.crt > /dev/null
-echo "${private_key_pem}" | sudo tee /opt/pet-info/server.key > /dev/null
-sudo chown ec2-user:ec2-user /opt/pet-info/server.crt /opt/pet-info/server.key
-sudo chmod 644 /opt/pet-info/server.crt
-sudo chmod 600 /opt/pet-info/server.key
-log "✓ SSL certificates installed at /opt/pet-info/"
-
 # Clone repository
 log "Cloning pet-info repository..."
 cd /home/ec2-user

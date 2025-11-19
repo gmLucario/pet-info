@@ -33,7 +33,8 @@ variable "ec2_user_data_path" {
 }
 
 variable "cert_server_path" {
-  type = string
+  type    = string
+  default = "../web_app/server.crt"
 }
 
 variable "ssh_key_path" {
@@ -41,7 +42,8 @@ variable "ssh_key_path" {
 }
 
 variable "cert_key_path" {
-  type = string
+  type    = string
+  default = "../web_app/server.key"
 }
 
 variable "pass_cert_path" {

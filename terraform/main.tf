@@ -14,12 +14,12 @@ locals {
       description = "Environment name (prod, dev, staging)"
     }
     PRIVATE_KEY_PATH = {
-      value       = "/opt/pet-info/server.key"
+      value       = "/home/ec2-user/pet-info/web_app/server.key"
       type        = "String"
       description = "Path to SSL private key file"
     }
     CERTIFICATE_PATH = {
-      value       = "/opt/pet-info/server.crt"
+      value       = "/home/ec2-user/pet-info/web_app/server.crt"
       type        = "String"
       description = "Path to SSL certificate file"
     }
