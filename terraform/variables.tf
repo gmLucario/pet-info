@@ -24,6 +24,10 @@ variable "stack_tags" {
   }
 }
 
+variable "web_app_executable_path" {
+  type = string
+}
+
 variable "ec2_user_data_path" {
   type = string
 }

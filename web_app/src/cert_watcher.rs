@@ -178,14 +178,3 @@ async fn watch_certificates_impl(cert_path: String, key_path: String) -> Result<
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cert_validation() {
-        // This test requires actual certificate files
-        // In production, you would test with test certificates
-    }
-}

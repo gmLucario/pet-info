@@ -68,7 +68,7 @@ resource "null_resource" "deploy_app" {
 
   # Copy application binary
   provisioner "file" {
-    source      = "${path.module}/../../web_app/out/pet-info"
+    source      = var.web_app_executable_path
     destination = "/tmp/pet-info"
 
     connection {

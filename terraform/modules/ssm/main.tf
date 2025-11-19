@@ -7,7 +7,6 @@ resource "aws_ssm_parameter" "parameters" {
   value_wo_version = 1
   description      = each.value.description
 
-  # Use KMS key for SecureString parameters if provided
   key_id = each.value.type == "SecureString" && var.kms_key_id != null ? var.kms_key_id : null
 
   tags = merge(

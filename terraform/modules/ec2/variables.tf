@@ -25,6 +25,10 @@ variable "domain_zone_id" {
   description = "zone id of the domain"
 }
 
+variable "web_app_executable_path" {
+  type = string
+}
+
 variable "user_data_path" {
   type        = string
   description = "script to run when instance is initiated"
@@ -38,7 +42,7 @@ variable "cert_details" {
 }
 
 variable "instance_envs" {
-  type = map(string)
+  type      = map(string)
   sensitive = true
 }
 
