@@ -35,6 +35,61 @@ resource "aws_instance" "app_instance" {
   }
 }
 
+# Deploy the application binary
+resource "null_resource" "deploy_app" {
+  depends_on = [
+    aws_instance.app_instance,
+    aws_eip_association.ip_ec2,
+    aws_volume_attachment.ebs_att
+  ]
+
+  # Trigger redeployment when binary changes
+  triggers = {
+    binary_hash = fileexists("${path.module}/../../web_app/out/pet-info") ? filemd5("${path.module}/../../web_app/out/pet-info") : ""
+    instance_id = aws_instance.app_instance.id
+  }
+
+  # Wait for instance to be ready
+  provisioner "local-exec" {
+    command = "sleep 60"
+  }
+
+  # Copy application binary
+  provisioner "file" {
+    source      = "${path.module}/../../web_app/out/pet-info"
+    destination = "/tmp/pet-info"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move binary to final location and set up service
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p /home/ec2-user/pet-info/web_app",
+      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
+      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
+      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable pet-info.service",
+      "sudo systemctl restart pet-info.service"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
 data "aws_ami" "amazon_arm" {
   most_recent = true
   owners      = ["amazon"]

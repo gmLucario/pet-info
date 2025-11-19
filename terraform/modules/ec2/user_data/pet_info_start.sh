@@ -82,6 +82,7 @@ source /home/ec2-user/pet-info/.venv/bin/activate
 log "Installing systemd units..."
 sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.service /etc/systemd/system/
 sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.timer /etc/systemd/system/
+sudo cp /home/ec2-user/pet-info/systemd/pet-info.service /etc/systemd/system/
 
 # Make renewal script executable
 sudo chmod +x /home/ec2-user/pet-info/scripts/renew-certs.sh
