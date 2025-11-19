@@ -148,21 +148,21 @@ async fn configure_and_run_server(
 
     let server = web::server(move || {
         web::App::new()
-            .wrap(
-                Cors::new()
-                    .allowed_methods(vec![
-                        "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
-                    ])
-                    .allowed_origin("http://localhost:8080")
-                    .allowed_origin("https://openidconnect.googleapis.com")
-                    .allowed_origin("https://pet-info.link")
-                    .allowed_origin("https://oauth2.googleapis.com")
-                    .allowed_origin("https://www.googleapis.com")
-                    .allowed_origin("https://accounts.google.com")
-                    .allowed_origin("https://graph.facebook.com")
-                    .allowed_origin("https://api.mercadopago.com")
-                    .finish(),
-            )
+            // .wrap(
+            //     Cors::new()
+            //         .allowed_methods(vec![
+            //             "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
+            //         ])
+            //         .allowed_origin("http://localhost:8080")
+            //         .allowed_origin("https://openidconnect.googleapis.com")
+            //         .allowed_origin("https://pet-info.link")
+            //         .allowed_origin("https://oauth2.googleapis.com")
+            //         .allowed_origin("https://www.googleapis.com")
+            //         .allowed_origin("https://accounts.google.com")
+            //         .allowed_origin("https://graph.facebook.com")
+            //         .allowed_origin("https://api.mercadopago.com")
+            //         .finish(),
+            // )
             .wrap(
                 CookieSession::private(&session_key)
                     .secure(app_config.is_prod())
