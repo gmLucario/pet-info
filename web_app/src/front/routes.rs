@@ -4,7 +4,7 @@
 //! Routes are grouped by functionality into logical scopes for better organization
 //! and maintainability.
 
-use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder};
+use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder, webhook};
 use ntex::web;
 
 /// Configures public pet profile routes.
@@ -150,4 +150,17 @@ pub fn checkout(cfg: &mut web::ServiceConfig) {
 /// - `GET /blog/{entry_id}` - View blog entry
 pub fn blog(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/blog").service((blog::get_blog_entry,)));
+}
+
+/// Configures webhook routes for external integrations.
+///
+/// This function sets up routes for receiving webhook events from external
+/// services like WhatsApp Business API. These routes are public endpoints
+/// that don't require authentication.
+///
+/// # Routes
+/// - `GET /webhook/whatsapp` - WhatsApp webhook verification
+/// - `POST /webhook/whatsapp` - WhatsApp webhook receiver
+pub fn webhooks(cfg: &mut web::ServiceConfig) {
+    cfg.service((webhook::verify_webhook, webhook::receive_webhook));
 }

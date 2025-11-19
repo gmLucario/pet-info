@@ -189,6 +189,7 @@ async fn configure_and_run_server(
             .configure(front::routes::checkout)
             .configure(front::routes::blog)
             .configure(front::routes::reminders)
+            .configure(front::routes::webhooks)
             .service((
                 ntex_files::Files::new("/static", "web/static/"),
                 front::server::serve_favicon,
