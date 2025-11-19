@@ -6,7 +6,6 @@
 #![recursion_limit = "256"]
 
 pub mod api;
-pub mod cert_watcher;
 pub mod config;
 pub mod consts;
 pub mod front;
@@ -67,15 +66,6 @@ async fn main() -> anyhow::Result<()> {
     let csrf_key = utils::build_csrf_key(&app_config.csrf_pass, &app_config.csrf_salt)?;
     let session_key = utils::build_random_csrf_key()?;
     let identity_key = utils::build_random_csrf_key()?;
-
-    // Start certificate file watcher for automatic reload detection
-    if app_config.is_prod() {
-        cert_watcher::start_watching(
-            app_config.certificate_path.clone(),
-            app_config.private_key_path.clone(),
-        );
-        log::info!("🔐 SSL certificate auto-reload monitoring enabled");
-    }
 
     // Configure and start the web server
     configure_and_run_server(

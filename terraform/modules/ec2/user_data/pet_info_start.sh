@@ -68,42 +68,18 @@ until lsblk -o MOUNTPOINT | grep -q "pet-info"; do
 done
 log "Data volume mounted successfully"
 
-# Set up automatic certificate renewal
-log "Setting up automatic SSL certificate renewal..."
-
-# Install certbot dependencies
+# Install certbot for Let's Encrypt certificate
 log "Installing certbot and Route53 plugin..."
 /root/.local/bin/uv venv /home/ec2-user/pet-info/.venv
 source /home/ec2-user/pet-info/.venv/bin/activate
 /root/.local/bin/uv pip install certbot certbot-dns-route53
 
-# Copy systemd service and timer files
-log "Installing systemd units..."
-sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.service /etc/systemd/system/
-sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.timer /etc/systemd/system/
+# Copy pet-info systemd service
+log "Installing pet-info systemd service..."
 sudo cp /home/ec2-user/pet-info/systemd/pet-info.service /etc/systemd/system/
-
-# Make renewal script executable
-sudo chmod +x /home/ec2-user/pet-info/scripts/renew-certs.sh
-
-# Update renewal script path in systemd service
-sudo sed -i "s|/opt/pet-info/scripts/renew-certs.sh|/home/ec2-user/pet-info/scripts/renew-certs.sh|g" /etc/systemd/system/certbot-renewal.service
-
-# Enable and start the renewal timer
-log "Enabling automatic certificate renewal..."
 sudo systemctl daemon-reload
-sudo systemctl enable certbot-renewal.timer
-sudo systemctl start certbot-renewal.timer
 
-# Verify timer is running
-if sudo systemctl is-active --quiet certbot-renewal.timer; then
-    log "✓ Certificate renewal timer activated successfully"
-    sudo systemctl status certbot-renewal.timer --no-pager
-else
-    log "⚠ Warning: Certificate renewal timer failed to start"
-fi
-
-# Request initial Let's Encrypt certificate with retries
+# Request Let's Encrypt certificate with retries
 log "Requesting initial Let's Encrypt certificate..."
 source /home/ec2-user/pet-info/.venv/bin/activate
 CERTBOT_BIN="/home/ec2-user/pet-info/.venv/bin/certbot"
@@ -140,15 +116,10 @@ done
 
 if [ "$CERT_OBTAINED" = "true" ]; then
     log "🎉 Successfully obtained and installed Let's Encrypt certificates"
+else
+    log "⚠ Using terraform-provided certificates (Let's Encrypt request failed)"
 fi
 
-log "=== Certificate renewal automation setup complete ==="
-log "Next steps:"
-log "  1. Build and deploy the Rust application"
-log "  2. Certificates will auto-renew when <30 days to expiry"
-log "  3. Check renewal status: sudo systemctl status certbot-renewal.timer"
-log "  4. View logs: sudo journalctl -u certbot-renewal.service"
-log ""
 log "=== pet-info EC2 instance setup complete ==="
 
 # Create completion marker file for terraform provisioner
