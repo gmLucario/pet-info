@@ -230,7 +230,7 @@ module "pet_info_role" {
           "route53:GetHostedZone",
           "route53:ListResourceRecordSets"
         ]
-        Resource = "arn:aws:route53:::hostedzone/${module.pet_info_domain.info.domain_zone_id}"
+        Resource = "arn:aws:route53:::hostedzone/*"
       }
     ]
   }
