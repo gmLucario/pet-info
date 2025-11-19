@@ -178,6 +178,25 @@ module "pet_info_role" {
             "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com"
           }
         }
+      },
+      {
+        Sid    = "Route53CertbotAccess"
+        Effect = "Allow"
+        Action = [
+          "route53:ListHostedZones",
+          "route53:GetChange"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "Route53RecordSetAccess"
+        Effect = "Allow"
+        Action = [
+          "route53:ChangeResourceRecordSets",
+          "route53:GetHostedZone",
+          "route53:ListResourceRecordSets"
+        ]
+        Resource = "arn:aws:route53:::hostedzone/${module.pet_info_domain.info.domain_zone_id}"
       }
     ]
   }
