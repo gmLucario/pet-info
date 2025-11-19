@@ -104,7 +104,7 @@ resource "null_resource" "deploy_app" {
 
 # Upload Apple Wallet Pass certificate files
 resource "null_resource" "upload_pass_certificates" {
-  depends_on = [null_resource.wait_for_instance]
+  depends_on = [null_resource.deploy_app]
 
   # Upload pass certificate
   provisioner "file" {
