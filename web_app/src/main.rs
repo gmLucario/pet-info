@@ -91,19 +91,6 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")?;
-
-    // Load certificate first (best practice)
-    ssl_acceptor
-        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load certificate from {}: {}",
-                app_config.certificate_path,
-                e
-            )
-        })?;
-
-    // Load private key second
     ssl_acceptor
         .set_private_key_file(&app_config.private_key_path, SslFiletype::PEM)
         .map_err(|e| {
@@ -114,14 +101,15 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
             )
         })?;
 
-    // Explicitly verify that the private key matches the certificate
     ssl_acceptor
-        .check_private_key()
-        .map_err(|e| anyhow::anyhow!("Private key does not match certificate: {}", e))?;
-
-    log::info!("✓ SSL certificates loaded and validated successfully");
-    log::info!("  Certificate: {}", app_config.certificate_path);
-    log::info!("  Private key: {}", app_config.private_key_path);
+        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load certificate from {}: {}",
+                app_config.certificate_path,
+                e
+            )
+        })?;
 
     Ok(ssl_acceptor)
 }
@@ -219,17 +207,11 @@ async fn configure_and_run_server(
     });
 
     let bound_server = if app_config.is_prod() {
-        log::info!("🔧 Setting up HTTPS server with SSL/TLS");
         let ssl_acceptor = setup_ssl_acceptor()?;
-        log::info!("🔗 Binding to {}:{} with HTTPS", server_addr.0, server_addr.1);
         server.bind_openssl(server_addr, ssl_acceptor)?
     } else {
-        log::info!("🔗 Binding to {}:{} with HTTP", server_addr.0, server_addr.1);
         server.bind(server_addr)?
     };
-
-    log::info!("🚀 Starting web server - ready to accept connections!");
-    log::info!("📍 Server listening on https://{}:{}", app_config.wep_server_host, server_addr.1);
 
     bound_server
         .run()

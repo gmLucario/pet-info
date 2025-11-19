@@ -24,12 +24,12 @@ locals {
       description = "Path to SSL certificate file"
     }
     PASS_CERT_PATH = {
-      value       = "/opt/pet-info/pass_certificate.pem"
+      value       = "/home/ec2-user/pet-info/web_app/pass_certificate.pem"
       type        = "String"
       description = "Path to Apple Wallet Pass certificate file"
     }
     PASS_KEY_PATH = {
-      value       = "/opt/pet-info/pass_private_key.pem"
+      value       = "/home/ec2-user/pet-info/web_app/pass_private_key.pem"
       type        = "String"
       description = "Path to Apple Wallet Pass private key file"
     }

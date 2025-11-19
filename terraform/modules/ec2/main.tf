@@ -73,10 +73,7 @@ resource "null_resource" "deploy_app" {
       "mkdir -p /home/ec2-user/pet-info/web_app",
       "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
       "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
-      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable pet-info.service",
-      "sudo systemctl restart pet-info.service"
+      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info"
     ]
 
     connection {
@@ -176,12 +173,11 @@ resource "null_resource" "upload_pass_certificates" {
   # Move pass files to final location
   provisioner "remote-exec" {
     inline = [
-      "sudo mv /tmp/pass_certificate.pem /opt/pet-info/pass_certificate.pem",
-      "sudo mv /tmp/pass_private_key.pem /opt/pet-info/pass_private_key.pem",
-      "sudo chown ec2-user:ec2-user /opt/pet-info/pass_certificate.pem /opt/pet-info/pass_private_key.pem",
-      "sudo chmod 644 /opt/pet-info/pass_certificate.pem",
-      "sudo chmod 600 /opt/pet-info/pass_private_key.pem",
-      "sudo systemctl restart pet-info.service"
+      "sudo mv /tmp/pass_certificate.pem /home/ec2-user/pet-info/web_app/pass_certificate.pem",
+      "sudo mv /tmp/pass_private_key.pem /home/ec2-user/pet-info/web_app/pass_private_key.pem",
+      "sudo chown ec2-user:ec2-user /home/ec2-user/pet-info/web_app/pass_certificate.pem /home/ec2-user/pet-info/web_app/pass_private_key.pem",
+      "sudo chmod 644 /home/ec2-user/pet-info/web_app/pass_certificate.pem",
+      "sudo chmod 600 /home/ec2-user/pet-info/web_app/pass_private_key.pem"
     ]
 
     connection {

@@ -64,9 +64,9 @@ chrono-tz = "0.10.4"
 
 # aws
 aws-config = { version = "1.8.10", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.112.0"
+aws-sdk-s3 = "1.113.0"
 aws-sdk-ssm = { version = "1.99.0", optional = true }
-aws-sdk-sfn = "1.93.0"
+aws-sdk-sfn = "1.94.0"
 
 [dev-dependencies]
 mockall = "0.13.1"

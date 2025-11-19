@@ -10,7 +10,7 @@ pub static WEB_TEMPLATES: LazyLock<Tera> =
     LazyLock::new(|| Tera::new("web/templates/**/*.html").unwrap());
 
 pub static WEB_MANIFESTS: LazyLock<Tera> =
-    LazyLock::new(|| Tera::new("web/templates/**/*.webmanifest").unwrap());    
+    LazyLock::new(|| Tera::new("web/templates/**/*.webmanifest").unwrap());
 
 /// Global Tera template engine instance for PDF report templates.
 ///
