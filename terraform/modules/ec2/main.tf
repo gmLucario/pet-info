@@ -43,9 +43,8 @@ resource "null_resource" "deploy_app" {
     aws_volume_attachment.ebs_att
   ]
 
-  # Trigger redeployment when binary changes
+  # Deploy only on initial instance creation
   triggers = {
-    binary_hash = fileexists("${path.module}/../../web_app/out/pet-info") ? filemd5("${path.module}/../../web_app/out/pet-info") : ""
     instance_id = aws_instance.app_instance.id
   }
 
