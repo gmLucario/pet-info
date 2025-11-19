@@ -36,7 +36,7 @@ pub struct VerifyQuery {
 /// - 200 with challenge string if verification succeeds
 /// - 403 if verification fails
 #[web::get("/webhook/whatsapp")]
-pub async fn verify_webhook(
+pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
     info!(
@@ -80,7 +80,7 @@ pub async fn verify_webhook(
 /// - 200 OK if processing succeeds
 /// - 500 if processing fails
 #[web::post("/webhook/whatsapp")]
-pub async fn receive_webhook(
+pub async fn receive(
     payload: web::types::Json<api::whatsapp::WebhookPayload>,
 ) -> Result<impl web::Responder, web::Error> {
     let _span = logfire::span!("whatsapp_webhook").entered();

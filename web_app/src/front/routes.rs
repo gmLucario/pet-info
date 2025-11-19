@@ -162,5 +162,5 @@ pub fn blog(cfg: &mut web::ServiceConfig) {
 /// - `GET /webhook/whatsapp` - WhatsApp webhook verification
 /// - `POST /webhook/whatsapp` - WhatsApp webhook receiver
 pub fn webhooks(cfg: &mut web::ServiceConfig) {
-    cfg.service((webhook::verify_webhook, webhook::receive_webhook));
+    cfg.service((webhook::whatsapp::verify, webhook::whatsapp::receive));
 }
