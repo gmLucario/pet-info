@@ -42,7 +42,6 @@ EOF
 echo "export PRIVATE_KEY_PATH=/opt/pet-info/server.key" >> /home/ec2-user/.bashrc
 echo "export CERTIFICATE_PATH=/opt/pet-info/server.crt" >> /home/ec2-user/.bashrc
 echo "export APP_CERT_DIR=/opt/pet-info" >> /home/ec2-user/.bashrc
-source /home/ec2-user/.bashrc
 
 # Clone repository
 log "Cloning pet-info repository..."
