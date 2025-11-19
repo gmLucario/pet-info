@@ -166,14 +166,12 @@ async fn configure_and_run_server(
             .wrap(
                 CookieSession::private(&session_key)
                     .secure(app_config.is_prod())
-                    .domain(app_config.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
                     .name("pet-info-session"),
             )
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&identity_key)
                     .name("user_id")
-                    .domain(app_config.wep_server_host.to_string())
                     .max_age(consts::MAX_AGE_COOKIES)
                     .secure(app_config.is_prod()),
             ))
