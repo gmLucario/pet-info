@@ -23,6 +23,16 @@ locals {
       type        = "String"
       description = "Path to SSL certificate file"
     }
+    PASS_CERT_PATH = {
+      value       = "/opt/pet-info/pass_certificate.pem"
+      type        = "String"
+      description = "Path to Apple Wallet Pass certificate file"
+    }
+    PASS_KEY_PATH = {
+      value       = "/opt/pet-info/pass_private_key.pem"
+      type        = "String"
+      description = "Path to Apple Wallet Pass private key file"
+    }
   }
 
   # Merge default parameters with user-provided sensitive parameters
@@ -251,5 +261,7 @@ module "pet_info_ec2_instance" {
     server_path = var.cert_server_path
     key_path    = var.cert_key_path
   }
-  instance_envs = var.instance_envs
+  pass_cert_path = var.pass_cert_path
+  pass_key_path  = var.pass_key_path
+  instance_envs  = var.instance_envs
 }

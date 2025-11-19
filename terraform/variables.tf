@@ -40,6 +40,16 @@ variable "cert_key_path" {
   type = string
 }
 
+variable "pass_cert_path" {
+  type    = string
+  default = ""
+}
+
+variable "pass_key_path" {
+  type    = string
+  default = ""
+}
+
 variable "sensitive_instance_envs" {
   type = map(object({
     value       = string
