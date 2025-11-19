@@ -62,46 +62,6 @@ where
     s.parse::<u64>().map_err(serde::de::Error::custom)
 }
 
-/// Default value for environment field when loading from SSM
-fn default_env() -> String {
-    "prod".to_string()
-}
-
-/// Default value for private key path when loading from SSM
-fn default_private_key_path() -> String {
-    "/opt/pet-info/server.key".to_string()
-}
-
-/// Default value for certificate path when loading from SSM
-fn default_certificate_path() -> String {
-    "/opt/pet-info/server.crt".to_string()
-}
-
-/// Default value for Google OAuth auth URI
-fn default_google_oauth_auth_uri() -> String {
-    "https://accounts.google.com/o/oauth2/auth".to_string()
-}
-
-/// Default value for Google OAuth token URI
-fn default_google_oauth_token_uri() -> String {
-    "https://oauth2.googleapis.com/token".to_string()
-}
-
-/// Default value for Google OAuth cert URL
-fn default_google_oauth_auth_provider_x509_cert_url() -> String {
-    "https://www.googleapis.com/oauth2/v1/certs".to_string()
-}
-
-/// Default value for pass certificate path
-fn default_pass_cert_path() -> String {
-    "pass_certificate.pem".to_string()
-}
-
-/// Default value for pass private key path
-fn default_pass_key_path() -> String {
-    "pass_private_key.pem".to_string()
-}
-
 /// Application configuration with security-aware field management.
 ///
 /// This struct contains all environment variables used to configure the application.
@@ -118,7 +78,6 @@ pub struct AppConfig {
     /// Environment name to deploy the app (NON-SENSITIVE)
     /// Values: "local", "dev", "staging", "prod"
     #[envconfig(default = "local")]
-    #[serde(default = "default_env")]
     pub env: String,
 
     /// Database host value (NON-SENSITIVE)
@@ -141,13 +100,11 @@ pub struct AppConfig {
     /// Security: File should have 600 permissions, store path securely
     /// Example: "/etc/ssl/private/server.key"
     #[envconfig(default = "server.key")]
-    #[serde(default = "default_private_key_path")]
     pub private_key_path: String,
 
     /// Path to SSL certificate file (NON-SENSITIVE)
     /// Example: "/etc/ssl/certs/server.crt"
     #[envconfig(default = "server.crt")]
-    #[serde(default = "default_certificate_path")]
     pub certificate_path: String,
 
     /// 🔒 SENSITIVE: CSRF protection password (UUID format)
@@ -195,17 +152,14 @@ pub struct AppConfig {
 
     /// Google OAuth authorization URI (NON-SENSITIVE)
     #[envconfig(default = "https://accounts.google.com/o/oauth2/auth")]
-    #[serde(default = "default_google_oauth_auth_uri")]
     pub google_oauth_auth_uri: String,
 
     /// Google OAuth token URI (NON-SENSITIVE)
     #[envconfig(default = "https://oauth2.googleapis.com/token")]
-    #[serde(default = "default_google_oauth_token_uri")]
     pub google_oauth_token_uri: String,
 
     /// Google OAuth certificate URL (NON-SENSITIVE)
     #[envconfig(default = "https://www.googleapis.com/oauth2/v1/certs")]
-    #[serde(default = "default_google_oauth_auth_provider_x509_cert_url")]
     pub google_oauth_auth_provider_x509_cert_url: String,
 
     /// 🔒 SENSITIVE: Google OAuth client secret
@@ -213,11 +167,9 @@ pub struct AppConfig {
     pub google_oauth_client_secret: String,
 
     #[envconfig(default = "pass_certificate.pem")]
-    #[serde(default = "default_pass_cert_path")]
     pub pass_cert_path: String,
 
     #[envconfig(default = "pass_private_key.pem")]
-    #[serde(default = "default_pass_key_path")]
     pub pass_key_path: String,
 
     pub logfire_token: String,
