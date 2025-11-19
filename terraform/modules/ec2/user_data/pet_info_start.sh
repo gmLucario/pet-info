@@ -116,7 +116,7 @@ CERT_OBTAINED=false
 for attempt in $(seq 1 $MAX_RETRIES); do
     log "Certificate request attempt $attempt/$MAX_RETRIES..."
 
-    if sudo -E "$CERTBOT_BIN" certonly --dns-route53 -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos --register-unsafely-without-email 2>&1 | tee -a /var/log/user-data.log; then
+    if sudo -E "$CERTBOT_BIN" certonly --dns-route53 -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos -m gmlukario@gmail.com 2>&1 | tee -a /var/log/user-data.log; then
         log "✓ Let's Encrypt certificate obtained successfully"
         if [ -f "/etc/letsencrypt/live/pet-info.link/fullchain.pem" ]; then
             sudo cp /etc/letsencrypt/live/pet-info.link/fullchain.pem /opt/pet-info/server.crt
