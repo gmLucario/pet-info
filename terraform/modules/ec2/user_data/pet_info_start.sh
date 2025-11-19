@@ -24,13 +24,13 @@ log "Setting up initial SSL certificates..."
 sudo mkdir -p /opt/pet-info /etc/ssl/certs
 echo "${certificate}" | sudo tee /opt/pet-info/server.crt > /dev/null
 echo "${private_key_pem}" | sudo tee /opt/pet-info/server.key > /dev/null
+sudo chown ec2-user:ec2-user /opt/pet-info/server.crt /opt/pet-info/server.key
 sudo chmod 644 /opt/pet-info/server.crt
 sudo chmod 600 /opt/pet-info/server.key
 
 # Legacy paths for backward compatibility (symlinks)
 sudo ln -sf /opt/pet-info/server.crt /etc/ssl/certs/server.crt
 sudo ln -sf /opt/pet-info/server.key /etc/ssl/certs/server.key
-sudo chmod o+r /etc/ssl/certs/server.crt /etc/ssl/certs/server.key
 
 # Set up environment variables
 log "Configuring environment variables..."

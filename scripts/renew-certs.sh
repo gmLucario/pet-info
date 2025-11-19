@@ -62,8 +62,8 @@ log "Copying certificates to $APP_CERT_DIR..."
 sudo cp "$CERT_BASE_PATH/fullchain.pem" "$APP_CERT_DIR/server.crt"
 sudo cp "$CERT_BASE_PATH/privkey.pem" "$APP_CERT_DIR/server.key"
 
-# Set proper permissions
-sudo chown root:root "$APP_CERT_DIR/server.crt" "$APP_CERT_DIR/server.key"
+# Set proper permissions and ownership for ec2-user
+sudo chown ec2-user:ec2-user "$APP_CERT_DIR/server.crt" "$APP_CERT_DIR/server.key"
 sudo chmod 644 "$APP_CERT_DIR/server.crt"
 sudo chmod 600 "$APP_CERT_DIR/server.key"
 
