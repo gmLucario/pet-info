@@ -9,7 +9,7 @@ ssm = ["aws-sdk-ssm"]
 
 [dependencies]
 # Front Web dependencies:
-ntex = { version = "2.16.0", features = [ "tokio", "compress", "openssl" ] }
+ntex = { version = "2.17.0", features = [ "tokio", "compress", "openssl" ] }
 ntex-files = "2.1.0"
 ntex-multipart = "2.0.0"
 ntex-identity = "2.0.0"
@@ -61,13 +61,13 @@ simplelog = "0.12.2"
 log = "0.4.28"
 tokio = { version = "1.48", features = ["sync"] }
 chrono-tz = "0.10.4"
-notify = "7.0.1"
+notify = { version = "8.2.0", features = ["serde"] }
 
 # aws
 aws-config = { version = "1.8.10", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.110.0"
-aws-sdk-ssm = { version = "1.98.0", optional = true }
-aws-sdk-sfn = "1.92.0"
+aws-sdk-s3 = "1.112.0"
+aws-sdk-ssm = { version = "1.99.0", optional = true }
+aws-sdk-sfn = "1.93.0"
 
 [dev-dependencies]
 mockall = "0.13.1"
