@@ -3,8 +3,7 @@ resource "aws_ssm_parameter" "parameters" {
 
   name        = "/pet-info/${each.key}"
   type        = each.value.type
-  value_wo         = each.value.value
-  value_wo_version = 1
+  value       = each.value.value
   description = each.value.description
 
   # Use KMS key for SecureString parameters if provided
