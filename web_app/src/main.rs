@@ -15,6 +15,7 @@ pub mod models;
 pub mod repo;
 pub mod services;
 pub mod utils;
+pub mod webhook;
 
 use anyhow::Context;
 use csrf::AesGcmCsrfProtection;

@@ -4,7 +4,8 @@
 //! Routes are grouped by functionality into logical scopes for better organization
 //! and maintainability.
 
-use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder, webhook};
+use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder};
+use crate::webhook;
 use ntex::web;
 
 /// Configures public pet profile routes.

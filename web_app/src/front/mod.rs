@@ -16,7 +16,6 @@ pub mod server;
 pub mod session;
 pub mod templates;
 pub mod utils;
-pub mod webhook;
 
 use crate::{repo, services};
 use csrf::AesGcmCsrfProtection;
