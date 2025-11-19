@@ -94,36 +94,11 @@ sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.service /etc/systemd/sys
 sudo cp /home/ec2-user/pet-info/systemd/certbot-renewal.timer /etc/systemd/system/
 sudo cp /home/ec2-user/pet-info/systemd/pet-info.service /etc/systemd/system/
 
-# Create environment file for pet-info service
-log "Creating pet-info environment configuration..."
-sudo tee /etc/sysconfig/pet-info > /dev/null <<EOF
-ENV=prod
-PRIVATE_KEY_PATH=/opt/pet-info/server.key
-CERTIFICATE_PATH=/opt/pet-info/server.crt
-APP_CERT_DIR=/opt/pet-info
-%{ for key, value in instance_envs ~}
-${key}=${value}
-%{ endfor ~}
-EOF
-
-# Update systemd service to use environment file
-sudo sed -i '/\[Service\]/a EnvironmentFile=/etc/sysconfig/pet-info' /etc/systemd/system/pet-info.service
-
 # Make renewal script executable
 sudo chmod +x /home/ec2-user/pet-info/scripts/renew-certs.sh
 
 # Update renewal script path in systemd service
 sudo sed -i "s|/opt/pet-info/scripts/renew-certs.sh|/home/ec2-user/pet-info/scripts/renew-certs.sh|g" /etc/systemd/system/certbot-renewal.service
-
-# Create systemd environment file for renewal script
-log "Creating environment configuration..."
-sudo tee /etc/sysconfig/certbot-renewal > /dev/null <<EOF
-APP_CERT_DIR=/opt/pet-info
-DOMAIN=pet-info.link
-EOF
-
-# Update systemd service to use environment file
-sudo sed -i '/\[Service\]/a EnvironmentFile=/etc/sysconfig/certbot-renewal' /etc/systemd/system/certbot-renewal.service
 
 # Enable and start the renewal timer
 log "Enabling automatic certificate renewal..."
