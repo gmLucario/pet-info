@@ -44,7 +44,8 @@ $UV_BIN pip install certbot-dns-route53 --quiet
 
 # Step 3: Run certbot renewal
 log "Running certbot renewal for $DOMAIN..."
-if sudo -E certbot renew --dns-route53 --quiet --no-self-upgrade; then
+CERTBOT_BIN="$VENV_DIR/bin/certbot"
+if sudo -E "$CERTBOT_BIN" renew --dns-route53 --quiet --no-self-upgrade; then
     log "Certbot renewal completed successfully"
 else
     EXIT_CODE=$?
