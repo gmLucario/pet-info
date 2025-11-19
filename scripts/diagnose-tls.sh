@@ -35,14 +35,32 @@ echo ""
 
 # 5. Check if certificate and key match
 echo "[5] Checking if certificate and key match..."
-CERT_MODULUS=$(openssl x509 -noout -modulus -in /opt/pet-info/server.crt | openssl md5)
-KEY_MODULUS=$(openssl rsa -noout -modulus -in /opt/pet-info/server.key | openssl md5)
-echo "Certificate modulus MD5: $CERT_MODULUS"
-echo "Private key modulus MD5: $KEY_MODULUS"
-if [ "$CERT_MODULUS" = "$KEY_MODULUS" ]; then
-    echo "✓ Certificate and private key match"
+# Detect key type (RSA vs ECDSA)
+if openssl ec -in /opt/pet-info/server.key -text -noout &>/dev/null; then
+    echo "Key type: ECDSA (Elliptic Curve)"
+    # For ECDSA, we verify by checking if the key can sign and cert can verify
+    echo "Testing key/cert compatibility..."
+    if openssl x509 -in /opt/pet-info/server.crt -noout -pubkey | openssl pkey -pubin -pubout > /tmp/cert_pubkey.pem 2>/dev/null && \
+       openssl ec -in /opt/pet-info/server.key -pubout > /tmp/key_pubkey.pem 2>/dev/null && \
+       diff -q /tmp/cert_pubkey.pem /tmp/key_pubkey.pem &>/dev/null; then
+        echo "✓ Certificate and private key match (ECDSA)"
+    else
+        echo "✗ ERROR: Certificate and private key do NOT match!"
+    fi
+    rm -f /tmp/cert_pubkey.pem /tmp/key_pubkey.pem
+elif openssl rsa -in /opt/pet-info/server.key -check -noout &>/dev/null; then
+    echo "Key type: RSA"
+    CERT_MODULUS=$(openssl x509 -noout -modulus -in /opt/pet-info/server.crt | openssl md5)
+    KEY_MODULUS=$(openssl rsa -noout -modulus -in /opt/pet-info/server.key | openssl md5)
+    echo "Certificate modulus MD5: $CERT_MODULUS"
+    echo "Private key modulus MD5: $KEY_MODULUS"
+    if [ "$CERT_MODULUS" = "$KEY_MODULUS" ]; then
+        echo "✓ Certificate and private key match (RSA)"
+    else
+        echo "✗ ERROR: Certificate and private key do NOT match!"
+    fi
 else
-    echo "✗ ERROR: Certificate and private key do NOT match!"
+    echo "⚠ WARNING: Could not determine key type"
 fi
 echo ""
 
