@@ -27,6 +27,7 @@ resource "aws_instance" "app_instance" {
       private_key_pem    = data.local_file.key.content
       instance_envs      = var.instance_envs
       volume_device_name = "/dev/xvdf"
+      git_branch         = var.git_branch
     }
   )
 

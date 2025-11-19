@@ -46,7 +46,7 @@ echo "export APP_CERT_DIR=/opt/pet-info" >> /home/ec2-user/.bashrc
 # Clone repository
 log "Cloning pet-info repository..."
 cd /home/ec2-user
-git clone https://github.com/gmLucario/pet-info.git --depth 1
+git clone --depth 1 --branch ${git_branch} https://github.com/gmLucario/pet-info.git
 chown -R ec2-user:ec2-user pet-info/
 cd pet-info
 

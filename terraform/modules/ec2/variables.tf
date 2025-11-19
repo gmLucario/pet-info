@@ -41,3 +41,9 @@ variable "instance_envs" {
   type = map(string)
   sensitive = true
 }
+
+variable "git_branch" {
+  type        = string
+  description = "Git branch to clone from repository"
+  default     = "claude/automate-cert-renewal-01FKiiopZg6qnXnJDxAuoEch"
+}
