@@ -2,12 +2,30 @@
 
 This directory contains the systemd configuration for automatic SSL certificate renewal for pet-info.link.
 
+## 🎯 Quick Start
+
+**Using Terraform?** Good news! Just run `terraform apply` and everything is configured automatically. The EC2 user_data script handles the entire setup.
+
+**Manual setup?** Follow the [Installation](#installation) section below.
+
 ## Overview
 
 The certificate renewal system consists of two components:
 
 1. **Automated Renewal** - Systemd timer that runs certbot daily
 2. **Auto-Reload Detection** - Rust application monitors certificate files and logs when renewal occurs
+
+## Terraform Integration
+
+These systemd files are **automatically deployed** when you provision your EC2 instance via Terraform. The `terraform/modules/ec2/user_data/pet_info_start.sh` script:
+
+- ✅ Installs all dependencies (Python, uv, certbot)
+- ✅ Copies systemd files to `/etc/systemd/system/`
+- ✅ Configures environment variables
+- ✅ Enables and starts the renewal timer
+- ✅ Verifies the setup
+
+No manual intervention required!
 
 ## Architecture
 

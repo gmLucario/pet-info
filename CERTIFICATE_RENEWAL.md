@@ -2,7 +2,48 @@
 
 This guide explains how to set up automatic SSL certificate renewal for pet-info.link.
 
-## Quick Start
+## 🚀 Quick Start (Terraform - Fully Automated)
+
+**The easiest way:** Simply run `terraform apply` and everything is configured automatically!
+
+```bash
+# From your terraform directory
+cd terraform
+terraform apply
+
+# That's it! The EC2 instance will be provisioned with:
+# ✅ Systemd timer for daily certificate renewal checks
+# ✅ Certbot and Route53 plugin pre-installed
+# ✅ Initial certificates configured
+# ✅ Renewal automation fully operational
+```
+
+### What Terraform Does Automatically
+
+The `user_data` script (`terraform/modules/ec2/user_data/pet_info_start.sh`) automatically:
+
+1. **Installs Dependencies**
+   - Python 3 and uv package manager
+   - Certbot and certbot-dns-route53
+
+2. **Sets Up Certificate Storage**
+   - Creates `/opt/pet-info/` directory
+   - Places initial certificates (provided by Terraform)
+   - Configures proper file permissions (644 for cert, 600 for key)
+
+3. **Configures Systemd Automation**
+   - Copies `certbot-renewal.service` to `/etc/systemd/system/`
+   - Copies `certbot-renewal.timer` to `/etc/systemd/system/`
+   - Creates environment configuration in `/etc/sysconfig/certbot-renewal`
+   - Enables and starts the timer
+
+4. **Verifies Setup**
+   - Checks timer is active
+   - Logs setup status to `/var/log/user-data.log`
+
+---
+
+## 📋 Manual Setup (If Not Using Terraform)
 
 ### 1. One-Time Setup
 
@@ -39,6 +80,47 @@ sudo systemctl start certbot-renewal.timer
 # Verify timer is running
 sudo systemctl status certbot-renewal.timer
 ```
+
+---
+
+## 🔍 Verifying Terraform Setup
+
+After running `terraform apply`, SSH into your EC2 instance and verify the setup:
+
+```bash
+# SSH to your instance
+ssh ec2-user@your-instance-ip
+
+# Check user-data setup logs
+sudo cat /var/log/user-data.log
+
+# Verify systemd timer is running
+sudo systemctl status certbot-renewal.timer
+
+# Check when the timer will next run
+sudo systemctl list-timers certbot-renewal.timer
+
+# View renewal service status
+sudo systemctl status certbot-renewal.service
+
+# Verify certificates are in place
+ls -la /opt/pet-info/server.{crt,key}
+sudo openssl x509 -enddate -noout -in /opt/pet-info/server.crt
+
+# Test the renewal script manually (dry run)
+sudo /home/ec2-user/pet-info/scripts/renew-certs.sh
+```
+
+### Expected Output
+
+```
+✓ Certificate renewal timer activated successfully
+● certbot-renewal.timer - Timer for Let's Encrypt certificate renewal
+     Loaded: loaded (/etc/systemd/system/certbot-renewal.timer; enabled)
+     Active: active (waiting)
+```
+
+---
 
 ### 2. Deploy Your Rust Application
 
