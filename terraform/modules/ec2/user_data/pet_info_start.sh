@@ -130,7 +130,7 @@ for attempt in $(seq 1 $MAX_RETRIES); do
         fi
     else
         if [ $attempt -lt $MAX_RETRIES ]; then
-            log "⚠ Certificate request failed, waiting ${RETRY_DELAY}s before retry..."
+            log "⚠ Certificate request failed, waiting $${RETRY_DELAY}s before retry..."
             sleep $RETRY_DELAY
         else
             log "⚠ All $MAX_RETRIES attempts failed, will use terraform-provided certs and retry via timer"
