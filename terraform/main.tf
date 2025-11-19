@@ -5,10 +5,34 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+locals {
+  # Default non-sensitive SSM parameters that are always needed
+  default_ssm_parameters = {
+    ENV = {
+      value       = "prod"
+      type        = "String"
+      description = "Environment name (prod, dev, staging)"
+    }
+    PRIVATE_KEY_PATH = {
+      value       = "/opt/pet-info/server.key"
+      type        = "String"
+      description = "Path to SSL private key file"
+    }
+    CERTIFICATE_PATH = {
+      value       = "/opt/pet-info/server.crt"
+      type        = "String"
+      description = "Path to SSL certificate file"
+    }
+  }
+
+  # Merge default parameters with user-provided sensitive parameters
+  all_ssm_parameters = merge(local.default_ssm_parameters, var.sensitive_instance_envs)
+}
+
 module "ssm_items" {
   source = "./modules/ssm"
 
-  parameters = var.sensitive_instance_envs
+  parameters = local.all_ssm_parameters
   kms_key_id = "alias/aws/ssm"
 
   common_tags = {

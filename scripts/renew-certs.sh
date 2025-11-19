@@ -45,8 +45,12 @@ $UV_BIN pip install certbot-dns-route53 --quiet
 # Step 3: Run certbot renewal
 log "Running certbot renewal for $DOMAIN..."
 CERTBOT_BIN="$VENV_DIR/bin/certbot"
+
+# Store modification time of current certificate before renewal
+CERT_BEFORE_MTIME=$(stat -c %Y "$APP_CERT_DIR/server.crt" 2>/dev/null || echo "0")
+
 if sudo -E "$CERTBOT_BIN" renew --dns-route53 --quiet --no-self-upgrade; then
-    log "Certbot renewal completed successfully"
+    log "Certbot renewal command completed successfully"
 else
     EXIT_CODE=$?
     log "ERROR: Certbot renewal failed with exit code $EXIT_CODE"
@@ -71,11 +75,24 @@ sudo chmod 600 "$APP_CERT_DIR/server.key"
 
 log "Certificates copied successfully"
 
-# Step 6: Verify certificate expiration
+# Step 6: Check if certificate was actually renewed
+CERT_AFTER_MTIME=$(stat -c %Y "$APP_CERT_DIR/server.crt")
+if [ "$CERT_AFTER_MTIME" != "$CERT_BEFORE_MTIME" ]; then
+    log "Certificate was renewed, restarting pet-info service..."
+    sudo systemctl restart pet-info.service
+    if [ $? -eq 0 ]; then
+        log "✓ pet-info service restarted successfully"
+    else
+        log "⚠ Warning: Failed to restart pet-info service"
+    fi
+else
+    log "Certificate was not renewed (still valid for >30 days)"
+fi
+
+# Step 7: Verify certificate expiration
 EXPIRY=$(sudo openssl x509 -enddate -noout -in "$APP_CERT_DIR/server.crt" | cut -d= -f2)
 log "Certificate expires: $EXPIRY"
 
 log "=== Certificate renewal process completed successfully ==="
-log "Note: The Rust application will automatically detect and reload the new certificates"
 
 exit 0

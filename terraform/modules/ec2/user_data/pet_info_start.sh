@@ -32,17 +32,6 @@ sudo chmod 600 /opt/pet-info/server.key
 sudo ln -sf /opt/pet-info/server.crt /etc/ssl/certs/server.crt
 sudo ln -sf /opt/pet-info/server.key /etc/ssl/certs/server.key
 
-# Set up environment variables
-log "Configuring environment variables..."
-cat <<EOF >> /home/ec2-user/.bashrc
-%{ for key, value in instance_envs ~}
-export ${key}="${value}"
-%{ endfor ~}
-EOF
-echo "export PRIVATE_KEY_PATH=/opt/pet-info/server.key" >> /home/ec2-user/.bashrc
-echo "export CERTIFICATE_PATH=/opt/pet-info/server.crt" >> /home/ec2-user/.bashrc
-echo "export APP_CERT_DIR=/opt/pet-info" >> /home/ec2-user/.bashrc
-
 # Clone repository
 log "Cloning pet-info repository..."
 cd /home/ec2-user
@@ -114,18 +103,23 @@ else
     log "⚠ Warning: Certificate renewal timer failed to start"
 fi
 
-# Create initial Let's Encrypt certificate (if terraform certs are temporary)
-# Uncomment the following lines if you want to request Let's Encrypt certs immediately
-# log "Requesting initial Let's Encrypt certificate..."
-# source /home/ec2-user/pet-info/.venv/bin/activate
-# sudo -E certbot certonly --dns-route53 -d pet-info.link --non-interactive --agree-tos --email your-email@example.com || log "⚠ Certbot certificate request failed (will retry via timer)"
-# if [ -f "/etc/letsencrypt/live/pet-info.link/fullchain.pem" ]; then
-#     sudo cp /etc/letsencrypt/live/pet-info.link/fullchain.pem /opt/pet-info/server.crt
-#     sudo cp /etc/letsencrypt/live/pet-info.link/privkey.pem /opt/pet-info/server.key
-#     sudo chmod 644 /opt/pet-info/server.crt
-#     sudo chmod 600 /opt/pet-info/server.key
-#     log "✓ Let's Encrypt certificates installed"
-# fi
+# Request initial Let's Encrypt certificate
+log "Requesting initial Let's Encrypt certificate..."
+source /home/ec2-user/pet-info/.venv/bin/activate
+CERTBOT_BIN="/home/ec2-user/pet-info/.venv/bin/certbot"
+if sudo -E "$CERTBOT_BIN" certonly --dns-route53 -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos --register-unsafely-without-email; then
+    log "✓ Let's Encrypt certificate obtained successfully"
+    if [ -f "/etc/letsencrypt/live/pet-info.link/fullchain.pem" ]; then
+        sudo cp /etc/letsencrypt/live/pet-info.link/fullchain.pem /opt/pet-info/server.crt
+        sudo cp /etc/letsencrypt/live/pet-info.link/privkey.pem /opt/pet-info/server.key
+        sudo chown ec2-user:ec2-user /opt/pet-info/server.crt /opt/pet-info/server.key
+        sudo chmod 644 /opt/pet-info/server.crt
+        sudo chmod 600 /opt/pet-info/server.key
+        log "✓ Let's Encrypt certificates installed at /opt/pet-info/"
+    fi
+else
+    log "⚠ Let's Encrypt certificate request failed (will use terraform-provided certs and retry via timer)"
+fi
 
 log "=== Certificate renewal automation setup complete ==="
 log "Next steps:"
