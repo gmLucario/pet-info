@@ -34,7 +34,6 @@ use std::time::SystemTime;
 pub struct CertInfo {
     pub path: PathBuf,
     pub modified: SystemTime,
-    pub valid_until: Option<SystemTime>,
 }
 
 impl CertInfo {
@@ -48,32 +47,10 @@ impl CertInfo {
             .modified()
             .context("Failed to get modification time")?;
 
-        // Try to parse the certificate to get expiration date
-        let valid_until = Self::get_cert_expiration(path).ok();
-
         Ok(Self {
             path: path.to_path_buf(),
             modified,
-            valid_until,
         })
-    }
-
-    /// Extract certificate expiration date
-    fn get_cert_expiration(path: &Path) -> Result<SystemTime> {
-        let cert_pem = std::fs::read(path)
-            .with_context(|| format!("Failed to read certificate from {}", path.display()))?;
-
-        let cert = X509::from_pem(&cert_pem)
-            .context("Failed to parse X509 certificate")?;
-
-        let not_after = cert.not_after();
-        let epoch = SystemTime::UNIX_EPOCH;
-
-        // Convert ASN1 time to SystemTime (approximate)
-        let days_since_epoch = not_after.diff_days(&openssl::asn1::Asn1Time::from_unix(0).unwrap())
-            .context("Failed to calculate certificate expiration")?;
-
-        Ok(epoch + std::time::Duration::from_secs(days_since_epoch as u64 * 86400))
     }
 
     /// Check if certificate has been modified since this info was created
@@ -151,11 +128,8 @@ async fn watch_certificates_impl(cert_path: String, key_path: String) -> Result<
         .context("Private key file has no parent directory")?
         .to_path_buf();
 
-    // Load initial certificate info
-    let initial_cert = CertInfo::load(cert_path.as_ref())?;
-    if let Some(valid_until) = initial_cert.valid_until {
-        log::info!("📅 Current certificate valid until: {:?}", valid_until);
-    }
+    // Load initial certificate info to verify it exists
+    let _initial_cert = CertInfo::load(cert_path.as_ref())?;
 
     // Create channel for file system events
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -193,13 +167,6 @@ async fn watch_certificates_impl(cert_path: String, key_path: String) -> Result<
                     log::warn!("🔐 New SSL certificates detected and validated!");
                     log::warn!("⚠️  Server restart required to use new certificates");
                     log::warn!("   Systemd will automatically restart the service if configured");
-
-                    // Load new cert info to log expiration
-                    if let Ok(new_cert) = CertInfo::load(cert_path.as_ref()) {
-                        if let Some(valid_until) = new_cert.valid_until {
-                            log::info!("📅 New certificate valid until: {:?}", valid_until);
-                        }
-                    }
                 }
                 Err(e) => {
                     log::error!("❌ New certificate validation failed: {}", e);
