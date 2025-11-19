@@ -103,22 +103,43 @@ else
     log "⚠ Warning: Certificate renewal timer failed to start"
 fi
 
-# Request initial Let's Encrypt certificate
+# Request initial Let's Encrypt certificate with retries
 log "Requesting initial Let's Encrypt certificate..."
 source /home/ec2-user/pet-info/.venv/bin/activate
 CERTBOT_BIN="/home/ec2-user/pet-info/.venv/bin/certbot"
-if sudo -E "$CERTBOT_BIN" certonly --dns-route53 -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos --register-unsafely-without-email; then
-    log "✓ Let's Encrypt certificate obtained successfully"
-    if [ -f "/etc/letsencrypt/live/pet-info.link/fullchain.pem" ]; then
-        sudo cp /etc/letsencrypt/live/pet-info.link/fullchain.pem /opt/pet-info/server.crt
-        sudo cp /etc/letsencrypt/live/pet-info.link/privkey.pem /opt/pet-info/server.key
-        sudo chown ec2-user:ec2-user /opt/pet-info/server.crt /opt/pet-info/server.key
-        sudo chmod 644 /opt/pet-info/server.crt
-        sudo chmod 600 /opt/pet-info/server.key
-        log "✓ Let's Encrypt certificates installed at /opt/pet-info/"
+
+# Retry up to 5 times with 30 second delays (to allow IAM propagation)
+MAX_RETRIES=5
+RETRY_DELAY=30
+CERT_OBTAINED=false
+
+for attempt in $(seq 1 $MAX_RETRIES); do
+    log "Certificate request attempt $attempt/$MAX_RETRIES..."
+
+    if sudo -E "$CERTBOT_BIN" certonly --dns-route53 -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos --register-unsafely-without-email 2>&1 | tee -a /var/log/user-data.log; then
+        log "✓ Let's Encrypt certificate obtained successfully"
+        if [ -f "/etc/letsencrypt/live/pet-info.link/fullchain.pem" ]; then
+            sudo cp /etc/letsencrypt/live/pet-info.link/fullchain.pem /opt/pet-info/server.crt
+            sudo cp /etc/letsencrypt/live/pet-info.link/privkey.pem /opt/pet-info/server.key
+            sudo chown ec2-user:ec2-user /opt/pet-info/server.crt /opt/pet-info/server.key
+            sudo chmod 644 /opt/pet-info/server.crt
+            sudo chmod 600 /opt/pet-info/server.key
+            log "✓ Let's Encrypt certificates installed at /opt/pet-info/"
+            CERT_OBTAINED=true
+            break
+        fi
+    else
+        if [ $attempt -lt $MAX_RETRIES ]; then
+            log "⚠ Certificate request failed, waiting ${RETRY_DELAY}s before retry..."
+            sleep $RETRY_DELAY
+        else
+            log "⚠ All $MAX_RETRIES attempts failed, will use terraform-provided certs and retry via timer"
+        fi
     fi
-else
-    log "⚠ Let's Encrypt certificate request failed (will use terraform-provided certs and retry via timer)"
+done
+
+if [ "$CERT_OBTAINED" = "true" ]; then
+    log "🎉 Successfully obtained and installed Let's Encrypt certificates"
 fi
 
 log "=== Certificate renewal automation setup complete ==="
