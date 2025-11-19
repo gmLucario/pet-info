@@ -135,3 +135,6 @@ log "  3. Check renewal status: sudo systemctl status certbot-renewal.timer"
 log "  4. View logs: sudo journalctl -u certbot-renewal.service"
 log ""
 log "=== pet-info EC2 instance setup complete ==="
+
+# Create completion marker file for terraform provisioner
+touch /tmp/user-data-complete

@@ -48,9 +48,21 @@ resource "null_resource" "deploy_app" {
     instance_id = aws_instance.app_instance.id
   }
 
-  # Wait for instance to be ready
-  provisioner "local-exec" {
-    command = "sleep 60"
+  # Wait for user-data script to complete
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'Waiting for user-data script to complete...'",
+      "while [ ! -f /tmp/user-data-complete ]; do sleep 10; done",
+      "echo 'User-data script completed, ready for deployment'"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "15m"
+    }
   }
 
   # Copy application binary
