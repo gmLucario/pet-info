@@ -22,6 +22,7 @@ DOMAIN="pet-info.link"
 CERT_BASE_PATH="/etc/letsencrypt/live/$DOMAIN"
 APP_CERT_DIR="${APP_CERT_DIR:-/opt/pet-info}"
 LOG_FILE="/var/log/certbot-renewal.log"
+UV_BIN="/root/.local/bin/uv"
 
 # Logging function
 log() {
@@ -33,13 +34,13 @@ log "=== Starting certificate renewal process ==="
 # Step 1: Create/activate virtual environment
 log "Setting up Python virtual environment..."
 if [ ! -d "$VENV_DIR" ]; then
-    uv venv "$VENV_DIR"
+    $UV_BIN venv "$VENV_DIR"
 fi
 source "$VENV_DIR/bin/activate"
 
 # Step 2: Install/update certbot
 log "Installing certbot-dns-route53..."
-uv pip install certbot-dns-route53 --quiet
+$UV_BIN pip install certbot-dns-route53 --quiet
 
 # Step 3: Run certbot renewal
 log "Running certbot renewal for $DOMAIN..."
