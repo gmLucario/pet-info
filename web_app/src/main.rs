@@ -229,11 +229,17 @@ async fn configure_and_run_server(
     });
 
     let bound_server = if app_config.is_prod() {
+        log::info!("🔧 Setting up HTTPS server with SSL/TLS");
         let ssl_acceptor = setup_ssl_acceptor()?;
+        log::info!("🔗 Binding to {}:{} with HTTPS", server_addr.0, server_addr.1);
         server.bind_openssl(server_addr, ssl_acceptor)?
     } else {
+        log::info!("🔗 Binding to {}:{} with HTTP", server_addr.0, server_addr.1);
         server.bind(server_addr)?
     };
+
+    log::info!("🚀 Starting web server - ready to accept connections!");
+    log::info!("📍 Server listening on https://{}:{}", app_config.wep_server_host, server_addr.1);
 
     bound_server
         .run()
