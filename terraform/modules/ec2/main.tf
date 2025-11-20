@@ -67,36 +67,7 @@ resource "null_resource" "deploy_app" {
     }
   }
 
-  # Move binary to final location and set up service
-  provisioner "remote-exec" {
-    inline = [
-      "mkdir -p /home/ec2-user/pet-info/web_app",
-      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
-      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
-      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-}
-
-# Upload SSL certificate files
-resource "null_resource" "upload_ssl_certificates" {
-  depends_on = [null_resource.deploy_app]
-
-  # Re-run when certificate files change
-  triggers = {
-    cert_hash = filemd5(var.cert_details.server_path)
-    key_hash  = filemd5(var.cert_details.key_path)
-  }
-
-  # Upload SSL certificate
+  # Copy SSL certificates
   provisioner "file" {
     source      = var.cert_details.server_path
     destination = "/tmp/server.crt"
@@ -110,7 +81,6 @@ resource "null_resource" "upload_ssl_certificates" {
     }
   }
 
-  # Upload SSL private key
   provisioner "file" {
     source      = var.cert_details.key_path
     destination = "/tmp/server.key"
@@ -124,14 +94,17 @@ resource "null_resource" "upload_ssl_certificates" {
     }
   }
 
-  # Move SSL files to final location
+  # Move binary and certificates to final location
   provisioner "remote-exec" {
     inline = [
       "mkdir -p /home/ec2-user/pet-info/web_app",
+      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
       "mv /tmp/server.crt /home/ec2-user/pet-info/web_app/server.crt",
       "mv /tmp/server.key /home/ec2-user/pet-info/web_app/server.key",
+      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
       "chmod 644 /home/ec2-user/pet-info/web_app/server.crt",
-      "chmod 600 /home/ec2-user/pet-info/web_app/server.key"
+      "chmod 600 /home/ec2-user/pet-info/web_app/server.key",
+      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info"
     ]
 
     connection {
@@ -146,13 +119,7 @@ resource "null_resource" "upload_ssl_certificates" {
 
 # Upload Apple Wallet Pass certificate files
 resource "null_resource" "upload_pass_certificates" {
-  depends_on = [null_resource.upload_ssl_certificates]
-
-  # Re-run when pass certificate files change
-  triggers = {
-    pass_cert_hash = filemd5(var.pass_cert_path)
-    pass_key_hash  = filemd5(var.pass_key_path)
-  }
+  depends_on = [null_resource.deploy_app]
 
   # Upload pass certificate
   provisioner "file" {
