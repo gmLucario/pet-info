@@ -90,6 +90,12 @@ resource "null_resource" "deploy_app" {
 resource "null_resource" "upload_ssl_certificates" {
   depends_on = [null_resource.deploy_app]
 
+  # Re-run when certificate files change
+  triggers = {
+    cert_hash = filemd5(var.cert_details.server_path)
+    key_hash  = filemd5(var.cert_details.key_path)
+  }
+
   # Upload SSL certificate
   provisioner "file" {
     source      = var.cert_details.server_path
@@ -141,6 +147,12 @@ resource "null_resource" "upload_ssl_certificates" {
 # Upload Apple Wallet Pass certificate files
 resource "null_resource" "upload_pass_certificates" {
   depends_on = [null_resource.upload_ssl_certificates]
+
+  # Re-run when pass certificate files change
+  triggers = {
+    pass_cert_hash = filemd5(var.pass_cert_path)
+    pass_key_hash  = filemd5(var.pass_key_path)
+  }
 
   # Upload pass certificate
   provisioner "file" {
