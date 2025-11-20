@@ -99,11 +99,11 @@ resource "null_resource" "deploy_app" {
     inline = concat([
       "mkdir -p /home/ec2-user/pet-info/web_app",
       "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
-      "mv /tmp/server.crt /home/ec2-user/pet-info/web_app/server.crt",
-      "mv /tmp/server.key /home/ec2-user/pet-info/web_app/server.key",
+      "mv /tmp/server.crt ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
+      "mv /tmp/server.key ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
       "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
-      "chmod 644 /home/ec2-user/pet-info/web_app/server.crt",
-      "chmod 600 /home/ec2-user/pet-info/web_app/server.key",
+      "chmod 644 ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
+      "chmod 600 ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
       "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
     ], [
       for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
@@ -159,11 +159,11 @@ resource "null_resource" "upload_pass_certificates" {
   # Move pass files to final location
   provisioner "remote-exec" {
     inline = [
-      "sudo mv /tmp/pass_certificate.pem /home/ec2-user/pet-info/web_app/pass_certificate.pem",
-      "sudo mv /tmp/pass_private_key.pem /home/ec2-user/pet-info/web_app/pass_private_key.pem",
-      "sudo chown ec2-user:ec2-user /home/ec2-user/pet-info/web_app/pass_certificate.pem /home/ec2-user/pet-info/web_app/pass_private_key.pem",
-      "sudo chmod 644 /home/ec2-user/pet-info/web_app/pass_certificate.pem",
-      "sudo chmod 600 /home/ec2-user/pet-info/web_app/pass_private_key.pem"
+      "sudo mv /tmp/pass_certificate.pem ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
+      "sudo mv /tmp/pass_private_key.pem ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
+      "sudo chown ec2-user:ec2-user ${var.sensitive_instance_envs["PASS_CERT_PATH"].value} ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
+      "sudo chmod 644 ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
+      "sudo chmod 600 ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}"
     ]
 
     connection {

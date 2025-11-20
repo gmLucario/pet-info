@@ -61,3 +61,12 @@ variable "pass_key_path" {
   type        = string
   description = "Path to Apple Wallet Pass private key file"
 }
+
+variable "sensitive_instance_envs" {
+  type = map(object({
+    value       = string
+    type        = string
+    description = string
+  }))
+  sensitive = true
+}

@@ -223,7 +223,8 @@ module "pet_info_ec2_instance" {
     key_path    = var.cert_key_path
   }
 
-  instance_envs = var.instance_envs
+  instance_envs           = var.instance_envs
+  sensitive_instance_envs = var.sensitive_instance_envs
 
   pass_cert_path          = var.pass_cert_path
   pass_key_path           = var.pass_key_path
