@@ -49,7 +49,6 @@ variable "instance_envs" {
 variable "git_branch" {
   type        = string
   description = "Git branch to clone from repository"
-  default     = "claude/automate-cert-renewal-01FKiiopZg6qnXnJDxAuoEch"
 }
 
 variable "pass_cert_path" {

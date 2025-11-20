@@ -105,9 +105,9 @@ resource "null_resource" "deploy_app" {
       "chmod 644 ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
       "chmod 600 ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
       "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
-    ], [
+      ], [
       for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
-    ], [
+      ], [
       "cd /home/ec2-user/pet-info/web_app",
       "source ~/.bashrc && nohup ./pet-info > /dev/null 2>&1 &",
       "sleep 2",

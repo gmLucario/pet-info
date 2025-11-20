@@ -68,3 +68,7 @@ variable "instance_envs" {
   sensitive = true
 }
 
+variable "git_branch" {
+  type        = string
+  description = "Git branch to clone from repository"
+}
