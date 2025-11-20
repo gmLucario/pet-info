@@ -5,10 +5,24 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+locals {
+  # Default non-sensitive SSM parameters that are always needed
+  default_ssm_parameters = {
+    ENV = {
+      value       = "prod"
+      type        = "String"
+      description = "Environment name (prod, dev, staging)"
+    }
+  }
+
+  # Merge default parameters with user-provided sensitive parameters
+  all_ssm_parameters = merge(local.default_ssm_parameters, var.sensitive_instance_envs)
+}
+
 module "ssm_items" {
   source = "./modules/ssm"
 
-  parameters = var.sensitive_instance_envs
+  parameters = local.all_ssm_parameters
   kms_key_id = "alias/aws/ssm"
 
   common_tags = {
@@ -208,5 +222,13 @@ module "pet_info_ec2_instance" {
     server_path = var.cert_server_path
     key_path    = var.cert_key_path
   }
-  instance_envs = var.instance_envs
+
+  instance_envs           = var.instance_envs
+  sensitive_instance_envs = var.sensitive_instance_envs
+
+  pass_cert_path          = var.pass_cert_path
+  pass_key_path           = var.pass_key_path
+  web_app_executable_path = var.web_app_executable_path
+
+  git_branch = var.git_branch
 }

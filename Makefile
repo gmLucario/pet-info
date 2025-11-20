@@ -8,4 +8,9 @@ build_send_reminders:
 	@docker build -t build_lambda:latest -f docker/lambda_build.Dockerfile terraform/lambda_package/send-reminders --output terraform/lambda_package/send-reminders/out
 
 deploy_prod_infra:
+	@terraform -chdir=terraform init -upgrade
 	@terraform -chdir=terraform apply -var-file=prod.tfvars
+
+tf_format:
+	@terraform -chdir=terraform fmt --recursive
+

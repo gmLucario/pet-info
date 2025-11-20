@@ -24,12 +24,17 @@ variable "stack_tags" {
   }
 }
 
+variable "web_app_executable_path" {
+  type = string
+}
+
 variable "ec2_user_data_path" {
   type = string
 }
 
 variable "cert_server_path" {
-  type = string
+  type    = string
+  default = "../web_app/server.crt"
 }
 
 variable "ssh_key_path" {
@@ -37,6 +42,15 @@ variable "ssh_key_path" {
 }
 
 variable "cert_key_path" {
+  type    = string
+  default = "../web_app/server.key"
+}
+
+variable "pass_cert_path" {
+  type = string
+}
+
+variable "pass_key_path" {
   type = string
 }
 
@@ -54,3 +68,7 @@ variable "instance_envs" {
   sensitive = true
 }
 
+variable "git_branch" {
+  type        = string
+  description = "Git branch to clone from repository"
+}

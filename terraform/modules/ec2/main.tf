@@ -1,14 +1,5 @@
 data "aws_region" "this" {}
 
-data "local_file" "cert" {
-  filename = var.cert_details.server_path
-}
-
-data "local_file" "key" {
-  filename = var.cert_details.key_path
-}
-
-
 resource "aws_instance" "app_instance" {
   ami                  = data.aws_ami.amazon_arm.id
   instance_type        = "t4g.small"
@@ -23,15 +14,165 @@ resource "aws_instance" "app_instance" {
   user_data = templatefile(
     var.user_data_path,
     {
-      certificate        = data.local_file.cert.content
-      private_key_pem    = data.local_file.key.content
-      instance_envs      = var.instance_envs
-      volume_device_name = "/dev/xvdf"
+      git_branch = var.git_branch
     }
   )
 
   tags = {
     Name = "pet-info-app"
+  }
+}
+
+# Deploy the application binary
+resource "null_resource" "deploy_app" {
+  depends_on = [
+    aws_instance.app_instance,
+    aws_eip_association.ip_ec2,
+    aws_volume_attachment.ebs_att
+  ]
+
+  # Deploy only on initial instance creation
+  triggers = {
+    instance_id = aws_instance.app_instance.id
+  }
+
+  # Wait for user-data script to complete
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'Waiting for user-data script to complete...'",
+      "while [ ! -f /tmp/user-data-complete ]; do sleep 10; done",
+      "echo 'User-data script completed, ready for deployment'"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "15m"
+    }
+  }
+
+  # Copy application binary
+  provisioner "file" {
+    source      = var.web_app_executable_path
+    destination = "/tmp/pet-info"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Copy SSL certificates
+  provisioner "file" {
+    source      = var.cert_details.server_path
+    destination = "/tmp/server.crt"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  provisioner "file" {
+    source      = var.cert_details.key_path
+    destination = "/tmp/server.key"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move binary and certificates to final location
+  provisioner "remote-exec" {
+    inline = concat([
+      "mkdir -p /home/ec2-user/pet-info/web_app",
+      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
+      "mv /tmp/server.crt ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
+      "mv /tmp/server.key ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
+      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
+      "chmod 644 ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
+      "chmod 600 ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
+      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
+      ], [
+      for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
+      ], [
+      "cd /home/ec2-user/pet-info/web_app",
+      "source ~/.bashrc && nohup ./pet-info > /dev/null 2>&1 &",
+      "sleep 2",
+      "echo 'Server started in background'"
+    ])
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
+# Upload Apple Wallet Pass certificate files
+resource "null_resource" "upload_pass_certificates" {
+  depends_on = [null_resource.deploy_app]
+
+  # Upload pass certificate
+  provisioner "file" {
+    source      = var.pass_cert_path
+    destination = "/tmp/pass_certificate.pem"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Upload pass private key
+  provisioner "file" {
+    source      = var.pass_key_path
+    destination = "/tmp/pass_private_key.pem"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move pass files to final location
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mv /tmp/pass_certificate.pem ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
+      "sudo mv /tmp/pass_private_key.pem ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
+      "sudo chown ec2-user:ec2-user ${var.sensitive_instance_envs["PASS_CERT_PATH"].value} ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
+      "sudo chmod 644 ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
+      "sudo chmod 600 ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
   }
 }
 
