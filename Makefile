@@ -13,3 +13,4 @@ deploy_prod_infra:
 
 tf_format:
 	@terraform -chdir=terraform fmt --recursive
+
