@@ -96,7 +96,7 @@ resource "null_resource" "deploy_app" {
 
   # Move binary and certificates to final location
   provisioner "remote-exec" {
-    inline = [
+    inline = concat([
       "mkdir -p /home/ec2-user/pet-info/web_app",
       "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
       "mv /tmp/server.crt /home/ec2-user/pet-info/web_app/server.crt",
@@ -104,8 +104,10 @@ resource "null_resource" "deploy_app" {
       "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
       "chmod 644 /home/ec2-user/pet-info/web_app/server.crt",
       "chmod 600 /home/ec2-user/pet-info/web_app/server.key",
-      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info"
-    ]
+      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
+    ], [
+      for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
+    ])
 
     connection {
       type        = "ssh"
