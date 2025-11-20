@@ -107,6 +107,11 @@ resource "null_resource" "deploy_app" {
       "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
     ], [
       for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
+    ], [
+      "cd /home/ec2-user/pet-info/web_app",
+      "nohup env RUST_LOG=pet_info ./pet-info > server.log 2>&1 &",
+      "sleep 2",
+      "echo 'Server started in background'"
     ])
 
     connection {
