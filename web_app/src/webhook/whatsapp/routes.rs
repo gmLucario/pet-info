@@ -13,13 +13,13 @@ use serde::Deserialize;
 pub struct VerifyQuery {
     /// The mode parameter, should be "subscribe"
     #[serde(rename = "hub.mode")]
-    pub mode: Option<String>,
+    pub mode: String,
     /// The verification token from WhatsApp
     #[serde(rename = "hub.verify_token")]
-    pub verify_token: Option<String>,
+    pub verify_token: String,
     /// The challenge string to echo back
     #[serde(rename = "hub.challenge")]
-    pub challenge: Option<String>,
+    pub challenge: String,
 }
 
 /// Webhook verification endpoint (GET)
@@ -39,48 +39,17 @@ pub struct VerifyQuery {
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
-    // Extract required query parameters
-    let mode = match &query.mode {
-        Some(m) => m,
-        None => {
-            logfire::warn!("Webhook verification request missing hub.mode parameter");
-            return Err(errors::UserError::FormInputValueError(
-                "Missing required parameter: hub.mode".to_string()
-            ).into());
-        }
-    };
-
-    let verify_token = match &query.verify_token {
-        Some(t) => t,
-        None => {
-            logfire::warn!("Webhook verification request missing hub.verify_token parameter");
-            return Err(errors::UserError::FormInputValueError(
-                "Missing required parameter: hub.verify_token".to_string()
-            ).into());
-        }
-    };
-
-    let challenge = match &query.challenge {
-        Some(c) => c,
-        None => {
-            logfire::warn!("Webhook verification request missing hub.challenge parameter");
-            return Err(errors::UserError::FormInputValueError(
-                "Missing required parameter: hub.challenge".to_string()
-            ).into());
-        }
-    };
-
     logfire::info!(
         "Received webhook verification request: mode={mode}, token={token}",
-        mode = mode,
-        token = verify_token
+        mode = &query.mode,
+        token = &query.verify_token
     );
 
     // Verify the mode is "subscribe"
-    if mode != "subscribe" {
+    if query.mode != "subscribe" {
         logfire::error!(
             "Invalid mode: expected 'subscribe', got '{mode}'",
-            mode = mode
+            mode = &query.mode
         );
         return Err(errors::UserError::Unauthorized.into());
     }
@@ -90,7 +59,7 @@ pub async fn verify(
         .get()
         .expect("APP_CONFIG should be initialized before starting web server");
 
-    if verify_token != &app_config.whatsapp_verify_token {
+    if query.verify_token != app_config.whatsapp_verify_token {
         logfire::error!("Invalid verify token");
         return Err(errors::UserError::Unauthorized.into());
     }
@@ -100,7 +69,7 @@ pub async fn verify(
     // Return the challenge to complete verification
     Ok(web::HttpResponse::Ok()
         .content_type("text/plain")
-        .body(challenge.clone()))
+        .body(query.challenge.clone()))
 }
 
 /// Webhook receiver endpoint (POST)
@@ -151,17 +120,8 @@ mod tests {
     fn test_verify_query_deserialization() {
         let json = r#"{"hub.mode":"subscribe","hub.verify_token":"test123","hub.challenge":"challenge123"}"#;
         let query: VerifyQuery = serde_json::from_str(json).unwrap();
-        assert_eq!(query.mode, Some("subscribe".to_string()));
-        assert_eq!(query.verify_token, Some("test123".to_string()));
-        assert_eq!(query.challenge, Some("challenge123".to_string()));
-    }
-
-    #[test]
-    fn test_verify_query_deserialization_empty() {
-        let json = r#"{}"#;
-        let query: VerifyQuery = serde_json::from_str(json).unwrap();
-        assert_eq!(query.mode, None);
-        assert_eq!(query.verify_token, None);
-        assert_eq!(query.challenge, None);
+        assert_eq!(query.mode, "subscribe");
+        assert_eq!(query.verify_token, "test123");
+        assert_eq!(query.challenge, "challenge123");
     }
 }
