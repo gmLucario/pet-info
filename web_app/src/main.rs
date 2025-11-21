@@ -103,10 +103,10 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
         })?;
 
     ssl_acceptor
-        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
+        .set_certificate_chain_file(&app_config.certificate_path)
         .map_err(|e| {
             anyhow::anyhow!(
-                "Failed to load certificate from {}: {}",
+                "Failed to load certificate chain from {}: {}",
                 app_config.certificate_path,
                 e
             )
