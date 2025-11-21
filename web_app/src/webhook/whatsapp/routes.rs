@@ -4,7 +4,7 @@
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
 use super::{handler, schemas};
-use crate::front::errors;
+use crate::{config, front::errors};
 use ntex::web;
 use serde::Deserialize;
 
@@ -55,11 +55,11 @@ pub async fn verify(
     }
 
     // Verify the token matches the configured token
-    // TODO: Add WHATSAPP_VERIFY_TOKEN to your config
-    let expected_token = std::env::var("WHATSAPP_VERIFY_TOKEN")
-        .unwrap_or_else(|_| "your_verify_token_here".to_string());
+    let app_config = config::APP_CONFIG
+        .get()
+        .expect("APP_CONFIG should be initialized before starting web server");
 
-    if query.verify_token != expected_token {
+    if query.verify_token != app_config.whatsapp_verify_token {
         logfire::error!("Invalid verify token");
         return Err(errors::UserError::Unauthorized.into());
     }
