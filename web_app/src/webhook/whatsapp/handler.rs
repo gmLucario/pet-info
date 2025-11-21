@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
 
 /// Root webhook payload from WhatsApp
 #[derive(Debug, Deserialize, Serialize)]
@@ -194,7 +193,10 @@ pub fn process_webhook_messages(payload: &WebhookPayload) -> Vec<&Message> {
         .flatten()
         .collect::<Vec<_>>();
 
-    info!("Processed {} messages from webhook", messages.len());
+    logfire::info!(
+        "Processed {count} messages from webhook",
+        count = messages.len()
+    );
     messages
 }
 
@@ -219,7 +221,10 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
         .flatten()
         .collect::<Vec<_>>();
 
-    info!("Processed {} statuses from webhook", statuses.len());
+    logfire::info!(
+        "Processed {count} statuses from webhook",
+        count = statuses.len()
+    );
     statuses
 }
 
@@ -236,42 +241,47 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 ///
 /// Result indicating success or failure
 pub async fn handle_user_message(message: &Message) -> Result<()> {
-    info!(
-        "Handling message from {}: type={}",
-        message.from, message.msg_type
+    logfire::info!(
+        "Handling message from {from}: type={msg_type}",
+        from = &message.from,
+        msg_type = &message.msg_type
     );
 
     match message.msg_type.as_str() {
         "text" => {
             if let Some(text) = &message.text {
-                info!("Received text message: {}", text.body);
+                logfire::info!("Received text message: {body}", body = &text.body);
                 // TODO: Add your message handling logic here
                 // Example: Parse commands, look up pet info, send responses
             }
         }
         "image" => {
             if let Some(image) = &message.image {
-                info!("Received image: id={}", image.id);
+                logfire::info!("Received image: id={id}", id = &image.id);
                 // TODO: Handle image uploads (e.g., pet photos)
             }
         }
         "location" => {
             if let Some(location) = &message.location {
-                info!(
-                    "Received location: lat={}, lon={}",
-                    location.latitude, location.longitude
+                logfire::info!(
+                    "Received location: lat={lat}, lon={lon}",
+                    lat = location.latitude,
+                    lon = location.longitude
                 );
                 // TODO: Handle location sharing (e.g., lost pet location)
             }
         }
         "document" => {
             if let Some(document) = &message.document {
-                info!("Received document: id={}", document.id);
+                logfire::info!("Received document: id={id}", id = &document.id);
                 // TODO: Handle document uploads
             }
         }
         _ => {
-            warn!("Unsupported message type: {}", message.msg_type);
+            logfire::warn!(
+                "Unsupported message type: {msg_type}",
+                msg_type = &message.msg_type
+            );
         }
     }
 
@@ -290,9 +300,11 @@ pub async fn handle_user_message(message: &Message) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub async fn handle_message_status(status: &Status) -> Result<()> {
-    info!(
-        "Message {} status: {} for recipient {}",
-        status.id, status.status, status.recipient_id
+    logfire::info!(
+        "Message {id} status: {msg_status} for recipient {recipient}",
+        id = &status.id,
+        msg_status = &status.status,
+        recipient = &status.recipient_id
     );
 
     // TODO: Update your database with delivery status if needed
@@ -312,13 +324,20 @@ pub async fn handle_message_status(status: &Status) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
-    info!("Processing webhook with {} entries", payload.entry.len());
+    logfire::info!(
+        "Processing webhook with {entries} entries",
+        entries = payload.entry.len()
+    );
 
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
         if let Err(e) = handle_user_message(message).await {
-            error!("Failed to handle message {}: {}", message.id, e);
+            logfire::error!(
+                "Failed to handle message {id}: {error}",
+                id = &message.id,
+                error = e.to_string()
+            );
         }
     }
 
@@ -326,7 +345,11 @@ pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
     let statuses = process_webhook_statuses(&payload);
     for status in statuses {
         if let Err(e) = handle_message_status(status).await {
-            error!("Failed to handle status {}: {}", status.id, e);
+            logfire::error!(
+                "Failed to handle status {id}: {error}",
+                id = &status.id,
+                error = e.to_string()
+            );
         }
     }
 

@@ -7,7 +7,6 @@ use super::handler;
 use crate::front::errors;
 use ntex::web;
 use serde::Deserialize;
-use tracing::{error, info};
 
 /// Query parameters for webhook verification
 #[derive(Debug, Deserialize)]
@@ -40,14 +39,18 @@ pub struct VerifyQuery {
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
-    info!(
-        "Received webhook verification request: mode={}, token={}",
-        query.mode, query.verify_token
+    logfire::info!(
+        "Received webhook verification request: mode={mode}, token={token}",
+        mode = &query.mode,
+        token = &query.verify_token
     );
 
     // Verify the mode is "subscribe"
     if query.mode != "subscribe" {
-        error!("Invalid mode: expected 'subscribe', got '{}'", query.mode);
+        logfire::error!(
+            "Invalid mode: expected 'subscribe', got '{mode}'",
+            mode = &query.mode
+        );
         return Err(errors::UserError::Unauthorized.into());
     }
 
@@ -57,11 +60,11 @@ pub async fn verify(
         .unwrap_or_else(|_| "your_verify_token_here".to_string());
 
     if query.verify_token != expected_token {
-        error!("Invalid verify token");
+        logfire::error!("Invalid verify token");
         return Err(errors::UserError::Unauthorized.into());
     }
 
-    info!("Webhook verification successful");
+    logfire::info!("Webhook verification successful");
 
     // Return the challenge to complete verification
     Ok(web::HttpResponse::Ok()
@@ -86,10 +89,10 @@ pub async fn receive(
 ) -> Result<impl web::Responder, web::Error> {
     let _span = logfire::span!("whatsapp_webhook").entered();
 
-    info!(
-        "Received webhook: object={}, entries={}",
-        payload.object,
-        payload.entry.len()
+    logfire::info!(
+        "Received webhook: object={object}, entries={entries}",
+        object = &payload.object,
+        entries = payload.entry.len()
     );
 
     // Process the webhook asynchronously
@@ -99,7 +102,7 @@ pub async fn receive(
     // Spawn a task to process the webhook in the background
     ntex::rt::spawn(async move {
         if let Err(e) = handler::process_webhook(payload_clone).await {
-            error!("Failed to process webhook: {}", e);
+            logfire::error!("Failed to process webhook: {error}", error = e.to_string());
         }
     });
 
