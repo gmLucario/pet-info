@@ -4,7 +4,10 @@
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
 use super::{handler, schemas};
-use crate::{config, front::{errors, AppState}};
+use crate::{
+    config,
+    front::{AppState, errors},
+};
 use ntex::web;
 use serde::Deserialize;
 

@@ -12,11 +12,11 @@
 //! - [`outgoing_schemas`] - Data structures for sending messages to WhatsApp
 //! - [`client`] - WhatsApp API client for sending messages
 
+pub mod client;
 pub mod handler;
+pub mod outgoing_schemas;
 pub mod routes;
 pub mod schemas;
-pub mod outgoing_schemas;
-pub mod client;
 
 // Re-export commonly used items for convenience
 pub use routes::{receive, verify};

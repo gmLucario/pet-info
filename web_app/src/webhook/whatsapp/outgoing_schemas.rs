@@ -54,7 +54,13 @@ pub struct OutgoingInteractiveMessage {
 
 impl OutgoingInteractiveMessage {
     /// Creates a new interactive list message
-    pub fn new_list(to: String, header: String, body: String, button_text: String, rows: Vec<InteractiveRow>) -> Self {
+    pub fn new_list(
+        to: String,
+        header: String,
+        body: String,
+        button_text: String,
+        rows: Vec<InteractiveRow>,
+    ) -> Self {
         Self {
             messaging_product: "whatsapp".to_string(),
             to,
@@ -68,10 +74,7 @@ impl OutgoingInteractiveMessage {
                 body: InteractiveBody { text: body },
                 action: InteractiveAction {
                     button: button_text,
-                    sections: vec![InteractiveSection {
-                        title: None,
-                        rows,
-                    }],
+                    sections: vec![InteractiveSection { title: None, rows }],
                 },
             },
         }

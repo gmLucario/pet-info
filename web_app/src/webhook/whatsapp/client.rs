@@ -179,11 +179,7 @@ impl WhatsAppClient {
                 .await
                 .unwrap_or_else(|_| "Unable to read response body".to_string());
 
-            anyhow::bail!(
-                "WhatsApp API returned error status {}: {}",
-                status,
-                body
-            );
+            anyhow::bail!("WhatsApp API returned error status {}: {}", status, body);
         }
 
         let whatsapp_response: WhatsAppMessageResponse = response

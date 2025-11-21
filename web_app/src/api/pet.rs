@@ -772,48 +772,6 @@ pub async fn get_full_info(
     })
 }
 
-/// Gets full pet information by external ID (public access, no auth required)
-///
-/// This function retrieves complete pet information using the pet's external UUID.
-/// Unlike `get_full_info`, this doesn't require user authentication, making it
-/// suitable for public APIs and WhatsApp bot responses.
-///
-/// # Arguments
-/// * `pet_external_id` - The pet's public external UUID
-/// * `repo` - Repository for database access
-///
-/// # Returns
-/// * `anyhow::Result<PetFullInfo>` - Complete pet information including health records, weights, and notes
-pub async fn get_full_info_by_external_id(
-    pet_external_id: Uuid,
-    repo: &repo::ImplAppRepo,
-) -> anyhow::Result<PetFullInfo> {
-    let pet = repo.get_pet_by_external_id(pet_external_id).await?;
-    let external_id = pet.external_id;
-    let pet_id = pet.id;
-    let user_id = pet.user_app_id;
-
-    Ok(PetFullInfo {
-        pet,
-        vaccines: repo
-            .get_pet_health_records(
-                external_id,
-                None, // No user authentication for public access
-                models::pet::PetHealthType::Vaccine,
-            )
-            .await?,
-        deworms: repo
-            .get_pet_health_records(
-                external_id,
-                None, // No user authentication for public access
-                models::pet::PetHealthType::Deworm,
-            )
-            .await?,
-        weights: repo.get_pet_weights(external_id, None).await?,
-        notes: repo.get_pet_notes(user_id, pet_id).await?,
-    })
-}
-
 /// Weight measurement data for PDF report generation
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub struct WeightReport {
@@ -825,47 +783,35 @@ pub struct WeightReport {
     pub fmt_age: String,
 }
 
+/// Converts HTML content in pet notes to plain text
+fn convert_html_to_text(note: &models::pet::PetNote) -> models::pet::PetNote {
+    models::pet::PetNote {
+        content: html2text::from_read(note.content.as_bytes(), 20)
+            .unwrap_or(note.content.to_string()),
+        ..note.clone()
+    }
+}
+
 /// Generates PDF report bytes for a pet by external ID
 ///
 /// Creates a comprehensive PDF report containing all pet information including
 /// health records, weight history, and notes. This function is designed for
 /// public access (e.g., WhatsApp bot) and doesn't require authentication.
-///
-/// # Arguments
-/// * `pet_external_id` - The pet's public external UUID
-/// * `repo` - Repository for database access
-///
-/// # Returns
-/// * `anyhow::Result<Vec<u8>>` - PDF document as bytes
-///
-/// # Process
-/// 1. Retrieves full pet information by external ID
-/// 2. Renders PDF template with pet data
-/// 3. Converts template to PDF bytes
-///
-/// # Errors
-/// Returns an error if:
-/// - Pet not found
-/// - Template rendering fails
-/// - PDF generation fails
 pub async fn generate_pdf_report_bytes(
-    pet_external_id: Uuid,
+    pet_id: i64,
+    user_id: i64,
     repo: &repo::ImplAppRepo,
 ) -> anyhow::Result<Vec<u8>> {
-    let pet_full_info = get_full_info_by_external_id(pet_external_id, repo).await?;
+    let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
 
     let now = chrono::Utc::now().date_naive();
 
     // Convert HTML notes to plain text
-    let notes: Vec<models::pet::PetNote> = pet_full_info
+    let notes = pet_full_info
         .notes
         .iter()
-        .map(|note| models::pet::PetNote {
-            content: html2text::from_read(note.content.as_bytes(), 20)
-                .unwrap_or(note.content.to_string()),
-            ..note.clone()
-        })
-        .collect();
+        .map(convert_html_to_text)
+        .collect::<Vec<models::pet::PetNote>>();
 
     // Calculate formatted age for each weight measurement
     let weights: Vec<WeightReport> = pet_full_info
@@ -881,31 +827,30 @@ pub async fn generate_pdf_report_bytes(
         })
         .collect();
 
-    let content = front::templates::PDF_REPORT_TEMPLATES
-        .render(
-            "pet_default.typ",
-            &tera::Context::from_value(serde_json::json!({
-                "pet_name": pet_full_info.pet.pet_name,
-                "birthday": pet_full_info.pet.birthday,
-                "age": front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
-                "breed": pet_full_info.pet.breed,
-                "is_female": pet_full_info.pet.is_female,
-                "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
-                "pet_link": format!(
-                    "https://pet-info.link/info/{external_id}",
-                    external_id=pet_full_info.pet.external_id
-                ),
-                "vaccines": pet_full_info.vaccines,
-                "deworms": pet_full_info.deworms,
-                "weights": weights,
-                "notes": notes,
-            }))
-            .unwrap_or_default(),
-        )?;
+    let content = front::templates::PDF_REPORT_TEMPLATES.render(
+        "pet_default.typ",
+        &tera::Context::from_value(serde_json::json!({
+            "pet_name": pet_full_info.pet.pet_name,
+            "birthday": pet_full_info.pet.birthday,
+            "age": front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
+            "breed": pet_full_info.pet.breed,
+            "is_female": pet_full_info.pet.is_female,
+            "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
+            "pet_link": format!(
+                "https://pet-info.link/info/{external_id}",
+                external_id=pet_full_info.pet.external_id
+            ),
+            "vaccines": pet_full_info.vaccines,
+            "deworms": pet_full_info.deworms,
+            "weights": weights,
+            "notes": notes,
+        }))
+        .unwrap_or_default(),
+    )?;
 
-    let pdf_bytes = crate::api::pdf_handler::create_pdf_bytes_from_str(&content)?;
-
-    Ok(pdf_bytes)
+    Ok(crate::api::pdf_handler::create_pdf_bytes_from_str(
+        &content,
+    )?)
 }
 
 #[cfg(test)]
