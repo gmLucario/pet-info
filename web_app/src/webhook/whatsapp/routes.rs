@@ -3,7 +3,7 @@
 //! This module handles incoming webhook requests from WhatsApp Business API.
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
-use super::handler;
+use super::{handler, schemas};
 use crate::front::errors;
 use ntex::web;
 use serde::Deserialize;
@@ -85,7 +85,7 @@ pub async fn verify(
 /// - 500 if processing fails
 #[web::post("/webhook/whatsapp")]
 pub async fn receive(
-    payload: web::types::Json<handler::WebhookPayload>,
+    payload: web::types::Json<schemas::WebhookPayload>,
 ) -> Result<impl web::Responder, web::Error> {
     let _span = logfire::span!("whatsapp_webhook").entered();
 

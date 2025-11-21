@@ -8,9 +8,11 @@
 //!
 //! - [`handler`] - Business logic for processing WhatsApp webhook events
 //! - [`routes`] - HTTP endpoint handlers for WhatsApp webhooks
+//! - [`schemas`] - Data structures for WhatsApp webhook payloads
 
 pub mod handler;
 pub mod routes;
+pub mod schemas;
 
 // Re-export commonly used items for convenience
 pub use routes::{receive, verify};
