@@ -63,10 +63,10 @@ tokio = { version = "1.48", features = ["sync"] }
 chrono-tz = "0.10.4"
 
 # aws
-aws-config = { version = "1.8.10", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.112.0"
-aws-sdk-ssm = { version = "1.99.0", optional = true }
-aws-sdk-sfn = "1.93.0"
+aws-config = { version = "1.8.11", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.115.0"
+aws-sdk-ssm = { version = "1.100.0", optional = true }
+aws-sdk-sfn = "1.95.0"
 
 [dev-dependencies]
 mockall = "0.13.1"

@@ -35,7 +35,7 @@ pub struct VerifyQuery {
 /// # Returns
 /// - 200 with challenge string if verification succeeds
 /// - 403 if verification fails
-#[web::get("/webhook/whatsapp")]
+#[web::get("")]
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
@@ -83,7 +83,7 @@ pub async fn verify(
 /// # Returns
 /// - 200 OK if processing succeeds
 /// - 500 if processing fails
-#[web::post("/webhook/whatsapp")]
+#[web::post("")]
 pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
 ) -> Result<impl web::Responder, web::Error> {
