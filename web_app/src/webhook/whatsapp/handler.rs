@@ -8,7 +8,7 @@ use super::{
     outgoing_schemas::{InteractiveRow, OutgoingDocumentMessage, OutgoingInteractiveMessage},
     schemas::{Message, Status, WebhookPayload},
 };
-use crate::{config, repo};
+use crate::repo;
 use anyhow::{Context, Result};
 
 /// Processes incoming WhatsApp webhook messages
@@ -168,7 +168,7 @@ async fn handle_interactive_response(
 
     let parts: Vec<&str> = list_reply.id.split(':').collect();
     if parts.len() != 2 {
-        logfire::warn!("Invalid interactive response ID format: {}", list_reply.id);
+        logfire::warn!("Invalid interactive response ID format: {id}", id = &list_reply.id);
         return Ok(());
     }
 
@@ -180,26 +180,35 @@ async fn handle_interactive_response(
 
     match action {
         "reporte" => {
-            // Send PDF report
-            let app_config = config::APP_CONFIG
-                .get()
-                .context("failed to get app config")?;
+            // Generate PDF report bytes
+            logfire::info!("Generating PDF report for pet external_id {id}", id = external_id.to_string());
 
-            let pdf_url = format!(
-                "{}/pet/pdf_report/{}",
-                app_config.base_url(),
-                external_id
-            );
+            let pdf_bytes = crate::api::pet::generate_pdf_report_bytes(external_id, repo)
+                .await
+                .context("Failed to generate PDF report")?;
 
             let pet = repo
                 .get_pet_by_external_id(external_id)
                 .await
                 .context("Failed to get pet by external ID")?;
 
-            let document_message = OutgoingDocumentMessage::new_with_link(
+            let filename = format!("reporte_{}.pdf", pet.pet_name);
+
+            // Upload PDF to WhatsApp and get media ID
+            logfire::info!("Uploading PDF to WhatsApp for pet {name}", name = &pet.pet_name);
+
+            let media_id = client
+                .upload_media(pdf_bytes, "application/pdf", &filename)
+                .await
+                .context("Failed to upload PDF to WhatsApp")?;
+
+            let pet_name_for_log = pet.pet_name.clone();
+
+            // Send document message with media ID
+            let document_message = OutgoingDocumentMessage::new_with_id(
                 message.from.clone(),
-                pdf_url,
-                format!("reporte_{}.pdf", pet.pet_name),
+                media_id,
+                filename,
             );
 
             client
@@ -207,7 +216,7 @@ async fn handle_interactive_response(
                 .await
                 .context("Failed to send PDF report")?;
 
-            logfire::info!("Sent PDF report for pet {}", pet.pet_name);
+            logfire::info!("Sent PDF report for pet {name}", name = &pet_name_for_log);
         }
         "qr" => {
             // Send QR code link
@@ -219,7 +228,7 @@ async fn handle_interactive_response(
                 .await
                 .context("Failed to send QR code link")?;
 
-            logfire::info!("Sent QR code link for pet external_id {}", external_id);
+            logfire::info!("Sent QR code link for pet external_id {id}", id = external_id.to_string());
         }
         "tarjeta" => {
             // Send Apple Wallet pass link
@@ -231,10 +240,10 @@ async fn handle_interactive_response(
                 .await
                 .context("Failed to send pass link")?;
 
-            logfire::info!("Sent pass link for pet external_id {}", external_id);
+            logfire::info!("Sent pass link for pet external_id {id}", id = external_id.to_string());
         }
         _ => {
-            logfire::warn!("Unknown action in interactive response: {}", action);
+            logfire::warn!("Unknown action in interactive response: {action}", action = action.to_string());
         }
     }
 
@@ -262,7 +271,7 @@ pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) ->
     match message.msg_type.as_str() {
         "text" => {
             if message.text.is_some() {
-                logfire::info!("Received text message from {}", message.from);
+                logfire::info!("Received text message from {from}", from = &message.from);
 
                 // Look up user by phone number
                 let user = repo
@@ -290,7 +299,7 @@ pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) ->
             }
         }
         "interactive" => {
-            logfire::info!("Received interactive response from {}", message.from);
+            logfire::info!("Received interactive response from {from}", from = &message.from);
             handle_interactive_response(&client, message, repo).await?;
         }
         "image" => {
@@ -312,7 +321,7 @@ pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) ->
             }
         }
         _ => {
-            logfire::warn!("Unsupported message type received: {}", message.msg_type);
+            logfire::warn!("Unsupported message type received: {type}", r#type = &message.msg_type);
         }
     }
 

@@ -74,17 +74,15 @@ pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    // Process the webhook asynchronously
-    // We return 200 immediately to acknowledge receipt
-    let payload_clone = payload.into_inner();
-    let repo_clone = app_state.repo.clone();
+    let payload = payload.into_inner();
 
-    // Spawn a task to process the webhook in the background
-    ntex::rt::spawn(async move {
-        if let Err(e) = handler::process_webhook(payload_clone, &repo_clone).await {
-            logfire::error!("Failed to process webhook: {error}", error = e.to_string());
-        }
-    });
+    // Process webhook synchronously
+    // WhatsApp gives us 20 seconds to respond, which should be sufficient
+    if let Err(e) = handler::process_webhook(payload, &app_state.repo).await {
+        logfire::error!("Failed to process webhook: {error}", error = e.to_string());
+        // Still return 200 to acknowledge receipt even if processing fails
+        // This prevents WhatsApp from retrying failed messages
+    }
 
     Ok(web::HttpResponse::Ok().json(&serde_json::json!({
         "status": "received"

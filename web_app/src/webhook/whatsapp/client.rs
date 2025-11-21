@@ -10,12 +10,21 @@ use super::outgoing_schemas::{
 use crate::config;
 use anyhow::{Context, Result};
 
-/// WhatsApp API client for sending messages
+/// Response from WhatsApp media upload API
+#[derive(Debug, serde::Deserialize)]
+pub struct MediaUploadResponse {
+    /// Uploaded media ID
+    pub id: String,
+}
+
+/// WhatsApp API client for sending messages and uploading media
 pub struct WhatsAppClient {
     /// HTTP client for making API requests
-    client: awc::Client,
-    /// WhatsApp Business API endpoint
+    client: reqwest::Client,
+    /// WhatsApp Business API endpoint for sending messages
     endpoint: String,
+    /// WhatsApp Business phone number ID
+    phone_number_id: u64,
     /// Authentication token
     auth_token: String,
 }
@@ -28,8 +37,9 @@ impl WhatsAppClient {
             .context("failed to get app config")?;
 
         Ok(Self {
-            client: awc::Client::default(),
+            client: reqwest::Client::new(),
             endpoint: app_config.whatsapp_send_msg_endpoint(),
+            phone_number_id: app_config.whatsapp_business_phone_number_id,
             auth_token: app_config.whatsapp_business_auth.clone(),
         })
     }
@@ -79,6 +89,74 @@ impl WhatsAppClient {
         self.send_message(message).await
     }
 
+    /// Uploads media (document, image, etc.) to WhatsApp and returns media ID
+    ///
+    /// Uploads file bytes to WhatsApp's media upload API and returns a media ID
+    /// that can be used in subsequent message sends.
+    ///
+    /// # Arguments
+    /// * `file_bytes` - The file content as bytes
+    /// * `mime_type` - MIME type of the file (e.g., "application/pdf", "image/jpeg")
+    /// * `filename` - Name of the file
+    ///
+    /// # Returns
+    /// * `Result<String>` - Media ID that can be used to send the document
+    ///
+    /// # Example
+    /// ```no_run
+    /// let media_id = client.upload_media(pdf_bytes, "application/pdf", "report.pdf").await?;
+    /// ```
+    pub async fn upload_media(
+        &self,
+        file_bytes: Vec<u8>,
+        mime_type: &str,
+        filename: &str,
+    ) -> Result<String> {
+        let upload_endpoint = format!(
+            "https://graph.facebook.com/v22.0/{}/media",
+            self.phone_number_id
+        );
+
+        // Create multipart form using reqwest
+        let file_part = reqwest::multipart::Part::bytes(file_bytes)
+            .file_name(filename.to_string())
+            .mime_str(mime_type)?;
+
+        let form = reqwest::multipart::Form::new()
+            .text("messaging_product", "whatsapp")
+            .part("file", file_part);
+
+        let response = self
+            .client
+            .post(&upload_endpoint)
+            .header("Authorization", format!("Bearer {}", self.auth_token))
+            .multipart(form)
+            .send()
+            .await
+            .context("Failed to upload media to WhatsApp API")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unable to read response body".to_string());
+
+            anyhow::bail!(
+                "WhatsApp media upload returned error status {}: {}",
+                status,
+                body
+            );
+        }
+
+        let upload_response: MediaUploadResponse = response
+            .json()
+            .await
+            .context("Failed to parse WhatsApp media upload response")?;
+
+        Ok(upload_response.id)
+    }
+
     /// Internal method to send any message type to WhatsApp API
     async fn send_message<T: serde::Serialize>(
         &self,
@@ -87,18 +165,18 @@ impl WhatsAppClient {
         let response = self
             .client
             .post(&self.endpoint)
-            .insert_header(("Authorization", format!("Bearer {}", self.auth_token)))
-            .insert_header(("Content-Type", "application/json"))
-            .send_json(message)
+            .header("Authorization", format!("Bearer {}", self.auth_token))
+            .header("Content-Type", "application/json")
+            .json(message)
+            .send()
             .await
             .context("Failed to send request to WhatsApp API")?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response
-                .body()
+                .text()
                 .await
-                .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                 .unwrap_or_else(|_| "Unable to read response body".to_string());
 
             anyhow::bail!(
