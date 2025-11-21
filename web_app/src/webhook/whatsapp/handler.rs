@@ -28,10 +28,6 @@ pub fn process_webhook_messages(payload: &WebhookPayload) -> Vec<&Message> {
         .flatten()
         .collect::<Vec<_>>();
 
-    logfire::info!(
-        "Processed {count} messages from webhook",
-        count = messages.len()
-    );
     messages
 }
 
@@ -55,11 +51,6 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
         .filter_map(|change| change.value.statuses.as_ref())
         .flatten()
         .collect::<Vec<_>>();
-
-    logfire::info!(
-        "Processed {count} statuses from webhook",
-        count = statuses.len()
-    );
     statuses
 }
 
@@ -76,8 +67,6 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 ///
 /// Result indicating success or failure
 pub async fn handle_user_message(message: &Message) -> Result<()> {
-    logfire::info!("Handling incoming message");
-
     match message.msg_type.as_str() {
         "text" => {
             if message.text.is_some() {
@@ -124,8 +113,6 @@ pub async fn handle_user_message(message: &Message) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub async fn handle_message_status(_status: &Status) -> Result<()> {
-    logfire::info!("Processing message status update");
-
     // TODO: Update your database with delivery status if needed
 
     Ok(())
@@ -143,8 +130,6 @@ pub async fn handle_message_status(_status: &Status) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
-    logfire::info!("Processing webhook payload");
-
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {

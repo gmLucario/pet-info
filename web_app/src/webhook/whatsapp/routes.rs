@@ -41,25 +41,18 @@ pub async fn verify(
 ) -> Result<impl web::Responder, web::Error> {
     logfire::info!("Received webhook verification request");
 
-    // Verify the mode is "subscribe"
     if query.mode != "subscribe" {
-        logfire::error!("Invalid mode: expected 'subscribe'");
         return Err(errors::UserError::Unauthorized.into());
     }
 
-    // Verify the token matches the configured token
     let app_config = config::APP_CONFIG
         .get()
         .expect("APP_CONFIG should be initialized before starting web server");
 
     if query.verify_token != app_config.whatsapp_verify_token {
-        logfire::error!("Invalid verify token");
         return Err(errors::UserError::Unauthorized.into());
     }
 
-    logfire::info!("Webhook verification successful");
-
-    // Return the challenge to complete verification
     Ok(web::HttpResponse::Ok()
         .content_type("text/plain")
         .body(query.challenge.clone()))
@@ -80,10 +73,6 @@ pub async fn verify(
 pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
 ) -> Result<impl web::Responder, web::Error> {
-    let _span = logfire::span!("whatsapp_webhook").entered();
-
-    logfire::info!("Received webhook event");
-
     // Process the webhook asynchronously
     // We return 200 immediately to acknowledge receipt
     let payload_clone = payload.into_inner();
@@ -95,7 +84,6 @@ pub async fn receive(
         }
     });
 
-    // Return 200 OK immediately to acknowledge receipt
     Ok(web::HttpResponse::Ok().json(&serde_json::json!({
         "status": "received"
     })))
