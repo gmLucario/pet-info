@@ -15,6 +15,7 @@ pub mod models;
 pub mod repo;
 pub mod services;
 pub mod utils;
+pub mod webhook;
 
 use anyhow::Context;
 use csrf::AesGcmCsrfProtection;
@@ -102,10 +103,10 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
         })?;
 
     ssl_acceptor
-        .set_certificate_file(&app_config.certificate_path, SslFiletype::PEM)
+        .set_certificate_chain_file(&app_config.certificate_path)
         .map_err(|e| {
             anyhow::anyhow!(
-                "Failed to load certificate from {}: {}",
+                "Failed to load certificate chain from {}: {}",
                 app_config.certificate_path,
                 e
             )
@@ -189,6 +190,7 @@ async fn configure_and_run_server(
             .configure(front::routes::checkout)
             .configure(front::routes::blog)
             .configure(front::routes::reminders)
+            .configure(front::routes::webhooks)
             .service((
                 ntex_files::Files::new("/static", "web/static/"),
                 front::server::serve_favicon,

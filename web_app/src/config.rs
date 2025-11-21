@@ -137,6 +137,11 @@ pub struct AppConfig {
     /// Security: Store in secure secret management system
     pub whatsapp_business_auth: String,
 
+    /// 🔒 SENSITIVE: WhatsApp webhook verification token
+    /// Security: Used to verify webhook requests from WhatsApp
+    /// This token must match the value configured in WhatsApp Business API dashboard
+    pub whatsapp_verify_token: String,
+
     /// AWS Step Functions ARN for notifications (SEMI-SENSITIVE)
     /// Security: Contains account information, restrict access
     /// Example: "arn:aws:states:us-east-1:123456789012:stateMachine:notifications"
