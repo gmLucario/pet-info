@@ -4,7 +4,7 @@
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
 use super::{handler, schemas};
-use crate::{config, front::errors};
+use crate::{config, front::{errors, AppState}};
 use ntex::web;
 use serde::Deserialize;
 
@@ -72,14 +72,16 @@ pub async fn verify(
 #[web::post("")]
 pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
+    app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     // Process the webhook asynchronously
     // We return 200 immediately to acknowledge receipt
     let payload_clone = payload.into_inner();
+    let repo_clone = app_state.repo.clone();
 
     // Spawn a task to process the webhook in the background
     ntex::rt::spawn(async move {
-        if let Err(e) = handler::process_webhook(payload_clone).await {
+        if let Err(e) = handler::process_webhook(payload_clone, &repo_clone).await {
             logfire::error!("Failed to process webhook: {error}", error = e.to_string());
         }
     });

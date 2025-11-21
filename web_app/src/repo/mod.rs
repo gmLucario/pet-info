@@ -48,6 +48,18 @@ pub trait AppRepo {
         email: &str,
     ) -> anyhow::Result<Option<models::user_app::User>>;
 
+    /// Retrieves a user by their phone number.
+    ///
+    /// # Arguments
+    /// * `phone` - The phone number to search for (WhatsApp ID format)
+    ///
+    /// # Returns
+    /// * `Some(User)` if found, `None` if not found
+    async fn get_user_app_by_phone(
+        &self,
+        phone: &str,
+    ) -> anyhow::Result<Option<models::user_app::User>>;
+
     /// Associates a verified phone number with a user account.
     ///
     /// # Arguments

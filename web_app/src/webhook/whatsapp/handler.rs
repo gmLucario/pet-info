@@ -3,8 +3,13 @@
 //! This module handles incoming webhook events from WhatsApp Business API.
 //! It processes incoming messages, status updates, and other webhook events.
 
-use super::schemas::{Message, Status, WebhookPayload};
-use anyhow::Result;
+use super::{
+    client::WhatsAppClient,
+    outgoing_schemas::{InteractiveRow, OutgoingDocumentMessage, OutgoingInteractiveMessage},
+    schemas::{Message, Status, WebhookPayload},
+};
+use crate::{config, repo};
+use anyhow::{Context, Result};
 
 /// Processes incoming WhatsApp webhook messages
 ///
@@ -54,6 +59,188 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
     statuses
 }
 
+/// Sends pet information to a WhatsApp user
+///
+/// Sends a text message listing all registered pets, followed by an interactive
+/// list message for each pet with options for report, QR, and card.
+///
+/// # Arguments
+///
+/// * `client` - WhatsApp API client
+/// * `to` - Recipient's WhatsApp ID (phone number)
+/// * `user_id` - Database ID of the user
+/// * `repo` - Repository for database access
+async fn send_pet_info_to_user(
+    client: &WhatsAppClient,
+    to: &str,
+    user_id: i64,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
+    let _span = logfire::span!("send_pet_info_to_user").entered();
+
+    // Get all pets for the user
+    let pets = repo
+        .get_all_pets_user_id(user_id)
+        .await
+        .context("Failed to get user pets")?;
+
+    if pets.is_empty() {
+        client
+            .send_text_message(
+                to.to_string(),
+                "No tienes mascotas registradas en Pet-Info.".to_string(),
+            )
+            .await?;
+        return Ok(());
+    }
+
+    // Send initial text message
+    client
+        .send_text_message(
+            to.to_string(),
+            "Tus mascotas registradas en Pet-Info son:".to_string(),
+        )
+        .await
+        .context("Failed to send pets list message")?;
+
+    // Send interactive list message for each pet
+    for pet in pets {
+        let pet_name = pet.pet_name.clone();
+        let external_id = pet.external_id;
+
+        let rows = vec![
+            InteractiveRow::new(
+                format!("reporte:{}", external_id),
+                format!("reporte: [{}]", pet_name),
+            ),
+            InteractiveRow::new(
+                format!("qr:{}", external_id),
+                format!("qr: [{}]", pet_name),
+            ),
+            InteractiveRow::new(
+                format!("tarjeta:{}", external_id),
+                format!("tarjeta: [{}]", pet_name),
+            ),
+        ];
+
+        let message = OutgoingInteractiveMessage::new_list(
+            to.to_string(),
+            pet_name.clone(),
+            format!("Su perfil público es: https://pet-info.link/info/{}", external_id),
+            "opciones".to_string(),
+            rows,
+        );
+
+        client
+            .send_interactive_message(&message)
+            .await
+            .with_context(|| format!("Failed to send interactive message for pet {}", pet_name))?;
+    }
+
+    Ok(())
+}
+
+/// Handles interactive button responses from users
+///
+/// Processes user selections from interactive list messages and sends appropriate responses.
+///
+/// # Arguments
+///
+/// * `client` - WhatsApp API client
+/// * `message` - The message containing the interactive response
+/// * `repo` - Repository for database access
+async fn handle_interactive_response(
+    client: &WhatsAppClient,
+    message: &Message,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
+    let _span = logfire::span!("handle_interactive_response").entered();
+
+    let interactive = message
+        .interactive
+        .as_ref()
+        .context("No interactive data in message")?;
+
+    let list_reply = interactive
+        .list_reply
+        .as_ref()
+        .context("No list reply in interactive message")?;
+
+    let parts: Vec<&str> = list_reply.id.split(':').collect();
+    if parts.len() != 2 {
+        logfire::warn!("Invalid interactive response ID format: {}", list_reply.id);
+        return Ok(());
+    }
+
+    let action = parts[0];
+    let external_id_str = parts[1];
+
+    let external_id = uuid::Uuid::parse_str(external_id_str)
+        .with_context(|| format!("Invalid UUID in interactive response: {}", external_id_str))?;
+
+    match action {
+        "reporte" => {
+            // Send PDF report
+            let app_config = config::APP_CONFIG
+                .get()
+                .context("failed to get app config")?;
+
+            let pdf_url = format!(
+                "{}/pet/pdf_report/{}",
+                app_config.base_url(),
+                external_id
+            );
+
+            let pet = repo
+                .get_pet_by_external_id(external_id)
+                .await
+                .context("Failed to get pet by external ID")?;
+
+            let document_message = OutgoingDocumentMessage::new_with_link(
+                message.from.clone(),
+                pdf_url,
+                format!("reporte_{}.pdf", pet.pet_name),
+            );
+
+            client
+                .send_document_message(&document_message)
+                .await
+                .context("Failed to send PDF report")?;
+
+            logfire::info!("Sent PDF report for pet {}", pet.pet_name);
+        }
+        "qr" => {
+            // Send QR code link
+            client
+                .send_text_message(
+                    message.from.clone(),
+                    format!("Código QR: https://pet-info.link/pet/qr_code/{}", external_id),
+                )
+                .await
+                .context("Failed to send QR code link")?;
+
+            logfire::info!("Sent QR code link for pet external_id {}", external_id);
+        }
+        "tarjeta" => {
+            // Send Apple Wallet pass link
+            client
+                .send_text_message(
+                    message.from.clone(),
+                    format!("Tarjeta digital: https://pet-info.link/pet/pass/{}", external_id),
+                )
+                .await
+                .context("Failed to send pass link")?;
+
+            logfire::info!("Sent pass link for pet external_id {}", external_id);
+        }
+        _ => {
+            logfire::warn!("Unknown action in interactive response: {}", action);
+        }
+    }
+
+    Ok(())
+}
+
 /// Handles incoming messages from users
 ///
 /// This function processes each message and determines the appropriate response.
@@ -62,18 +249,49 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 /// # Arguments
 ///
 /// * `message` - The message to handle
+/// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn handle_user_message(message: &Message) -> Result<()> {
+pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) -> Result<()> {
+    let _span = logfire::span!("handle_user_message").entered();
+
+    let client = WhatsAppClient::new()?;
+
     match message.msg_type.as_str() {
         "text" => {
             if message.text.is_some() {
-                logfire::info!("Received text message");
-                // TODO: Add your message handling logic here
-                // Example: Parse commands, look up pet info, send responses
+                logfire::info!("Received text message from {}", message.from);
+
+                // Look up user by phone number
+                let user = repo
+                    .get_user_app_by_phone(&message.from)
+                    .await
+                    .context("Failed to get user by phone")?;
+
+                match user {
+                    Some(user) => {
+                        // Send pet information
+                        send_pet_info_to_user(&client, &message.from, user.id, repo).await?;
+                    }
+                    None => {
+                        // User not found
+                        client
+                            .send_text_message(
+                                message.from.clone(),
+                                "No se encontró una cuenta asociada a este número de teléfono. \
+                                 Por favor, regístrala en tu perfil en https://pet-info.link"
+                                    .to_string(),
+                            )
+                            .await?;
+                    }
+                }
             }
+        }
+        "interactive" => {
+            logfire::info!("Received interactive response from {}", message.from);
+            handle_interactive_response(&client, message, repo).await?;
         }
         "image" => {
             if message.image.is_some() {
@@ -94,7 +312,7 @@ pub async fn handle_user_message(message: &Message) -> Result<()> {
             }
         }
         _ => {
-            logfire::warn!("Unsupported message type received");
+            logfire::warn!("Unsupported message type received: {}", message.msg_type);
         }
     }
 
@@ -125,15 +343,16 @@ pub async fn handle_message_status(_status: &Status) -> Result<()> {
 /// # Arguments
 ///
 /// * `payload` - The webhook payload from WhatsApp
+/// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
+pub async fn process_webhook(payload: WebhookPayload, repo: &repo::ImplAppRepo) -> Result<()> {
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
-        if let Err(e) = handle_user_message(message).await {
+        if let Err(e) = handle_user_message(message, repo).await {
             logfire::error!("Failed to handle message: {error}", error = e.to_string());
         }
     }
@@ -182,6 +401,7 @@ mod tests {
                             document: None,
                             audio: None,
                             location: None,
+                            interactive: None,
                             context: None,
                         }]),
                         statuses: None,
