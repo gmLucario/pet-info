@@ -3,7 +3,8 @@
 //! This module handles incoming webhook requests from WhatsApp Business API.
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
-use crate::{api, front::errors};
+use super::handler;
+use crate::front::errors;
 use ntex::web;
 use serde::Deserialize;
 use tracing::{error, info};
@@ -81,7 +82,7 @@ pub async fn verify(
 /// - 500 if processing fails
 #[web::post("/webhook/whatsapp")]
 pub async fn receive(
-    payload: web::types::Json<api::whatsapp::WebhookPayload>,
+    payload: web::types::Json<handler::WebhookPayload>,
 ) -> Result<impl web::Responder, web::Error> {
     let _span = logfire::span!("whatsapp_webhook").entered();
 
@@ -97,7 +98,7 @@ pub async fn receive(
 
     // Spawn a task to process the webhook in the background
     ntex::rt::spawn(async move {
-        if let Err(e) = api::whatsapp::process_webhook(payload_clone).await {
+        if let Err(e) = handler::process_webhook(payload_clone).await {
             error!("Failed to process webhook: {}", e);
         }
     });

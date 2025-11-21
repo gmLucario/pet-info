@@ -12,7 +12,6 @@
 //! - [`pet`] - Pet management, profiles, and health records
 //! - [`reminder`] - Notification and reminder systems
 //! - [`user`] - User management and authentication
-//! - [`whatsapp`] - WhatsApp webhook handling and message processing
 
 pub mod passes;
 pub mod payment;
@@ -20,4 +19,3 @@ pub mod pdf_handler;
 pub mod pet;
 pub mod reminder;
 pub mod user;
-pub mod whatsapp;
