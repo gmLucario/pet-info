@@ -39,18 +39,11 @@ pub struct VerifyQuery {
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
-    logfire::info!(
-        "Received webhook verification request: mode={mode}, token={token}",
-        mode = &query.mode,
-        token = &query.verify_token
-    );
+    logfire::info!("Received webhook verification request");
 
     // Verify the mode is "subscribe"
     if query.mode != "subscribe" {
-        logfire::error!(
-            "Invalid mode: expected 'subscribe', got '{mode}'",
-            mode = &query.mode
-        );
+        logfire::error!("Invalid mode: expected 'subscribe'");
         return Err(errors::UserError::Unauthorized.into());
     }
 
@@ -89,11 +82,7 @@ pub async fn receive(
 ) -> Result<impl web::Responder, web::Error> {
     let _span = logfire::span!("whatsapp_webhook").entered();
 
-    logfire::info!(
-        "Received webhook: object={object}, entries={entries}",
-        object = &payload.object,
-        entries = payload.entry.len()
-    );
+    logfire::info!("Received webhook event");
 
     // Process the webhook asynchronously
     // We return 200 immediately to acknowledge receipt

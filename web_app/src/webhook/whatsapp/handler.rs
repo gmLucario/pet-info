@@ -76,47 +76,36 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 ///
 /// Result indicating success or failure
 pub async fn handle_user_message(message: &Message) -> Result<()> {
-    logfire::info!(
-        "Handling message from {from}: type={msg_type}",
-        from = &message.from,
-        msg_type = &message.msg_type
-    );
+    logfire::info!("Handling incoming message");
 
     match message.msg_type.as_str() {
         "text" => {
-            if let Some(text) = &message.text {
-                logfire::info!("Received text message: {body}", body = &text.body);
+            if message.text.is_some() {
+                logfire::info!("Received text message");
                 // TODO: Add your message handling logic here
                 // Example: Parse commands, look up pet info, send responses
             }
         }
         "image" => {
-            if let Some(image) = &message.image {
-                logfire::info!("Received image: id={id}", id = &image.id);
+            if message.image.is_some() {
+                logfire::info!("Received image");
                 // TODO: Handle image uploads (e.g., pet photos)
             }
         }
         "location" => {
-            if let Some(location) = &message.location {
-                logfire::info!(
-                    "Received location: lat={lat}, lon={lon}",
-                    lat = location.latitude,
-                    lon = location.longitude
-                );
+            if message.location.is_some() {
+                logfire::info!("Received location");
                 // TODO: Handle location sharing (e.g., lost pet location)
             }
         }
         "document" => {
-            if let Some(document) = &message.document {
-                logfire::info!("Received document: id={id}", id = &document.id);
+            if message.document.is_some() {
+                logfire::info!("Received document");
                 // TODO: Handle document uploads
             }
         }
         _ => {
-            logfire::warn!(
-                "Unsupported message type: {msg_type}",
-                msg_type = &message.msg_type
-            );
+            logfire::warn!("Unsupported message type received");
         }
     }
 
@@ -134,13 +123,8 @@ pub async fn handle_user_message(message: &Message) -> Result<()> {
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn handle_message_status(status: &Status) -> Result<()> {
-    logfire::info!(
-        "Message {id} status: {msg_status} for recipient {recipient}",
-        id = &status.id,
-        msg_status = &status.status,
-        recipient = &status.recipient_id
-    );
+pub async fn handle_message_status(_status: &Status) -> Result<()> {
+    logfire::info!("Processing message status update");
 
     // TODO: Update your database with delivery status if needed
 
@@ -159,20 +143,13 @@ pub async fn handle_message_status(status: &Status) -> Result<()> {
 ///
 /// Result indicating success or failure
 pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
-    logfire::info!(
-        "Processing webhook with {entries} entries",
-        entries = payload.entry.len()
-    );
+    logfire::info!("Processing webhook payload");
 
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
         if let Err(e) = handle_user_message(message).await {
-            logfire::error!(
-                "Failed to handle message {id}: {error}",
-                id = &message.id,
-                error = e.to_string()
-            );
+            logfire::error!("Failed to handle message: {error}", error = e.to_string());
         }
     }
 
@@ -180,11 +157,7 @@ pub async fn process_webhook(payload: WebhookPayload) -> Result<()> {
     let statuses = process_webhook_statuses(&payload);
     for status in statuses {
         if let Err(e) = handle_message_status(status).await {
-            logfire::error!(
-                "Failed to handle status {id}: {error}",
-                id = &status.id,
-                error = e.to_string()
-            );
+            logfire::error!("Failed to handle status: {error}", error = e.to_string());
         }
     }
 
