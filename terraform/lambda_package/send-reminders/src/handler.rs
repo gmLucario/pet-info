@@ -28,9 +28,15 @@ async fn send_msg(phone_number: &str, body: &str) -> Result<(), Error> {
         "to": phone_number,
         "type": "template",
         "template": {
-            "name": "custom_reminder_es_mex",
+            "name": "pet_reminder_mex",
             "language": {"code": "es_mx"},
-            "components": [{"type": "body", "parameters": [{"type": "text","text": body}]}]
+            "components": [{
+                "type": "body",
+                "parameters": [{
+                    "type": "text",
+                    "parameter_name": "reminder_txt",
+                    "text": body,
+            }]}]
         }}))
         .send()
         .await?;
