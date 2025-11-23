@@ -772,6 +772,87 @@ pub async fn get_full_info(
     })
 }
 
+/// Weight measurement data for PDF report generation
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+pub struct WeightReport {
+    /// Weight value in user's preferred units
+    pub value: f64,
+    /// Timestamp when the weight was recorded
+    pub created_at: NaiveDateTime,
+    /// Formatted age string (e.g., "3 months, 2 weeks")
+    pub fmt_age: String,
+}
+
+/// Converts HTML content in pet notes to plain text
+fn convert_html_to_text(note: &models::pet::PetNote) -> models::pet::PetNote {
+    models::pet::PetNote {
+        content: html2text::from_read(note.content.as_bytes(), 20)
+            .unwrap_or(note.content.to_string()),
+        ..note.clone()
+    }
+}
+
+/// Generates PDF report bytes for a pet by external ID
+///
+/// Creates a comprehensive PDF report containing all pet information including
+/// health records, weight history, and notes. This function is designed for
+/// public access (e.g., WhatsApp bot) and doesn't require authentication.
+pub async fn generate_pdf_report_bytes(
+    pet_id: i64,
+    user_id: i64,
+    repo: &repo::ImplAppRepo,
+) -> anyhow::Result<Vec<u8>> {
+    let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
+
+    let now = chrono::Utc::now().date_naive();
+
+    // Convert HTML notes to plain text
+    let notes = pet_full_info
+        .notes
+        .iter()
+        .map(convert_html_to_text)
+        .collect::<Vec<models::pet::PetNote>>();
+
+    // Calculate formatted age for each weight measurement
+    let weights: Vec<WeightReport> = pet_full_info
+        .weights
+        .iter()
+        .map(|w| WeightReport {
+            value: w.value,
+            created_at: w.created_at,
+            fmt_age: front::utils::fmt_dates_difference(
+                pet_full_info.pet.birthday,
+                w.created_at.into(),
+            ),
+        })
+        .collect();
+
+    let content = front::templates::PDF_REPORT_TEMPLATES.render(
+        "pet_default.typ",
+        &tera::Context::from_value(serde_json::json!({
+            "pet_name": pet_full_info.pet.pet_name,
+            "birthday": pet_full_info.pet.birthday,
+            "age": front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
+            "breed": pet_full_info.pet.breed,
+            "is_female": pet_full_info.pet.is_female,
+            "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
+            "pet_link": format!(
+                "https://pet-info.link/info/{external_id}",
+                external_id=pet_full_info.pet.external_id
+            ),
+            "vaccines": pet_full_info.vaccines,
+            "deworms": pet_full_info.deworms,
+            "weights": weights,
+            "notes": notes,
+        }))
+        .unwrap_or_default(),
+    )?;
+
+    crate::api::pdf_handler::create_pdf_bytes_from_str(
+        &content,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

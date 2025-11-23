@@ -21,7 +21,6 @@
 //! CSRF protection is enabled for state-changing operations.
 
 use anyhow::{Context, bail};
-use chrono::NaiveDateTime;
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
 use serde_json::json;
@@ -31,7 +30,6 @@ use uuid::Uuid;
 use crate::{
     api, config, consts,
     front::{AppState, errors, forms, middleware, session, templates, utils},
-    models::pet::PetNote,
 };
 
 /// Safely extracts header value as string from HTTP headers
@@ -454,26 +452,6 @@ async fn get_profile_qr_code(
         .streaming(body))
 }
 
-/// Weight measurement data for PDF report generation
-#[derive(Debug, Clone, Default, serde::Serialize, PartialEq)]
-struct WeightReport {
-    /// Weight value in user's preferred units
-    pub value: f64,
-    /// Timestamp when the weight was recorded
-    pub created_at: NaiveDateTime,
-    /// Formatted age string (e.g., "3 months, 2 weeks")
-    pub fmt_age: String,
-}
-
-/// Converts HTML content in pet notes to plain text
-fn convert_html_to_text(note: &PetNote) -> PetNote {
-    PetNote {
-        content: html2text::from_read(note.content.as_bytes(), 20)
-            .unwrap_or(note.content.to_string()),
-        ..note.clone()
-    }
-}
-
 /// Generates and streams a comprehensive PDF report for a pet
 ///
 /// Creates a formatted PDF document containing:
@@ -503,52 +481,13 @@ async fn get_pdf_report(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let pet_full_info = api::pet::get_full_info(path.0, user.id, &app_state.repo)
+    let content = crate::api::pet::generate_pdf_report_bytes(path.0, user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
-                "get_full_info could not be retrieved: {e}"
+                "get_pdf_report could not generate the file: {e}"
             ))
         })?;
-
-    let now = utils::get_utc_now_with_default_time().date_naive();
-
-    let content = templates::PDF_REPORT_TEMPLATES
-        .render(
-            "pet_default.typ",
-            &tera::Context::from_value(json!({
-                "pet_name": pet_full_info.pet.pet_name,
-                "birthday": pet_full_info.pet.birthday,
-                "age": utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
-                "breed": pet_full_info.pet.breed,
-                "is_female": pet_full_info.pet.is_female,
-                "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
-                "pet_link": format!(
-                    "https://pet-info.link/info/{external_id}",
-                    external_id=pet_full_info.pet.external_id
-                ),
-                "vaccines": pet_full_info.vaccines,
-                "deworms": pet_full_info.deworms,
-                "weights": pet_full_info.weights.iter().map(|w| WeightReport{
-                    value: w.value,
-                    created_at: w.created_at,
-                    fmt_age: utils::fmt_dates_difference(pet_full_info.pet.birthday, w.created_at.into()),
-                }).collect::<Vec<WeightReport>>(),
-                "notes": pet_full_info.notes.iter().map(convert_html_to_text).collect::<Vec<_>>(),
-            }))
-            .unwrap_or_default(),
-        )
-        .map_err(|e| {
-            errors::ServerError::TemplateError(format!(
-                "at /blog endpoint the template couldnt be rendered: {e}"
-            ))
-        })?;
-
-    let content = api::pdf_handler::create_pdf_bytes_from_str(&content).map_err(|e| {
-        errors::ServerError::TemplateError(format!(
-            "at /blog endpoint the template couldnt be rendered: {e}"
-        ))
-    })?;
 
     let body = once(ok::<_, web::Error>(Bytes::from_iter(&content)));
 

@@ -8,8 +8,10 @@
 //!
 //! - [`handler`] - Business logic for processing WhatsApp webhook events
 //! - [`routes`] - HTTP endpoint handlers for WhatsApp webhooks
-//! - [`schemas`] - Data structures for WhatsApp webhook payloads
+//! - [`schemas`] - Data structures for WhatsApp webhook payloads (incoming and outgoing)
+//! - [`client`] - WhatsApp API client for sending messages
 
+pub mod client;
 pub mod handler;
 pub mod routes;
 pub mod schemas;

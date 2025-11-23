@@ -418,7 +418,7 @@ mod ssm_env {
         parameters: &[aws_sdk_ssm::types::Parameter],
     ) -> anyhow::Result<HashMap<String, serde_json::Value>> {
         parameters
-            .into_iter()
+            .iter()
             .map(|param| {
                 let name = param.name().context("Missing parameter name")?;
                 let value = param.value().context("Missing parameter value")?;

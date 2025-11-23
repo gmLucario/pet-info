@@ -1,7 +1,7 @@
 use lambda_runtime::{run, service_fn, tracing, Error};
 
-mod handler;
 mod config;
+mod handler;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

@@ -5,6 +5,13 @@ FROM user_app
 WHERE email=$1;
 "#;
 
+pub const QUERY_GET_USER_APP_BY_PHONE: &str = r#"
+SELECT
+    id,email,phone_reminder,account_role,is_subscribed,is_enabled,created_at,updated_at
+FROM user_app
+WHERE phone_reminder=$1;
+"#;
+
 pub const QUERY_GET_USER_PAYM_SUBS: &str = r#"
 SELECT
     user_id,

@@ -4,7 +4,10 @@
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
 
 use super::{handler, schemas};
-use crate::{config, front::errors};
+use crate::{
+    config,
+    front::{AppState, errors},
+};
 use ntex::web;
 use serde::Deserialize;
 
@@ -39,8 +42,6 @@ pub struct VerifyQuery {
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
-    logfire::info!("Received webhook verification request");
-
     if query.mode != "subscribe" {
         return Err(errors::UserError::Unauthorized.into());
     }
@@ -63,26 +64,18 @@ pub async fn verify(
 /// Receives webhook events from WhatsApp Business API.
 /// Processes incoming messages, status updates, and other events.
 ///
-/// # Request Body
-/// JSON payload containing webhook data from WhatsApp
-///
-/// # Returns
-/// - 200 OK if processing succeeds
-/// - 500 if processing fails
+/// Process webhook synchronously
+/// WhatsApp gives us 20 seconds to respond, which should be sufficient
 #[web::post("")]
 pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
+    app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    // Process the webhook asynchronously
-    // We return 200 immediately to acknowledge receipt
-    let payload_clone = payload.into_inner();
-
-    // Spawn a task to process the webhook in the background
-    ntex::rt::spawn(async move {
-        if let Err(e) = handler::process_webhook(payload_clone).await {
-            logfire::error!("Failed to process webhook: {error}", error = e.to_string());
-        }
-    });
+    if let Err(e) =
+        handler::process_webhook(payload.0, &app_state.whatsapp_client, &app_state.repo).await
+    {
+        logfire::error!("Failed to process webhook: {error}", error = e.to_string());
+    }
 
     Ok(web::HttpResponse::Ok().json(&serde_json::json!({
         "status": "received"

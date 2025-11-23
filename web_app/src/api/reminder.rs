@@ -4,8 +4,8 @@
 //! phone verification via WhatsApp, reminder scheduling, and notification
 //! delivery for pet health and care reminders.
 
-use crate::{config, metric, models, repo, services, utils};
-use anyhow::{Context, bail};
+use crate::{metric, models, repo, services, utils, webhook};
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use serde_json::json;
@@ -13,25 +13,28 @@ use serde_json::json;
 /// Sends a verification code to a phone number via WhatsApp.
 ///
 /// Generates a TOTP verification code and sends it to the specified phone
-/// number using WhatsApp Business API. Optimized with better error handling
-/// and reduced nesting.
+/// number using WhatsApp Business API.
 ///
 /// # Arguments
+/// * `whatsapp_client` - Shared WhatsApp client instance
 /// * `phone_number` - Phone number to send verification to (international format)
 ///
 /// # Returns
 /// * `anyhow::Result<()>` - Success confirmation or error details
-pub async fn send_verification(phone_number: &str) -> anyhow::Result<()> {
+pub async fn send_verification(
+    whatsapp_client: &webhook::whatsapp::client::WhatsAppClient,
+    phone_number: &str,
+) -> anyhow::Result<()> {
     let otp = utils::TOTP_CLIENT.generate_current()?;
 
     let payload = create_whatsapp_verification_payload(phone_number, &otp);
-    let response = send_whatsapp_message(payload).await?;
 
-    if response.status().is_success() {
-        return Ok(());
-    }
+    whatsapp_client
+        .send_template_message(payload)
+        .await
+        .context("Failed to send WhatsApp verification code")?;
 
-    handle_whatsapp_error_response(response).await
+    Ok(())
 }
 
 /// Creates the WhatsApp verification message payload.
@@ -58,35 +61,6 @@ fn create_whatsapp_verification_payload(phone_number: &str, otp: &str) -> serde_
             ]
         }
     })
-}
-
-/// Sends a message via WhatsApp Business API.
-async fn send_whatsapp_message(payload: serde_json::Value) -> anyhow::Result<reqwest::Response> {
-    let app_config = config::APP_CONFIG
-        .get()
-        .context("failed to get app config")?;
-
-    utils::REQUEST_CLIENT
-        .post(app_config.whatsapp_send_msg_endpoint())
-        .header("accept", "application/json")
-        .header("content-type", "application/json")
-        .bearer_auth(&app_config.whatsapp_business_auth)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(Into::into)
-}
-
-/// Handles WhatsApp API error responses.
-async fn handle_whatsapp_error_response(response: reqwest::Response) -> anyhow::Result<()> {
-    let error_body = response
-        .json::<serde_json::Value>()
-        .await
-        .unwrap_or_else(|_| json!({"error": "Unknown error"}));
-
-    logfire::error!("whatsapp_error={error}", error = error_body.to_string());
-
-    bail!("WhatsApp API error: {}", error_body)
 }
 
 /// Validates a TOTP code against the current time window.

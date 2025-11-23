@@ -85,7 +85,7 @@ pub struct Message {
     pub id: String,
     /// Timestamp of the message
     pub timestamp: String,
-    /// Message type (text, image, video, document, etc.)
+    /// Message type (text, image, video, document, interactive, etc.)
     #[serde(rename = "type")]
     pub msg_type: String,
     /// Text message content (if type is "text")
@@ -106,9 +106,47 @@ pub struct Message {
     /// Location message content (if type is "location")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<LocationMessage>,
+    /// Interactive message content (if type is "interactive")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interactive: Option<InteractiveResponse>,
     /// Context (if this is a reply to another message)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Context>,
+}
+
+/// Interactive response from user (button or list selection)
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InteractiveResponse {
+    /// Type of interactive response
+    #[serde(rename = "type")]
+    pub response_type: String,
+    /// List reply (if type is "list_reply")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_reply: Option<ListReply>,
+    /// Button reply (if type is "button_reply")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub button_reply: Option<ButtonReply>,
+}
+
+/// List reply from user
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListReply {
+    /// ID of the selected row
+    pub id: String,
+    /// Title of the selected row
+    pub title: String,
+    /// Description of the selected row (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Button reply from user
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ButtonReply {
+    /// ID of the button
+    pub id: String,
+    /// Title of the button
+    pub title: String,
 }
 
 /// Text message content
