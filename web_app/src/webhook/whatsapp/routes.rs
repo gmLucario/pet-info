@@ -71,8 +71,13 @@ pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    if let Err(e) =
-        handler::process_webhook(payload.0, &app_state.whatsapp_client, &app_state.repo).await
+    if let Err(e) = handler::process_webhook(
+        payload.0,
+        &app_state.whatsapp_client,
+        &app_state.repo,
+        &app_state.storage_service,
+    )
+    .await
     {
         logfire::error!("Failed to process webhook: {error}", error = e.to_string());
     }

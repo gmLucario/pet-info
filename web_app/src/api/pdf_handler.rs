@@ -1,6 +1,7 @@
 //! PDF and image generation using Typst typesetting system.
 
 use anyhow::Result;
+use std::collections::HashMap;
 use typst::{
     Library, World,
     diag::{FileError, FileResult},
@@ -19,6 +20,7 @@ struct TypstWorld {
     book: LazyHash<FontBook>,
     font: Font,
     source: Source,
+    files: HashMap<FileId, Bytes>,
 }
 
 impl TypstWorld {
@@ -35,7 +37,19 @@ impl TypstWorld {
             book: LazyHash::new(FontBook::from_fonts([&font])),
             font,
             source: Source::detached(text),
+            files: HashMap::new(),
         })
+    }
+
+    /// Creates a new TypstWorld with an embedded image file.
+    fn with_image(text: &str, image_bytes: Vec<u8>, image_name: &str) -> Result<Self> {
+        let mut world = Self::new(text)?;
+
+        // Create a FileId for the image
+        let image_id = FileId::new(None, typst::syntax::VirtualPath::new(image_name));
+        world.files.insert(image_id, Bytes::new(image_bytes));
+
+        Ok(world)
     }
 }
 
@@ -61,7 +75,10 @@ impl World for TypstWorld {
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+        self.files
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().into()))
     }
 
     fn font(&self, _: usize) -> Option<Font> {
@@ -85,6 +102,31 @@ impl World for TypstWorld {
 /// Returns error if compilation or PDF generation fails
 pub fn create_pdf_bytes_from_str(content: &str) -> Result<Vec<u8>> {
     let world = TypstWorld::new(content)?;
+    let document = typst::compile(&world)
+        .output
+        .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;
+    typst_pdf::pdf(&document, &PdfOptions::default())
+        .map_err(|e| anyhow::anyhow!("PDF generation failed: {:?}", e))
+}
+
+/// Converts Typst markup content with an embedded image to PDF bytes.
+///
+/// # Arguments
+/// * `content` - Typst markup text to compile
+/// * `image_bytes` - The image file bytes to embed
+/// * `image_name` - The filename to reference in the Typst markup (e.g., "pet.jpg")
+///
+/// # Returns
+/// PDF document as bytes
+///
+/// # Errors
+/// Returns error if compilation or PDF generation fails
+pub fn create_pdf_bytes_with_image(
+    content: &str,
+    image_bytes: Vec<u8>,
+    image_name: &str,
+) -> Result<Vec<u8>> {
+    let world = TypstWorld::with_image(content, image_bytes, image_name)?;
     let document = typst::compile(&world)
         .output
         .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;

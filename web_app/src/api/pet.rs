@@ -801,6 +801,7 @@ pub async fn generate_pdf_report_bytes(
     pet_id: i64,
     user_id: i64,
     repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<Vec<u8>> {
     let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
 
@@ -849,9 +850,16 @@ pub async fn generate_pdf_report_bytes(
         .unwrap_or_default(),
     )?;
 
-    crate::api::pdf_handler::create_pdf_bytes_from_str(
-        &content,
-    )
+    // Download the pet picture if available
+    if let Some(pet_pic) = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await? {
+        crate::api::pdf_handler::create_pdf_bytes_with_image(
+            &content,
+            pet_pic.body,
+            "pet.jpg",
+        )
+    } else {
+        crate::api::pdf_handler::create_pdf_bytes_from_str(&content)
+    }
 }
 
 #[cfg(test)]

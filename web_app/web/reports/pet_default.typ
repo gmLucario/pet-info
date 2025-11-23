@@ -30,13 +30,8 @@
     height: 250pt,
     radius: 12pt,
     clip: true,
-    fill: rgb("#e2e8f0")
 )[
-    #align(center + horizon)[
-        #text(size: 50pt, fill: rgb("#94a3b8"))[🐾]
-        #v(5pt)
-        #text(size: 11pt, fill: rgb("#64748b"), style: "italic")[Foto de {{ pet_name }}]
-    ]
+    #image("pet.jpg", width: 100%, height: 100%, fit: "cover")
 ]
 #v(15pt)
 {% endif %}
@@ -81,7 +76,7 @@
     width: 100%,
     stroke: (paint: rgb("#e2e8f0"), thickness: 1pt)
 )[
-    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[📋 Información General]
+    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[Información General]
     #v(12pt)
 
     #grid(
@@ -94,9 +89,9 @@
         [*Raza:*], [{{ breed }}],
         [*Sexo:*], [{% if is_female %}Hembra{% else %}Macho{% endif %}],
         [*Esterilización:*], [
-            {% if is_female and is_spaying_neutering %}✓ Esterilizada
-            {% elif not is_female and is_spaying_neutering %}✓ Esterilizado
-            {% else %}✗ Sin esterilizar
+            {% if is_female and is_spaying_neutering %}[+] Esterilizada
+            {% elif not is_female and is_spaying_neutering %}[+] Esterilizado
+            {% else %}[-] Sin esterilizar
             {% endif %}
         ],
         [*Link Público:*], [#link("{{ pet_link }}")[Ver perfil]]
@@ -113,7 +108,7 @@
     width: 100%,
     stroke: (paint: rgb("#e2e8f0"), thickness: 1pt)
 )[
-    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[💉 Vacunas]
+    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[Vacunas]
     #v(12pt)
 
     #table(
@@ -144,7 +139,7 @@
     width: 100%,
     stroke: (paint: rgb("#e2e8f0"), thickness: 1pt)
 )[
-    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[🪱 Desparasitaciones]
+    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[Desparasitaciones]
     #v(12pt)
 
     #table(
@@ -175,7 +170,7 @@
     width: 100%,
     stroke: (paint: rgb("#e2e8f0"), thickness: 1pt)
 )[
-    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[⚖️ Historial de Peso]
+    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[Historial de Peso]
     #v(12pt)
 
     #table(
@@ -211,7 +206,7 @@
 )[
     #set align(left)
     #text(size: 15pt, weight: "bold", fill: rgb("#78350f"))[
-        📝 {{ note.title | title }}
+        {{ note.title | title }}
     ]
     #v(5pt)
     #text(size: 9pt, fill: rgb("#92400e"), style: "italic")[
