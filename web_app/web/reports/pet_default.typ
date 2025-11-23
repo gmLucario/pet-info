@@ -27,7 +27,7 @@
 {% if has_picture %}
 #box(
     width: 100%,
-    height: 250pt,
+    height: 150pt,
     radius: 12pt,
     clip: true,
 )[
