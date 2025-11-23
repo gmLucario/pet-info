@@ -5,7 +5,10 @@
 
 use super::{
     client::WhatsAppClient,
-    schemas::{InteractiveRow, Message, OutgoingDocumentMessage, OutgoingInteractiveMessage, Status, WebhookPayload},
+    schemas::{
+        InteractiveRow, Message, OutgoingDocumentMessage, OutgoingInteractiveMessage, Status,
+        WebhookPayload,
+    },
 };
 use crate::repo;
 use anyhow::{Context, Result};
@@ -75,8 +78,6 @@ async fn send_pet_info_to_user(
     user_id: i64,
     repo: &repo::ImplAppRepo,
 ) -> Result<()> {
-    let _span = logfire::span!("send_pet_info_to_user").entered();
-
     // Get all pets for the user
     let pets = repo.get_all_pets_user_id(user_id).await?;
 
@@ -174,39 +175,20 @@ async fn handle_interactive_response(
 
     match action {
         "reporte" => {
-            // Generate PDF report bytes
-            logfire::info!(
-                "Generating PDF report for pet external_id {id}",
-                id = external_id.to_string()
-            );
-
             let pet = repo.get_pet_by_external_id(external_id).await?;
             let pdf_bytes =
                 crate::api::pet::generate_pdf_report_bytes(pet.id, pet.user_app_id, repo).await?;
 
-            let pet = repo.get_pet_by_external_id(external_id).await?;
-
-            let filename = format!("reporte_{}.pdf", pet.pet_name);
-
-            // Upload PDF to WhatsApp and get media ID
-            logfire::info!(
-                "Uploading PDF to WhatsApp for pet {name}",
-                name = &pet.pet_name
-            );
-
+            let filename = format!("reporte_{}.pdf", pet.pet_name).to_lowercase();
             let media_id = client
                 .upload_media(pdf_bytes, "application/pdf", &filename)
                 .await?;
-
-            let pet_name_for_log = pet.pet_name.clone();
 
             // Send document message with media ID
             let document_message =
                 OutgoingDocumentMessage::new_with_id(message.from.clone(), media_id, filename);
 
             client.send_document_message(&document_message).await?;
-
-            logfire::info!("Sent PDF report for pet {name}", name = &pet_name_for_log);
         }
         "qr" => {
             // Send QR code link
@@ -219,11 +201,6 @@ async fn handle_interactive_response(
                     ),
                 )
                 .await?;
-
-            logfire::info!(
-                "Sent QR code link for pet external_id {id}",
-                id = external_id.to_string()
-            );
         }
         "tarjeta" => {
             // Send Apple Wallet pass link
@@ -236,11 +213,6 @@ async fn handle_interactive_response(
                     ),
                 )
                 .await?;
-
-            logfire::info!(
-                "Sent pass link for pet external_id {id}",
-                id = external_id.to_string()
-            );
         }
         _ => {
             logfire::warn!(
@@ -261,67 +233,48 @@ async fn handle_interactive_response(
 /// # Arguments
 ///
 /// * `message` - The message to handle
+/// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) -> Result<()> {
-    let _span = logfire::span!("handle_user_message").entered();
-
-    let client = WhatsAppClient::new()?;
-
+pub async fn handle_user_message(
+    message: &Message,
+    client: &WhatsAppClient,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
     match message.msg_type.as_str() {
-        "text" => {
-            if message.text.is_some() {
-                logfire::info!("Received text message from {from}", from = &message.from);
+        "text" if message.text.is_some() => {
+            let user = repo.get_user_app_by_phone(&message.from).await?;
 
-                // Look up user by phone number
-                let user = repo.get_user_app_by_phone(&message.from).await?;
-
-                match user {
-                    Some(user) => {
-                        // Send pet information
-                        send_pet_info_to_user(&client, &message.from, user.id, repo).await?;
-                    }
-                    None => {
-                        // User not found
-                        client
-                            .send_text_message(
-                                message.from.clone(),
-                                "No se encontró una cuenta asociada a este número de teléfono. \
+            match user {
+                Some(user) => {
+                    send_pet_info_to_user(&client, &message.from, user.id, repo).await?;
+                }
+                None => {
+                    client
+                        .send_text_message(
+                            message.from.clone(),
+                            "No se encontró una cuenta asociada a este número de teléfono. \
                                  Por favor, regístrala en tu perfil en https://pet-info.link"
-                                    .to_string(),
-                            )
-                            .await?;
-                    }
+                                .to_string(),
+                        )
+                        .await?;
                 }
             }
         }
         "interactive" => {
-            logfire::info!(
-                "Received interactive response from {from}",
-                from = &message.from
-            );
             handle_interactive_response(&client, message, repo).await?;
         }
-        "image" => {
-            if message.image.is_some() {
-                logfire::info!("Received image");
-                // TODO: Handle image uploads (e.g., pet photos)
-            }
+        "image" if message.image.is_some() => {
+            // TODO: Handle image uploads (e.g., pet photos)
         }
-        "location" => {
-            if message.location.is_some() {
-                logfire::info!("Received location");
-                // TODO: Handle location sharing (e.g., lost pet location)
-            }
+        "location" if message.location.is_some() => {
+            // TODO: Handle location sharing (e.g., lost pet location)
         }
-        "document" => {
-            if message.document.is_some() {
-                logfire::info!("Received document");
-                // TODO: Handle document uploads
-            }
+        "document" if message.document.is_some() => {
+            // TODO: Handle document uploads
         }
         _ => {
             logfire::warn!(
@@ -358,16 +311,21 @@ pub async fn handle_message_status(_status: &Status) -> Result<()> {
 /// # Arguments
 ///
 /// * `payload` - The webhook payload from WhatsApp
+/// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn process_webhook(payload: WebhookPayload, repo: &repo::ImplAppRepo) -> Result<()> {
+pub async fn process_webhook(
+    payload: WebhookPayload,
+    client: &WhatsAppClient,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
-        if let Err(e) = handle_user_message(message, repo).await {
+        if let Err(e) = handle_user_message(message, client, repo).await {
             logfire::error!("Failed to handle message: {error}", error = e.to_string());
         }
     }

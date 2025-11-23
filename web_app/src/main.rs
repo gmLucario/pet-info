@@ -121,13 +121,16 @@ fn create_app_state(
     sqlite_repo: repo::sqlite::SqlxSqliteRepo,
     storage_service: services::storage::StorageHandler,
     notification_service: services::notification::NotificationHandler,
-) -> front::AppState {
-    front::AppState {
+) -> anyhow::Result<front::AppState> {
+    let whatsapp_client = webhook::whatsapp::client::WhatsAppClient::new()?;
+
+    Ok(front::AppState {
         csrf_protec: AesGcmCsrfProtection::from_key(csrf_key),
         repo: Box::new(sqlite_repo),
         storage_service: Box::new(storage_service),
         notification_service: Box::new(notification_service),
-    }
+        whatsapp_client,
+    })
 }
 
 /// Configures and starts the web server with appropriate SSL settings
@@ -178,12 +181,15 @@ async fn configure_and_run_server(
             ))
             .wrap(web::middleware::Logger::default())
             .wrap(web::middleware::Compress::default())
-            .state(create_app_state(
-                csrf_key,
-                sqlite_repo.clone(),
-                storage_service.clone(),
-                notification_service.clone(),
-            ))
+            .state(
+                create_app_state(
+                    csrf_key,
+                    sqlite_repo.clone(),
+                    storage_service.clone(),
+                    notification_service.clone(),
+                )
+                .expect("Failed to create app state"),
+            )
             .configure(front::routes::pet_public_profile)
             .configure(front::routes::pet)
             .configure(front::routes::user_profile)

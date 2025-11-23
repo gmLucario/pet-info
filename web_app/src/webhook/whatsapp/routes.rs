@@ -42,8 +42,6 @@ pub struct VerifyQuery {
 pub async fn verify(
     query: web::types::Query<VerifyQuery>,
 ) -> Result<impl web::Responder, web::Error> {
-    logfire::info!("Received webhook verification request");
-
     if query.mode != "subscribe" {
         return Err(errors::UserError::Unauthorized.into());
     }
@@ -73,9 +71,9 @@ pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    if let Err(e) = handler::process_webhook(payload.0, &app_state.repo).await {
-        // Still return 200 to acknowledge receipt even if processing fails
-        // This prevents WhatsApp from retrying failed messages
+    if let Err(e) =
+        handler::process_webhook(payload.0, &app_state.whatsapp_client, &app_state.repo).await
+    {
         logfire::error!("Failed to process webhook: {error}", error = e.to_string());
     }
 
