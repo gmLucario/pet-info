@@ -853,6 +853,63 @@ pub async fn generate_pdf_report_bytes(
     )
 }
 
+/// Generates a PDF of the pet's public profile information.
+///
+/// This function creates a shareable PDF card with the pet's public information
+/// using the pet_public_info.typ Typst template.
+///
+/// # Arguments
+/// * `pet_id` - The pet's database ID
+/// * `user_id` - The owner's user ID
+/// * `repo` - Repository for database access
+///
+/// # Returns
+/// PDF bytes containing the pet's public profile card
+///
+/// # Errors
+/// Returns error if pet not found, user doesn't own the pet, or PDF generation fails
+pub async fn generate_public_info_pdf_bytes(
+    pet_id: i64,
+    user_id: i64,
+    repo: &repo::ImplAppRepo,
+) -> anyhow::Result<Vec<u8>> {
+    let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
+    let now = chrono::Utc::now().date_naive();
+
+    // Format the about text (convert HTML to plain text if needed)
+    let about_pet = html2text::from_read(
+        pet_full_info.pet.about.as_bytes(),
+        80 // max line width
+    ).unwrap_or_else(|_| pet_full_info.pet.about.clone());
+
+    // Format contact info if lost
+    let contact_info = if pet_full_info.pet.is_lost {
+        // You might want to fetch actual contact info here
+        Some("Ver información de contacto en el perfil web".to_string())
+    } else {
+        None
+    };
+
+    let content = front::templates::PDF_REPORT_TEMPLATES.render(
+        "pet_public_info.typ",
+        &tera::Context::from_value(serde_json::json!({
+            "pet_name": pet_full_info.pet.pet_name,
+            "breed": pet_full_info.pet.breed,
+            "sex": if pet_full_info.pet.is_female { "hembra" } else { "macho" },
+            "weight": pet_full_info.weights.first().map(|w| w.value),
+            "age": front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
+            "about_pet": about_pet,
+            "is_lost": pet_full_info.pet.is_lost,
+            "contact_info": contact_info,
+            "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
+            "has_picture": pet_full_info.pet.pic.is_some(),
+        }))
+        .unwrap_or_default(),
+    )?;
+
+    crate::api::pdf_handler::create_pdf_bytes_from_str(&content)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

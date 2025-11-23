@@ -1,15 +1,17 @@
-//! PDF generation using Typst typesetting system.
+//! PDF and image generation using Typst typesetting system.
 
 use anyhow::Result;
 use typst::{
     Library, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
+    layout::PagedDocument,
     syntax::{FileId, Source},
     text::{Font, FontBook},
     utils::LazyHash,
 };
 use typst_pdf::PdfOptions;
+use typst_render::render;
 
 /// Typst world implementation for PDF compilation.
 struct TypstWorld {
@@ -88,4 +90,41 @@ pub fn create_pdf_bytes_from_str(content: &str) -> Result<Vec<u8>> {
         .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;
     typst_pdf::pdf(&document, &PdfOptions::default())
         .map_err(|e| anyhow::anyhow!("PDF generation failed: {:?}", e))
+}
+
+/// Converts Typst markup content to PNG image bytes.
+///
+/// # Arguments
+/// * `content` - Typst markup text to compile
+/// * `pixel_per_pt` - Pixels per point for rendering (default: 2.0 for high-quality)
+///
+/// # Returns
+/// PNG image as bytes
+///
+/// # Errors
+/// Returns error if compilation or image generation fails
+pub fn create_image_bytes_from_str(content: &str, pixel_per_pt: Option<f32>) -> Result<Vec<u8>> {
+    let world = TypstWorld::new(content)?;
+    let document: PagedDocument = typst::compile(&world)
+        .output
+        .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;
+
+    // Get the first page
+    let page = document
+        .pages
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Document has no pages"))?;
+
+    // Set pixel density (higher = better quality, but larger file size)
+    let ppp = pixel_per_pt.unwrap_or(2.0);
+
+    // Render the page to a pixmap
+    let pixmap = render(page, ppp);
+
+    // Convert pixmap to PNG bytes
+    let png_bytes = pixmap
+        .encode_png()
+        .map_err(|e| anyhow::anyhow!("PNG encoding failed: {:?}", e))?;
+
+    Ok(png_bytes)
 }
