@@ -90,6 +90,34 @@ impl WhatsAppClient {
         self.send_message(message).await
     }
 
+    /// Sends a template message (for OTP verification, notifications, etc.)
+    ///
+    /// Template messages are pre-approved message formats used for sending
+    /// notifications, OTPs, and other structured messages.
+    ///
+    /// # Arguments
+    /// * `payload` - Template message payload as JSON
+    ///
+    /// # Returns
+    /// * `Result<WhatsAppMessageResponse>` - Response from WhatsApp API
+    ///
+    /// # Example
+    /// ```no_run
+    /// let payload = json!({
+    ///     "messaging_product": "whatsapp",
+    ///     "to": "+1234567890",
+    ///     "type": "template",
+    ///     "template": { ... }
+    /// });
+    /// client.send_template_message(payload).await?;
+    /// ```
+    pub async fn send_template_message(
+        &self,
+        payload: serde_json::Value,
+    ) -> Result<WhatsAppMessageResponse> {
+        self.send_message(&payload).await
+    }
+
     /// Uploads media (document, image, etc.) to WhatsApp and returns media ID
     ///
     /// Uploads file bytes to WhatsApp's media upload API and returns a media ID
