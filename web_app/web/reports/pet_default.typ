@@ -31,7 +31,7 @@
     radius: 12pt,
     clip: true,
 )[
-    #image("pet.jpg", width: 100%, height: 100%, fit: "cover")
+    #image("{{ image_filename }}", width: 100%, height: 100%, fit: "cover")
 ]
 #v(15pt)
 {% endif %}

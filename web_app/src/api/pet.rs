@@ -828,6 +828,10 @@ pub async fn generate_pdf_report_bytes(
         })
         .collect();
 
+    // Download the pet picture if available and get the extension
+    let pet_pic_data = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?;
+    let image_filename = pet_pic_data.as_ref().map(|p| format!("pet.{}", p.extension));
+
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
         &tera::Context::from_value(serde_json::json!({
@@ -846,16 +850,17 @@ pub async fn generate_pdf_report_bytes(
             "weights": weights,
             "notes": notes,
             "has_picture": pet_full_info.pet.pic.is_some(),
+            "image_filename": image_filename.as_deref().unwrap_or("pet.jpg"),
         }))
         .unwrap_or_default(),
     )?;
 
-    // Download the pet picture if available
-    if let Some(pet_pic) = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await? {
+    // Embed the image if available
+    if let Some(pet_pic) = pet_pic_data {
         crate::api::pdf_handler::create_pdf_bytes_with_image(
             &content,
             pet_pic.body,
-            "pet.jpg",
+            &format!("pet.{}", pet_pic.extension),
         )
     } else {
         crate::api::pdf_handler::create_pdf_bytes_from_str(&content)
