@@ -25,13 +25,8 @@
 
 // Pet Picture (if available)
 {% if has_picture %}
-#box(
-    width: 100%,
-    height: 100pt,
-    radius: 12pt,
-    clip: true,
-)[
-    #image("{{ image_filename }}", width: 100%, height: 100%, fit: "cover")
+#align(center)[
+    #image("{{ image_filename }}", height: 100pt)
 ]
 #v(15pt)
 {% endif %}
