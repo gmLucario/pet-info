@@ -88,6 +88,7 @@ async fn send_verification_code_to_reminder_phone(
     _: CheckUserCanAccessService,
     form: web::types::Form<forms::user::ReminderPhoneToVerify>,
     cookie: Session,
+    app_state: web::types::State<AppState>,
     _: CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::from_value(json!({
@@ -101,7 +102,7 @@ async fn send_verification_code_to_reminder_phone(
         phone = form.reminders_phone
     );
 
-    api::reminder::send_verification(&phone_number)
+    api::reminder::send_verification(&app_state.whatsapp_client, &phone_number)
         .await
         .map_err(|e| {
             errors::ServerError::WidgetTemplateError(format!("otp-send-verification-template: {e}"))
