@@ -26,16 +26,14 @@ use anyhow::{Context, Result};
 ///
 /// A vector of processed messages
 pub fn process_webhook_messages(payload: &WebhookPayload) -> Vec<&Message> {
-    let messages = payload
+    payload
         .entry
         .iter()
         .flat_map(|entry| &entry.changes)
         .filter(|change| change.field == "messages")
         .filter_map(|change| change.value.messages.as_ref())
         .flatten()
-        .collect::<Vec<_>>();
-
-    messages
+        .collect::<Vec<_>>()
 }
 
 /// Processes incoming WhatsApp webhook statuses
@@ -50,15 +48,14 @@ pub fn process_webhook_messages(payload: &WebhookPayload) -> Vec<&Message> {
 ///
 /// A vector of processed statuses
 pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
-    let statuses = payload
+    payload
         .entry
         .iter()
         .flat_map(|entry| &entry.changes)
         .filter(|change| change.field == "messages")
         .filter_map(|change| change.value.statuses.as_ref())
         .flatten()
-        .collect::<Vec<_>>();
-    statuses
+        .collect::<Vec<_>>()
 }
 
 /// Sends pet information to a WhatsApp user
@@ -105,15 +102,13 @@ async fn send_pet_info_to_user(
         let external_id = pet.external_id;
 
         let rows = vec![
-            InteractiveRow::new(
-                format!("reporte:{}", external_id),
-                format!("reporte: [{}]", pet_name),
-            ),
-            InteractiveRow::new(format!("qr:{}", external_id), format!("qr: [{}]", pet_name)),
-            InteractiveRow::new(
-                format!("tarjeta:{}", external_id),
-                format!("tarjeta: [{}]", pet_name),
-            ),
+            InteractiveRow::new(format!("reporte:{}", external_id), "reporte".into()),
+            InteractiveRow::new(format!("qr:{}", external_id), "qr".into()),
+            InteractiveRow {
+                id: format!("tarjeta:{}", external_id),
+                title: "tarjeta".into(),
+                description: Some("tarjeta digital (wallet)".into()),
+            },
         ];
 
         let message = OutgoingInteractiveMessage::new_list(
@@ -247,25 +242,19 @@ pub async fn handle_user_message(
     match message.msg_type.as_str() {
         "text" if message.text.is_some() => {
             let user = repo.get_user_app_by_phone(&message.from).await?;
-
-            match user {
-                Some(user) => {
-                    send_pet_info_to_user(&client, &message.from, user.id, repo).await?;
-                }
-                None => {
-                    client
-                        .send_text_message(
-                            message.from.clone(),
-                            "No se encontró una cuenta asociada a este número de teléfono. \
-                                 Por favor, regístrala en tu perfil en https://pet-info.link"
-                                .to_string(),
-                        )
-                        .await?;
-                }
+            if let Some(user) = user {
+                send_pet_info_to_user(client, &message.from, user.id, repo).await?;
+                return Ok(());
             }
+
+            client
+            .send_text_message(
+                message.from.clone(),
+                "No se encontró una cuenta asociada a este número de teléfono. Regístrala en https://pet-info.link".to_string()
+            ).await?;
         }
         "interactive" => {
-            handle_interactive_response(&client, message, repo).await?;
+            handle_interactive_response(client, message, repo).await?;
         }
         "image" if message.image.is_some() => {
             // TODO: Handle image uploads (e.g., pet photos)

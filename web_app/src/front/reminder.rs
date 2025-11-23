@@ -138,27 +138,25 @@ async fn verify_reminder_phone(
     }))
     .unwrap_or_default();
 
-    if api::reminder::validate_otp(&form.otp_value) {
-        if let Ok(Some(phone_number)) = cookie.get::<String>(consts::OTP_PHONE_COOKIE_NAME) {
-            if api::reminder::add_verified_phone_to_user(
-                user_session.user.id,
-                &phone_number,
-                &app_state.repo,
-            )
-            .await
-            .is_ok()
-            {
-                user_session.user.phone_reminder = Some(phone_number.to_string());
-                identity.remember(
-                    serde_json::to_string(&user_session).unwrap(), //unwrap cause its safe, it comes internally
-                );
+    if api::reminder::validate_otp(&form.otp_value)
+        && let Ok(Some(phone_number)) = cookie.get::<String>(consts::OTP_PHONE_COOKIE_NAME)
+        && api::reminder::add_verified_phone_to_user(
+            user_session.user.id,
+            &phone_number,
+            &app_state.repo,
+        )
+        .await
+        .is_ok()
+    {
+        user_session.user.phone_reminder = Some(phone_number.to_string());
+        identity.remember(
+            serde_json::to_string(&user_session).unwrap(), //unwrap cause its safe, it comes internally
+        );
 
-                cookie.remove(consts::OTP_PHONE_COOKIE_NAME);
+        cookie.remove(consts::OTP_PHONE_COOKIE_NAME);
 
-                context.insert("otp_step", "OTP_SUCCESS");
-                context.insert("phone_reminder", &phone_number);
-            }
-        }
+        context.insert("otp_step", "OTP_SUCCESS");
+        context.insert("phone_reminder", &phone_number);
     };
 
     let content = templates::WEB_TEMPLATES

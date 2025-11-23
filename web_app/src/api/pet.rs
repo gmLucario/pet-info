@@ -848,9 +848,9 @@ pub async fn generate_pdf_report_bytes(
         .unwrap_or_default(),
     )?;
 
-    Ok(crate::api::pdf_handler::create_pdf_bytes_from_str(
+    crate::api::pdf_handler::create_pdf_bytes_from_str(
         &content,
-    )?)
+    )
 }
 
 #[cfg(test)]
