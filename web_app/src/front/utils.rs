@@ -49,7 +49,7 @@ pub fn redirect_to(url: &str) -> Result<ntex::web::HttpResponse, ntex::web::Erro
 /// ```
 pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
     field
-        .filter_map(|x| async move { if let Ok(b) = x { Some(b) } else { None } })
+        .filter_map(|x| async move { x.ok() })
         .collect::<Vec<ntex::util::Bytes>>()
         .await
         .concat()
