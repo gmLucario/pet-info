@@ -806,12 +806,12 @@ fn detect_image_format(bytes: &[u8]) -> &'static str {
 
     // Check magic bytes for common image formats
     match &bytes[0..4] {
-        [0x89, 0x50, 0x4E, 0x47] => "png",  // PNG
-        [0xFF, 0xD8, 0xFF, ..] => "jpg",     // JPEG
-        [0x47, 0x49, 0x46, ..] => "gif",     // GIF
+        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
+        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
+        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
         [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
-        [0x42, 0x4D, ..] => "bmp",           // BMP
-        _ => "jpg", // Default fallback
+        [0x42, 0x4D, ..] => "bmp",         // BMP
+        _ => "jpg",                        // Default fallback
     }
 }
 

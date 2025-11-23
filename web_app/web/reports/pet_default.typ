@@ -13,7 +13,7 @@
 
 #set text(
     font: "PT Sans",
-    size: 11pt,
+    size: 14pt,
     fill: rgb("#1e293b")
 )
 
@@ -28,7 +28,6 @@
 #align(center)[
     #image("{{ image_filename }}", height: 100pt)
 ]
-#v(15pt)
 {% endif %}
 
 // Pet Name
@@ -39,8 +38,6 @@
 )[
     {{ pet_name | upper }}
 ]
-
-#v(10pt)
 
 // Basic Info Pill
 #box(
@@ -58,8 +55,6 @@
         {{ age }}
     ]
 ]
-
-#v(20pt)
 
 // ==================== BASIC INFO CARD ====================
 #set align(left)
@@ -200,15 +195,14 @@
     stroke: (paint: rgb("#fbbf24"), thickness: 1pt)
 )[
     #set align(left)
-    #text(size: 15pt, weight: "bold", fill: rgb("#78350f"))[
+    #text(size: 16pt, weight: "bold", fill: rgb("#78350f"))[
         {{ note.title | title }}
     ]
-    #v(5pt)
     #text(size: 9pt, fill: rgb("#92400e"), style: "italic")[
         {{ note.created_at | date(format="%v") }}
     ]
     #v(10pt)
-    #text(size: 11pt, fill: rgb("#1e293b"))[
+    #text(size: 14pt, fill: rgb("#1e293b"))[
         {{ note.content }}
     ]
 ]

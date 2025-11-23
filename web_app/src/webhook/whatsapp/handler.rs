@@ -61,7 +61,7 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 /// Sends pet information to a WhatsApp user
 ///
 /// Sends a text message listing all registered pets, followed by an interactive
-/// list message for each pet with options for report, QR, and card.
+/// list message for each pet with options for report, and card.
 ///
 /// # Arguments
 ///
@@ -103,7 +103,6 @@ async fn send_pet_info_to_user(
 
         let rows = vec![
             InteractiveRow::new(format!("reporte:{}", external_id), "reporte".into()),
-            InteractiveRow::new(format!("qr:{}", external_id), "qr".into()),
             InteractiveRow {
                 id: format!("tarjeta:{}", external_id),
                 title: "tarjeta".into(),
@@ -191,18 +190,6 @@ async fn handle_interactive_response(
                 OutgoingDocumentMessage::new_with_id(message.from.clone(), media_id, filename);
 
             client.send_document_message(&document_message).await?;
-        }
-        "qr" => {
-            // Send QR code link
-            client
-                .send_text_message(
-                    message.from.clone(),
-                    format!(
-                        "Código QR: https://pet-info.link/pet/qr_code/{}",
-                        external_id
-                    ),
-                )
-                .await?;
         }
         "tarjeta" => {
             // Send Apple Wallet pass link
