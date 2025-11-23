@@ -261,15 +261,18 @@ async fn handle_interactive_response(
 /// # Arguments
 ///
 /// * `message` - The message to handle
+/// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn handle_user_message(message: &Message, repo: &repo::ImplAppRepo) -> Result<()> {
+pub async fn handle_user_message(
+    message: &Message,
+    client: &WhatsAppClient,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
     let _span = logfire::span!("handle_user_message").entered();
-
-    let client = WhatsAppClient::new()?;
 
     match message.msg_type.as_str() {
         "text" => {
@@ -358,16 +361,21 @@ pub async fn handle_message_status(_status: &Status) -> Result<()> {
 /// # Arguments
 ///
 /// * `payload` - The webhook payload from WhatsApp
+/// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
 ///
 /// # Returns
 ///
 /// Result indicating success or failure
-pub async fn process_webhook(payload: WebhookPayload, repo: &repo::ImplAppRepo) -> Result<()> {
+pub async fn process_webhook(
+    payload: WebhookPayload,
+    client: &WhatsAppClient,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
-        if let Err(e) = handle_user_message(message, repo).await {
+        if let Err(e) = handle_user_message(message, client, repo).await {
             logfire::error!("Failed to handle message: {error}", error = e.to_string());
         }
     }

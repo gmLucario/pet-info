@@ -17,7 +17,7 @@ pub mod session;
 pub mod templates;
 pub mod utils;
 
-use crate::{repo, services};
+use crate::{repo, services, webhook};
 use csrf::AesGcmCsrfProtection;
 
 pub struct AppState {
@@ -25,4 +25,5 @@ pub struct AppState {
     pub repo: repo::ImplAppRepo,
     pub storage_service: services::ImplStorageService,
     pub notification_service: services::ImplNotificationService,
+    pub whatsapp_client: webhook::whatsapp::client::WhatsAppClient,
 }

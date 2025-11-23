@@ -81,7 +81,7 @@ pub async fn receive(
 
     // Process webhook synchronously
     // WhatsApp gives us 20 seconds to respond, which should be sufficient
-    if let Err(e) = handler::process_webhook(payload, &app_state.repo).await {
+    if let Err(e) = handler::process_webhook(payload, &app_state.whatsapp_client, &app_state.repo).await {
         logfire::error!("Failed to process webhook: {error}", error = e.to_string());
         // Still return 200 to acknowledge receipt even if processing fails
         // This prevents WhatsApp from retrying failed messages

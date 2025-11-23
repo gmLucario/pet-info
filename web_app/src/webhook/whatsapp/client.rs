@@ -18,6 +18,7 @@ pub struct MediaUploadResponse {
 }
 
 /// WhatsApp API client for sending messages and uploading media
+#[derive(Clone)]
 pub struct WhatsAppClient {
     /// HTTP client for making API requests
     client: reqwest::Client,
