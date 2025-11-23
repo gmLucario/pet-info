@@ -3,7 +3,7 @@
 //! This module provides a client for sending messages to WhatsApp Business API.
 //! It handles authentication and message sending for text, interactive, and document messages.
 
-use super::outgoing_schemas::{
+use super::schemas::{
     OutgoingDocumentMessage, OutgoingInteractiveMessage, OutgoingTextMessage,
     WhatsAppMessageResponse,
 };

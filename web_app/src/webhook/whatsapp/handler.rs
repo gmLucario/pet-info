@@ -5,8 +5,7 @@
 
 use super::{
     client::WhatsAppClient,
-    outgoing_schemas::{InteractiveRow, OutgoingDocumentMessage, OutgoingInteractiveMessage},
-    schemas::{Message, Status, WebhookPayload},
+    schemas::{InteractiveRow, Message, OutgoingDocumentMessage, OutgoingInteractiveMessage, Status, WebhookPayload},
 };
 use crate::repo;
 use anyhow::{Context, Result};
