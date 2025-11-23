@@ -23,18 +23,6 @@
 // ==================== HEADER SECTION ====================
 #set align(center)
 
-// Pet Info Logo
-#text(
-    font: "TeX Gyre Heros",
-    size: 22pt,
-    weight: "bold",
-    fill: rgb("#0f172a")
-)[
-    #link("https://pet-info.link")[🐾 Pet-Info]
-]
-
-#v(15pt)
-
 // Pet Picture (if available)
 {% if has_picture %}
 #box(
