@@ -66,25 +66,17 @@ pub async fn verify(
 /// Receives webhook events from WhatsApp Business API.
 /// Processes incoming messages, status updates, and other events.
 ///
-/// # Request Body
-/// JSON payload containing webhook data from WhatsApp
-///
-/// # Returns
-/// - 200 OK if processing succeeds
-/// - 500 if processing fails
+/// Process webhook synchronously
+/// WhatsApp gives us 20 seconds to respond, which should be sufficient
 #[web::post("")]
 pub async fn receive(
     payload: web::types::Json<schemas::WebhookPayload>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let payload = payload.into_inner();
-
-    // Process webhook synchronously
-    // WhatsApp gives us 20 seconds to respond, which should be sufficient
-    if let Err(e) = handler::process_webhook(payload, &app_state.repo).await {
-        logfire::error!("Failed to process webhook: {error}", error = e.to_string());
+    if let Err(e) = handler::process_webhook(payload.0, &app_state.repo).await {
         // Still return 200 to acknowledge receipt even if processing fails
         // This prevents WhatsApp from retrying failed messages
+        logfire::error!("Failed to process webhook: {error}", error = e.to_string());
     }
 
     Ok(web::HttpResponse::Ok().json(&serde_json::json!({
