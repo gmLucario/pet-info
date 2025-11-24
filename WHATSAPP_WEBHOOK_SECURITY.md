@@ -58,16 +58,13 @@ This implementation uses **defense in depth** with two independent security laye
 
 **For Production Deployments:**
 
-The certificate is automatically downloaded during EC2 instance provisioning via the Terraform user_data script (`terraform/modules/ec2/user_data/pet_info_start.sh`). No manual intervention required.
+The certificate is **automatically downloaded** during EC2 instance provisioning via the Terraform user_data script (`terraform/modules/ec2/user_data/pet_info_start.sh`).
+
+✅ **No manual intervention required** - certificates are provisioned automatically!
 
 **For Development/Testing:**
 
-The DigiCert High Assurance EV Root CA certificate is already included in this repository at:
-```
-certs/DigiCertHighAssuranceEVRootCA.pem
-```
-
-If you need to download it manually:
+Download the DigiCert High Assurance EV Root CA certificate manually:
 
 ```bash
 # Download the certificate
@@ -84,6 +81,7 @@ openssl x509 -inform DER -in DigiCertHighAssuranceEVRootCA.crt \
 - **Subject**: CN=DigiCert High Assurance EV Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
 - **Valid Until**: November 10, 2031
 - **Purpose**: Verify Meta's client certificates for webhook requests
+- **Note**: Certificate files are excluded from git (see `.gitignore`) as they're auto-downloaded in production
 
 ### Step 2: Configure Environment Variables
 

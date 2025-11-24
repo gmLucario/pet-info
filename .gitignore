@@ -25,7 +25,9 @@ scripts/**/*.rs.bk
 **/.terraform/*
 **/*.lock.hcl
 
+# SSL/TLS certificates (auto-downloaded in production)
 **/*.pem
+**/*.crt
 
 # .tfstate files
 *.tfstate
