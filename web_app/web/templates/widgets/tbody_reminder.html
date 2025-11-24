@@ -4,7 +4,7 @@
         {% set delete_url = "/reminder" ~ "/" ~ reminder.id %}
         {% include "widgets/trash_icon.html" %}
     </td>
-    <td>{{ reminder.send_at | date(format="%v", timezone=reminder.user_timezone, locale="es_MX") }}</td>
+    <td>{{ reminder.send_at | date(format="%v, %R", timezone=reminder.user_timezone, locale="es_MX") }}</td>
     <td data-tooltip="vía: {{reminder.notification_type}}">{{ reminder.body }}</td>
 </tr>
 {% endfor %}
