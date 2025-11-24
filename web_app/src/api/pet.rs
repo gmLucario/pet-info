@@ -854,21 +854,19 @@ pub async fn generate_pdf_report_bytes(
     // Generate QR code from public link
     let pet_link = format!(
         "https://pet-info.link/info/{external_id}",
-        external_id=pet_full_info.pet.external_id
+        external_id = pet_full_info.pet.external_id
     );
     let qr_code_data = front::utils::get_qr_code(&pet_link)?;
 
-    // Download and prepare pet picture if available
-    let (image_filename, pet_pic_data) = if pet_full_info.pet.pic.is_some() {
-        let pic_data = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?;
-        let filename = pic_data.as_ref().map(|p| {
-            let actual_format = detect_image_format(&p.body);
-            format!("pet.{}", actual_format)
-        });
-        (filename, pic_data)
+    let pet_pic_option = if pet_full_info.pet.pic.is_some() {
+        get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?
     } else {
-        (None, None)
+        None
     };
+    let image_filename = pet_pic_option.as_ref().map(|pic| {
+        let actual_format = detect_image_format(&pic.body);
+        format!("pet.{}", actual_format)
+    });
 
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
@@ -884,23 +882,19 @@ pub async fn generate_pdf_report_bytes(
             "deworms": pet_full_info.deworms,
             "weights": weights,
             "notes": notes,
-            "has_picture": pet_full_info.pet.pic.is_some(),
-            "image_filename": image_filename.as_deref().unwrap_or("pet.jpg"),
+            "image_filename": image_filename.as_deref().unwrap_or("NO_PIC"),
         }))
         .unwrap_or_default(),
     )?;
 
-    // Embed images (pet picture and QR code)
-    if let Some(pet_pic) = pet_pic_data {
-        let actual_format = detect_image_format(&pet_pic.body);
-        let pet_image_name = format!("pet.{}", actual_format);
-        let images = vec![(qr_code_data, "qr.png"), (pet_pic.body, pet_image_name.as_str())];
-        crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
-    } else {
-        // Only QR code (no pet picture)
-        let images = vec![(qr_code_data, "qr.png")];
-        crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
+    let mut images = vec![(qr_code_data, "qr.png")];
+    if let Some(pet_pic) = pet_pic_option {
+        if let Some(ref filename) = image_filename {
+            images.push((pet_pic.body, filename.as_str()));
+        }
     }
+
+    crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
 }
 
 #[cfg(test)]

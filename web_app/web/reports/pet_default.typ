@@ -24,7 +24,7 @@
 #set align(center)
 
 // Pet Picture (if available)
-{% if has_picture %}
+{% if image_filename != 'NO_PIC' %}
 #align(center)[
     #image("{{ image_filename }}", height: 100pt)
 ]
