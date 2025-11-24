@@ -860,6 +860,13 @@ pub async fn generate_pdf_report_bytes(
         format!("pet.{}", actual_format)
     });
 
+    // Generate QR code from public link
+    let pet_link = format!(
+        "https://pet-info.link/info/{external_id}",
+        external_id=pet_full_info.pet.external_id
+    );
+    let qr_code_data = front::utils::get_qr_code(&pet_link)?;
+
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
         &tera::Context::from_value(serde_json::json!({
@@ -869,10 +876,7 @@ pub async fn generate_pdf_report_bytes(
             "breed": pet_full_info.pet.breed,
             "is_female": pet_full_info.pet.is_female,
             "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
-            "pet_link": format!(
-                "https://pet-info.link/info/{external_id}",
-                external_id=pet_full_info.pet.external_id
-            ),
+            "pet_link": pet_link,
             "vaccines": pet_full_info.vaccines,
             "deworms": pet_full_info.deworms,
             "weights": weights,
@@ -883,16 +887,15 @@ pub async fn generate_pdf_report_bytes(
         .unwrap_or_default(),
     )?;
 
-    // Embed the image if available using detected format
+    // Embed images (pet picture and QR code)
     if let Some(pet_pic) = pet_pic_data {
         let actual_format = detect_image_format(&pet_pic.body);
-        crate::api::pdf_handler::create_pdf_bytes_with_image(
-            &content,
-            pet_pic.body,
-            &format!("pet.{}", actual_format),
-        )
+        let pet_image_name = format!("pet.{}", actual_format);
+        let images = vec![(qr_code_data, "qr.png"), (pet_pic.body, pet_image_name.as_str())];
+        crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
     } else {
-        crate::api::pdf_handler::create_pdf_bytes_from_str(&content)
+        // Only QR code (no pet picture)
+        crate::api::pdf_handler::create_pdf_bytes_with_image(&content, qr_code_data, "qr.png")
     }
 }
 

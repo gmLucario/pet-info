@@ -6,13 +6,11 @@ use typst::{
     Library, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
-    layout::PagedDocument,
     syntax::{FileId, Source},
     text::{Font, FontBook},
     utils::LazyHash,
 };
 use typst_pdf::PdfOptions;
-use typst_render::render;
 
 /// Typst world implementation for PDF compilation.
 struct TypstWorld {
@@ -48,6 +46,18 @@ impl TypstWorld {
         // Create a FileId for the image
         let image_id = FileId::new(None, typst::syntax::VirtualPath::new(image_name));
         world.files.insert(image_id, Bytes::new(image_bytes));
+
+        Ok(world)
+    }
+
+    /// Creates a new TypstWorld with multiple embedded image files.
+    fn with_images(text: &str, images: Vec<(Vec<u8>, &str)>) -> Result<Self> {
+        let mut world = Self::new(text)?;
+
+        for (image_bytes, image_name) in images {
+            let image_id = FileId::new(None, typst::syntax::VirtualPath::new(image_name));
+            world.files.insert(image_id, Bytes::new(image_bytes));
+        }
 
         Ok(world)
     }
@@ -127,6 +137,29 @@ pub fn create_pdf_bytes_with_image(
     image_name: &str,
 ) -> Result<Vec<u8>> {
     let world = TypstWorld::with_image(content, image_bytes, image_name)?;
+    let document = typst::compile(&world)
+        .output
+        .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;
+    typst_pdf::pdf(&document, &PdfOptions::default())
+        .map_err(|e| anyhow::anyhow!("PDF generation failed: {:?}", e))
+}
+
+/// Converts Typst markup content with multiple embedded images to PDF bytes.
+///
+/// # Arguments
+/// * `content` - Typst markup text to compile
+/// * `images` - Vector of tuples containing (image_bytes, image_name)
+///
+/// # Returns
+/// PDF document as bytes
+///
+/// # Errors
+/// Returns error if compilation or PDF generation fails
+pub fn create_pdf_bytes_with_images(
+    content: &str,
+    images: Vec<(Vec<u8>, &str)>,
+) -> Result<Vec<u8>> {
+    let world = TypstWorld::with_images(content, images)?;
     let document = typst::compile(&world)
         .output
         .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;

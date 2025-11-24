@@ -83,8 +83,43 @@
             {% elif not is_female and is_spaying_neutering %}[+] Esterilizado
             {% else %}[-] Sin esterilizar
             {% endif %}
+        ]
+    )
+]
+
+#v(20pt)
+
+// ==================== PUBLIC LINK & QR CODE SECTION ====================
+#block(
+    fill: white,
+    inset: 20pt,
+    radius: 12pt,
+    width: 100%,
+    stroke: (paint: rgb("#e2e8f0"), thickness: 1pt)
+)[
+    #text(size: 16pt, weight: "bold", fill: rgb("#0f172a"))[Perfil Público]
+    #v(12pt)
+
+    #grid(
+        columns: (1fr, auto),
+        column-gutter: 20pt,
+        align: (left + horizon, center + horizon),
+
+        // Left side: Link text
+        [
+            #text(size: 12pt, fill: rgb("#64748b"))[
+                Escanea el código QR o visita el siguiente enlace para ver el perfil público:
+            ]
+            #v(8pt)
+            #text(size: 11pt, fill: rgb("#3730a3"), weight: "medium")[
+                #link("{{ pet_link }}")[{{ pet_link }}]
+            ]
         ],
-        [*Link Público:*], [#link("{{ pet_link }}")[Ver perfil]]
+
+        // Right side: QR code
+        [
+            #image("qr.png", width: 80pt, height: 80pt)
+        ]
     )
 ]
 
