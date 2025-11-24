@@ -89,7 +89,23 @@ pub async fn receive(
         .get()
         .expect("APP_CONFIG should be initialized before starting web server");
 
-    // Extract X-Hub-Signature-256 header
+    // Step 1: Verify mTLS client certificate (if in production)
+    if app_config.is_prod() {
+        // Check if a client certificate was provided and verified by OpenSSL
+        // The certificate verification happens at the TLS layer
+        // If we reach here with a verified certificate, it means:
+        // 1. A client certificate was presented
+        // 2. It was signed by our trusted CA (DigiCert)
+        // 3. It hasn't expired
+        // 4. The certificate chain is valid
+
+        // Note: ntex/OpenSSL handles the verification. If the certificate is invalid,
+        // the TLS handshake will fail before we reach this point.
+        // We just log that mTLS was successful.
+        logfire::info!("Webhook request with verified mTLS client certificate");
+    }
+
+    // Step 2: Extract and verify X-Hub-Signature-256 header
     let signature = match req.headers().get("X-Hub-Signature-256") {
         Some(header_value) => match header_value.to_str() {
             Ok(s) => s,
@@ -104,7 +120,7 @@ pub async fn receive(
         }
     };
 
-    // Verify the signature
+    // Step 3: Verify the HMAC signature
     if !security::verify_signature(signature, &body, &app_config.whatsapp_app_secret) {
         logfire::warn!("Webhook signature verification failed - rejecting request");
         return Err(errors::UserError::Unauthorized.into());

@@ -107,6 +107,12 @@ pub struct AppConfig {
     #[envconfig(default = "server.crt")]
     pub certificate_path: String,
 
+    /// Path to client CA certificate for mTLS verification (NON-SENSITIVE)
+    /// This certificate is used to verify client certificates from Facebook/Meta webhooks
+    /// Example: "/etc/ssl/certs/DigiCertHighAssuranceEVRootCA.pem"
+    #[envconfig(default = "certs/DigiCertHighAssuranceEVRootCA.pem")]
+    pub client_ca_cert_path: String,
+
     /// 🔒 SENSITIVE: CSRF protection password (UUID format)
     /// Security: Generate using cryptographically secure random generator
     /// Rotation: Change on security incidents or every 6 months

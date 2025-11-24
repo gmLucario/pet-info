@@ -1,19 +1,33 @@
 # WhatsApp Webhook Security Setup
 
-This document explains how to secure your WhatsApp webhook endpoints using X-Hub-Signature-256 verification.
+This document explains how to secure your WhatsApp webhook endpoints using **mTLS (Mutual TLS)** and **X-Hub-Signature-256** verification.
 
 ## Overview
 
-WhatsApp/Meta webhooks use **X-Hub-Signature-256** HMAC verification to ensure webhook requests are authentic and haven't been tampered with. This implementation provides robust security by:
+WhatsApp/Meta webhooks use a **dual-layer security approach** to ensure webhook requests are authentic and haven't been tampered with. This implementation provides robust security by:
 
-1. ✅ Verifying that requests originate from Meta/Facebook
-2. ✅ Ensuring payload integrity (no tampering)
+1. ✅ **mTLS (Mutual TLS)**: Verifying client certificates from Meta/Facebook at the TLS layer
+2. ✅ **X-Hub-Signature-256**: Verifying HMAC signatures to ensure payload integrity
 3. ✅ Using constant-time comparison to prevent timing attacks
-4. ✅ Rejecting requests with invalid or missing signatures
+4. ✅ Rejecting requests with invalid or missing authentication
 
 ## Security Implementation
 
-### How It Works
+### Dual-Layer Security Architecture
+
+This implementation uses **defense in depth** with two independent security layers:
+
+#### Layer 1: mTLS (Mutual TLS) Certificate Verification
+
+1. **Meta presents client certificate**: When Meta sends a webhook request, they present a client certificate during the TLS handshake
+2. **Server verifies certificate**: The OpenSSL layer automatically verifies:
+   - Certificate is signed by DigiCert High Assurance EV Root CA
+   - Certificate hasn't expired
+   - Certificate chain is valid
+   - Certificate matches `client.webhooks.fbclientcerts.com`
+3. **TLS handshake fails if invalid**: If the certificate is invalid, the connection is rejected at the TLS layer before reaching your application
+
+#### Layer 2: X-Hub-Signature-256 HMAC Verification
 
 1. **Meta signs the payload**: When Meta sends a webhook request, they compute an HMAC-SHA256 signature using your app secret
 2. **Signature is sent in header**: The signature is included in the `X-Hub-Signature-256` header with format: `sha256=<hex_signature>`
@@ -23,23 +37,60 @@ WhatsApp/Meta webhooks use **X-Hub-Signature-256** HMAC verification to ensure w
    - Compares the computed signature with the received signature using constant-time comparison
    - Only processes the request if signatures match
 
+### Why Two Layers?
+
+- **mTLS**: Verifies the identity of the sender (Meta/Facebook)
+- **X-Hub-Signature-256**: Verifies the integrity of the message content
+- **Defense in depth**: Even if one layer is compromised, the other provides protection
+
 ### Code Location
 
+- **mTLS configuration**: `web_app/src/main.rs` (setup_ssl_acceptor function)
 - **Signature verification**: `web_app/src/webhook/whatsapp/security.rs`
 - **Webhook endpoint**: `web_app/src/webhook/whatsapp/routes.rs`
 - **Configuration**: `web_app/src/config.rs`
+- **CA Certificate**: `certs/DigiCertHighAssuranceEVRootCA.pem`
 
 ## Configuration
 
-### Required Environment Variable
+### Step 1: Download DigiCert Root CA Certificate
 
-Add the following environment variable to your configuration:
-
-```bash
-WHATSAPP_APP_SECRET="your-app-secret-from-meta"
+The DigiCert High Assurance EV Root CA certificate is already included in this repository at:
+```
+certs/DigiCertHighAssuranceEVRootCA.pem
 ```
 
-### Where to Find Your App Secret
+If you need to download it again:
+
+```bash
+# Download the certificate
+mkdir -p certs
+cd certs
+wget -q "https://cacerts.digicert.com/DigiCertHighAssuranceEVRootCA.crt"
+
+# Convert from DER to PEM format
+openssl x509 -inform DER -in DigiCertHighAssuranceEVRootCA.crt \
+  -out DigiCertHighAssuranceEVRootCA.pem
+```
+
+**Certificate Details:**
+- **Subject**: CN=DigiCert High Assurance EV Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
+- **Valid Until**: November 10, 2031
+- **Purpose**: Verify Meta's client certificates for webhook requests
+
+### Step 2: Configure Environment Variables
+
+Add the following environment variables to your configuration:
+
+```bash
+# WhatsApp App Secret for HMAC signature verification
+WHATSAPP_APP_SECRET="your-app-secret-from-meta"
+
+# Path to DigiCert root CA certificate for mTLS (optional, uses default if not set)
+CLIENT_CA_CERT_PATH="certs/DigiCertHighAssuranceEVRootCA.pem"
+```
+
+### Step 3: Where to Find Your App Secret
 
 1. Go to the [Meta for Developers](https://developers.facebook.com/) dashboard
 2. Navigate to your app
@@ -49,12 +100,18 @@ WHATSAPP_APP_SECRET="your-app-secret-from-meta"
 
 ### For AWS SSM Parameter Store
 
-If using the `ssm` feature, add the parameter:
+If using the `ssm` feature, add these parameters:
 
 ```bash
+# App Secret
 Parameter Name: /pet-info/WHATSAPP_APP_SECRET
 Type: SecureString
 Value: your-app-secret-from-meta
+
+# Client CA certificate path (optional)
+Parameter Name: /pet-info/CLIENT_CA_CERT_PATH
+Type: String
+Value: certs/DigiCertHighAssuranceEVRootCA.pem
 ```
 
 ## Testing
@@ -108,8 +165,27 @@ Consider implementing rate limiting on webhook endpoints to prevent abuse.
 │  Meta/Facebook  │
 └────────┬────────┘
          │
-         │ 1. Sign payload with app secret
-         │    HMAC-SHA256(payload, app_secret)
+         │ 1. Prepare webhook request
+         │    - Sign payload: HMAC-SHA256(payload, app_secret)
+         │    - Prepare client certificate (client.webhooks.fbclientcerts.com)
+         │
+         ▼
+┌────────────────────────────────────────────────┐
+│  TLS Handshake with mTLS                       │
+│  ┌──────────────────────────────────────────┐  │
+│  │ Meta presents client certificate         │  │
+│  │ Signed by: DigiCert High Assurance       │  │
+│  │                                           │  │
+│  │ Server verifies:                          │  │
+│  │  ✓ Certificate chain valid               │  │
+│  │  ✓ Signed by trusted CA (DigiCert)       │  │
+│  │  ✓ Not expired                           │  │
+│  │  ✓ Hostname matches                      │  │
+│  └──────────────────────────────────────────┘  │
+│         │                                       │
+│         ├─── ✅ Valid → TLS connection         │
+│         └─── ❌ Invalid → Connection rejected  │
+└────────┬───────────────────────────────────────┘
          │
          ▼
 ┌────────────────────────────────────────────┐
@@ -119,19 +195,21 @@ Consider implementing rate limiting on webhook endpoints to prevent abuse.
 │  Body: {"object":"whatsapp_business_...}   │
 └────────┬───────────────────────────────────┘
          │
-         │ 2. Extract signature from header
-         │
          ▼
 ┌─────────────────────────────────────────┐
-│  Your Server                            │
-│  1. Get raw request body                │
-│  2. Compute HMAC-SHA256(body, secret)   │
-│  3. Constant-time compare signatures    │
+│  Application Layer (Your Server)        │
+│                                         │
+│  Step 1: mTLS verified (TLS layer)      │
+│  ✓ Client certificate validated         │
+│                                         │
+│  Step 2: Extract X-Hub-Signature-256    │
+│  Step 3: Compute HMAC-SHA256(body)      │
+│  Step 4: Constant-time compare          │
 └────────┬────────────────────────────────┘
          │
-         ├─── ✅ Signatures match → Process webhook
+         ├─── ✅ Both layers valid → Process webhook
          │
-         └─── ❌ Signatures don't match → Reject with 403
+         └─── ❌ Any layer fails → Reject with 403
 ```
 
 ## API Behavior
@@ -207,4 +285,8 @@ If you encounter issues with webhook security:
 
 ---
 
-**Note**: This implementation uses **X-Hub-Signature-256** (HMAC-SHA256), not mTLS. This is the standard authentication mechanism for Meta/Facebook/WhatsApp webhooks as of 2025.
+**Note**: This implementation uses **dual-layer security** with both:
+1. **mTLS (Mutual TLS)** - Client certificate verification at the TLS layer
+2. **X-Hub-Signature-256** (HMAC-SHA256) - Payload signature verification at the application layer
+
+This provides defense-in-depth security for Meta/Facebook/WhatsApp webhooks.

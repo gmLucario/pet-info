@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Configures SSL acceptor for production environments
+/// Configures SSL acceptor for production environments with optional mTLS
 fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
     let mut ssl_acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())
         .map_err(|e| anyhow::anyhow!("Failed to create SSL acceptor: {}", e))?;
@@ -92,6 +92,8 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")?;
+
+    // Set server certificate and private key
     ssl_acceptor
         .set_private_key_file(&app_config.private_key_path, SslFiletype::PEM)
         .map_err(|e| {
@@ -111,6 +113,30 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
                 e
             )
         })?;
+
+    // Configure mTLS client certificate verification
+    // Load the DigiCert root CA certificate for verifying Facebook/Meta webhook certificates
+    ssl_acceptor
+        .set_ca_file(&app_config.client_ca_cert_path)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load client CA certificate from {}: {}",
+                app_config.client_ca_cert_path,
+                e
+            )
+        })?;
+
+    // Set verification mode:
+    // - VERIFY_PEER: Request client certificate from the client
+    // - VERIFY_FAIL_IF_NO_PEER_CERT is NOT set, making client certificates optional
+    // This allows regular HTTPS connections while also accepting mTLS from webhooks
+    use openssl::ssl::SslVerifyMode;
+    ssl_acceptor.set_verify(SslVerifyMode::PEER);
+
+    logfire::info!(
+        "mTLS configured: Client certificates will be verified using CA from {path}",
+        path = &app_config.client_ca_cert_path
+    );
 
     Ok(ssl_acceptor)
 }
