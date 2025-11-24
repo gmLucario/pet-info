@@ -792,6 +792,29 @@ fn convert_html_to_text(note: &models::pet::PetNote) -> models::pet::PetNote {
     }
 }
 
+/// Detects image format from magic bytes
+///
+/// # Arguments
+/// * `bytes` - The image file bytes
+///
+/// # Returns
+/// File extension string ("jpg", "png", "gif", "webp", etc.)
+fn detect_image_format(bytes: &[u8]) -> &'static str {
+    if bytes.len() < 4 {
+        return "jpg"; // Default fallback
+    }
+
+    // Check magic bytes for common image formats
+    match &bytes[0..4] {
+        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
+        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
+        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
+        [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
+        [0x42, 0x4D, ..] => "bmp",         // BMP
+        _ => "jpg",                        // Default fallback
+    }
+}
+
 /// Generates PDF report bytes for a pet by external ID
 ///
 /// Creates a comprehensive PDF report containing all pet information including
@@ -801,6 +824,7 @@ pub async fn generate_pdf_report_bytes(
     pet_id: i64,
     user_id: i64,
     repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<Vec<u8>> {
     let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
 
@@ -827,6 +851,23 @@ pub async fn generate_pdf_report_bytes(
         })
         .collect();
 
+    // Generate QR code from public link
+    let pet_link = format!(
+        "https://pet-info.link/info/{external_id}",
+        external_id = pet_full_info.pet.external_id
+    );
+    let qr_code_data = front::utils::get_qr_code(&pet_link)?;
+
+    let pet_pic_option = if pet_full_info.pet.pic.is_some() {
+        get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?
+    } else {
+        None
+    };
+    let image_filename = pet_pic_option.as_ref().map(|pic| {
+        let actual_format = detect_image_format(&pic.body);
+        format!("pet.{}", actual_format)
+    });
+
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
         &tera::Context::from_value(serde_json::json!({
@@ -836,21 +877,24 @@ pub async fn generate_pdf_report_bytes(
             "breed": pet_full_info.pet.breed,
             "is_female": pet_full_info.pet.is_female,
             "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
-            "pet_link": format!(
-                "https://pet-info.link/info/{external_id}",
-                external_id=pet_full_info.pet.external_id
-            ),
+            "pet_link": pet_link,
             "vaccines": pet_full_info.vaccines,
             "deworms": pet_full_info.deworms,
             "weights": weights,
             "notes": notes,
+            "image_filename": image_filename.as_deref().unwrap_or("NO_PIC"),
         }))
         .unwrap_or_default(),
     )?;
 
-    crate::api::pdf_handler::create_pdf_bytes_from_str(
-        &content,
-    )
+    let mut images = vec![(qr_code_data, "qr.png")];
+    if let Some(pet_pic) = pet_pic_option {
+        if let Some(ref filename) = image_filename {
+            images.push((pet_pic.body, filename.as_str()));
+        }
+    }
+
+    crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
 }
 
 #[cfg(test)]

@@ -481,13 +481,18 @@ async fn get_pdf_report(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let content = crate::api::pet::generate_pdf_report_bytes(path.0, user.id, &app_state.repo)
-        .await
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!(
-                "get_pdf_report could not generate the file: {e}"
-            ))
-        })?;
+    let content = crate::api::pet::generate_pdf_report_bytes(
+        path.0,
+        user.id,
+        &app_state.repo,
+        &app_state.storage_service,
+    )
+    .await
+    .map_err(|e| {
+        errors::ServerError::InternalServerError(format!(
+            "get_pdf_report could not generate the file: {e}"
+        ))
+    })?;
 
     let body = once(ok::<_, web::Error>(Bytes::from_iter(&content)));
 

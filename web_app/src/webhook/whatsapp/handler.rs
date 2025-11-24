@@ -10,7 +10,7 @@ use super::{
         WebhookPayload,
     },
 };
-use crate::repo;
+use crate::{repo, services};
 use anyhow::{Context, Result};
 
 /// Processes incoming WhatsApp webhook messages
@@ -61,7 +61,7 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 /// Sends pet information to a WhatsApp user
 ///
 /// Sends a text message listing all registered pets, followed by an interactive
-/// list message for each pet with options for report, QR, and card.
+/// list message for each pet with options for report, and card.
 ///
 /// # Arguments
 ///
@@ -103,7 +103,6 @@ async fn send_pet_info_to_user(
 
         let rows = vec![
             InteractiveRow::new(format!("reporte:{}", external_id), "reporte".into()),
-            InteractiveRow::new(format!("qr:{}", external_id), "qr".into()),
             InteractiveRow {
                 id: format!("tarjeta:{}", external_id),
                 title: "tarjeta".into(),
@@ -140,10 +139,12 @@ async fn send_pet_info_to_user(
 /// * `client` - WhatsApp API client
 /// * `message` - The message containing the interactive response
 /// * `repo` - Repository for database access
+/// * `storage_service` - Service for accessing pet images from S3
 async fn handle_interactive_response(
     client: &WhatsAppClient,
     message: &Message,
     repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
 ) -> Result<()> {
     let list_reply = message
         .interactive
@@ -171,8 +172,13 @@ async fn handle_interactive_response(
     match action {
         "reporte" => {
             let pet = repo.get_pet_by_external_id(external_id).await?;
-            let pdf_bytes =
-                crate::api::pet::generate_pdf_report_bytes(pet.id, pet.user_app_id, repo).await?;
+            let pdf_bytes = crate::api::pet::generate_pdf_report_bytes(
+                pet.id,
+                pet.user_app_id,
+                repo,
+                storage_service,
+            )
+            .await?;
 
             let filename = format!("reporte_{}.pdf", pet.pet_name).to_lowercase();
             let media_id = client
@@ -184,18 +190,6 @@ async fn handle_interactive_response(
                 OutgoingDocumentMessage::new_with_id(message.from.clone(), media_id, filename);
 
             client.send_document_message(&document_message).await?;
-        }
-        "qr" => {
-            // Send QR code link
-            client
-                .send_text_message(
-                    message.from.clone(),
-                    format!(
-                        "Código QR: https://pet-info.link/pet/qr_code/{}",
-                        external_id
-                    ),
-                )
-                .await?;
         }
         "tarjeta" => {
             // Send Apple Wallet pass link
@@ -230,6 +224,7 @@ async fn handle_interactive_response(
 /// * `message` - The message to handle
 /// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
+/// * `storage_service` - Service for accessing pet images from S3
 ///
 /// # Returns
 ///
@@ -238,6 +233,7 @@ pub async fn handle_user_message(
     message: &Message,
     client: &WhatsAppClient,
     repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
 ) -> Result<()> {
     match message.msg_type.as_str() {
         "text" if message.text.is_some() => {
@@ -254,7 +250,7 @@ pub async fn handle_user_message(
             ).await?;
         }
         "interactive" => {
-            handle_interactive_response(client, message, repo).await?;
+            handle_interactive_response(client, message, repo, storage_service).await?;
         }
         "image" if message.image.is_some() => {
             // TODO: Handle image uploads (e.g., pet photos)
@@ -302,6 +298,7 @@ pub async fn handle_message_status(_status: &Status) -> Result<()> {
 /// * `payload` - The webhook payload from WhatsApp
 /// * `client` - WhatsApp API client for sending messages
 /// * `repo` - Repository for database access
+/// * `storage_service` - Service for accessing pet images from S3
 ///
 /// # Returns
 ///
@@ -310,11 +307,12 @@ pub async fn process_webhook(
     payload: WebhookPayload,
     client: &WhatsAppClient,
     repo: &repo::ImplAppRepo,
+    storage_service: &services::ImplStorageService,
 ) -> Result<()> {
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
-        if let Err(e) = handle_user_message(message, client, repo).await {
+        if let Err(e) = handle_user_message(message, client, repo, storage_service).await {
             logfire::error!("Failed to handle message: {error}", error = e.to_string());
         }
     }
