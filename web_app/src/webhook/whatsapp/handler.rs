@@ -69,11 +69,13 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 /// * `to` - Recipient's WhatsApp ID (phone number)
 /// * `user_id` - Database ID of the user
 /// * `repo` - Repository for database access
+/// * `message_id` - The ID of the incoming message (for typing indicator)
 async fn send_pet_info_to_user(
     client: &WhatsAppClient,
     to: &str,
     user_id: i64,
     repo: &repo::ImplAppRepo,
+    message_id: &str,
 ) -> Result<()> {
     let pets = repo.get_all_pets_user_id(user_id).await?;
 
@@ -97,7 +99,7 @@ async fn send_pet_info_to_user(
 
     // Send interactive list message for each pet
     for pet in pets {
-        client.send_typing_on(to.to_string()).await.ok();
+        client.send_typing_on(message_id.to_string()).await.ok();
 
         let pet_name = pet.pet_name.clone();
         let external_id = pet.external_id;
@@ -148,7 +150,7 @@ async fn handle_interactive_response(
     storage_service: &services::ImplStorageService,
 ) -> Result<()> {
     // Show typing indicator while processing the interactive response
-    client.send_typing_on(message.from.clone()).await.ok();
+    client.send_typing_on(message.id.clone()).await.ok();
 
     let list_reply = message
         .interactive
@@ -242,11 +244,11 @@ pub async fn handle_user_message(
     match message.msg_type.as_str() {
         "text" if message.text.is_some() => {
             // Show typing indicator while looking up user
-            client.send_typing_on(message.from.clone()).await.ok();
+            client.send_typing_on(message.id.clone()).await.ok();
 
             let user = repo.get_user_app_by_phone(&message.from).await?;
             if let Some(user) = user {
-                send_pet_info_to_user(client, &message.from, user.id, repo).await?;
+                send_pet_info_to_user(client, &message.from, user.id, repo, &message.id).await?;
                 return Ok(());
             }
 
