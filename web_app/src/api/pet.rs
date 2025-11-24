@@ -851,21 +851,24 @@ pub async fn generate_pdf_report_bytes(
         })
         .collect();
 
-    // Download the pet picture if available and detect actual format from magic bytes
-    let pet_pic_data = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?;
-
-    // Detect actual image format instead of trusting stored extension
-    let image_filename = pet_pic_data.as_ref().map(|p| {
-        let actual_format = detect_image_format(&p.body);
-        format!("pet.{}", actual_format)
-    });
-
     // Generate QR code from public link
     let pet_link = format!(
         "https://pet-info.link/info/{external_id}",
         external_id=pet_full_info.pet.external_id
     );
     let qr_code_data = front::utils::get_qr_code(&pet_link)?;
+
+    // Download and prepare pet picture if available
+    let (image_filename, pet_pic_data) = if pet_full_info.pet.pic.is_some() {
+        let pic_data = get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?;
+        let filename = pic_data.as_ref().map(|p| {
+            let actual_format = detect_image_format(&p.body);
+            format!("pet.{}", actual_format)
+        });
+        (filename, pic_data)
+    } else {
+        (None, None)
+    };
 
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
