@@ -895,7 +895,8 @@ pub async fn generate_pdf_report_bytes(
         crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
     } else {
         // Only QR code (no pet picture)
-        crate::api::pdf_handler::create_pdf_bytes_with_image(&content, qr_code_data, "qr.png")
+        let images = vec![(qr_code_data, "qr.png")];
+        crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)
     }
 }
 
