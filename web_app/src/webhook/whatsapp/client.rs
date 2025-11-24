@@ -17,14 +17,20 @@ pub struct MediaUploadResponse {
     pub id: String,
 }
 
-/// Typing indicator action
+/// Typing indicator payload
 #[derive(Debug, serde::Serialize)]
 struct TypingIndicator {
     messaging_product: String,
-    recipient_type: String,
-    to: String,
+    status: String,
+    message_id: String,
+    typing_indicator: TypingIndicatorType,
+}
+
+/// Typing indicator type
+#[derive(Debug, serde::Serialize)]
+struct TypingIndicatorType {
     #[serde(rename = "type")]
-    typing_action: String,
+    indicator_type: String,
 }
 
 /// WhatsApp API client for sending messages and uploading media
@@ -128,27 +134,33 @@ impl WhatsAppClient {
         self.send_message(&payload).await
     }
 
-    /// Sends a typing indicator "on" to show the user that a message is being prepared
+    /// Sends a typing indicator to show the user that a message is being prepared
     ///
     /// This creates a visual feedback in the WhatsApp chat showing three dots
-    /// to indicate that a response is being typed.
+    /// to indicate that a response is being typed. The typing indicator will be
+    /// dismissed after 25 seconds or when you send a response, whichever comes first.
+    ///
+    /// Note: According to WhatsApp Cloud API documentation, typing indicators must be
+    /// sent along with a read receipt for a specific message.
     ///
     /// # Arguments
-    /// * `to` - Recipient's WhatsApp ID (phone number with country code)
+    /// * `message_id` - The ID of the message you're responding to (from the webhook)
     ///
     /// # Returns
     /// * `Result<WhatsAppMessageResponse>` - Response from WhatsApp API
     ///
     /// # Example
     /// ```no_run
-    /// client.send_typing_on("+1234567890".to_string()).await?;
+    /// client.send_typing_on("wamid.XXX".to_string()).await?;
     /// ```
-    pub async fn send_typing_on(&self, to: String) -> Result<WhatsAppMessageResponse> {
+    pub async fn send_typing_on(&self, message_id: String) -> Result<WhatsAppMessageResponse> {
         let indicator = TypingIndicator {
             messaging_product: "whatsapp".to_string(),
-            recipient_type: "individual".to_string(),
-            to,
-            typing_action: "typing_on".to_string(),
+            status: "read".to_string(),
+            message_id,
+            typing_indicator: TypingIndicatorType {
+                indicator_type: "text".to_string(),
+            },
         };
         self.send_message(&indicator).await
     }
