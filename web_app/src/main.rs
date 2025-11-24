@@ -114,29 +114,37 @@ fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
             )
         })?;
 
-    // Configure mTLS client certificate verification
-    // Load the DigiCert root CA certificate for verifying Facebook/Meta webhook certificates
-    ssl_acceptor
-        .set_ca_file(&app_config.client_ca_cert_path)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load client CA certificate from {}: {}",
-                app_config.client_ca_cert_path,
-                e
-            )
-        })?;
+    // Configure mTLS client certificate verification (production only)
+    // In production, verify client certificates from Facebook/Meta webhooks
+    // In development, skip mTLS to allow easier local testing
+    if app_config.is_prod() {
+        logfire::info!("Production environment detected - configuring mTLS");
 
-    // Set verification mode:
-    // - VERIFY_PEER: Request client certificate from the client
-    // - VERIFY_FAIL_IF_NO_PEER_CERT is NOT set, making client certificates optional
-    // This allows regular HTTPS connections while also accepting mTLS from webhooks
-    use openssl::ssl::SslVerifyMode;
-    ssl_acceptor.set_verify(SslVerifyMode::PEER);
+        // Load the DigiCert root CA certificate for verifying Facebook/Meta webhook certificates
+        ssl_acceptor
+            .set_ca_file(&app_config.client_ca_cert_path)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to load client CA certificate from {}: {}",
+                    app_config.client_ca_cert_path,
+                    e
+                )
+            })?;
 
-    logfire::info!(
-        "mTLS configured: Client certificates will be verified using CA from {path}",
-        path = &app_config.client_ca_cert_path
-    );
+        // Set verification mode:
+        // - VERIFY_PEER: Request client certificate from the client
+        // - VERIFY_FAIL_IF_NO_PEER_CERT is NOT set, making client certificates optional
+        // This allows regular HTTPS connections while also accepting mTLS from webhooks
+        use openssl::ssl::SslVerifyMode;
+        ssl_acceptor.set_verify(SslVerifyMode::PEER);
+
+        logfire::info!(
+            "✓ mTLS configured: Client certificates will be verified using CA from {path}",
+            path = &app_config.client_ca_cert_path
+        );
+    } else {
+        logfire::info!("Development environment - mTLS disabled for easier local testing");
+    }
 
     Ok(ssl_acceptor)
 }

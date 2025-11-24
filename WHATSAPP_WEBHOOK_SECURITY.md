@@ -45,7 +45,8 @@ This implementation uses **defense in depth** with two independent security laye
 
 ### Code Location
 
-- **mTLS configuration**: `web_app/src/main.rs` (setup_ssl_acceptor function)
+- **mTLS configuration**: `web_app/src/main.rs` (setup_ssl_acceptor function, production only)
+- **Certificate provisioning**: `terraform/modules/ec2/user_data/pet_info_start.sh`
 - **Signature verification**: `web_app/src/webhook/whatsapp/security.rs`
 - **Webhook endpoint**: `web_app/src/webhook/whatsapp/routes.rs`
 - **Configuration**: `web_app/src/config.rs`
@@ -55,12 +56,18 @@ This implementation uses **defense in depth** with two independent security laye
 
 ### Step 1: Download DigiCert Root CA Certificate
 
+**For Production Deployments:**
+
+The certificate is automatically downloaded during EC2 instance provisioning via the Terraform user_data script (`terraform/modules/ec2/user_data/pet_info_start.sh`). No manual intervention required.
+
+**For Development/Testing:**
+
 The DigiCert High Assurance EV Root CA certificate is already included in this repository at:
 ```
 certs/DigiCertHighAssuranceEVRootCA.pem
 ```
 
-If you need to download it again:
+If you need to download it manually:
 
 ```bash
 # Download the certificate
@@ -157,6 +164,58 @@ Always use HTTPS for webhook endpoints. The signature verification protects agai
 ### 4. Rate Limiting
 
 Consider implementing rate limiting on webhook endpoints to prevent abuse.
+
+## Environment-Specific Behavior
+
+### Production Environment (ENV=prod)
+
+**mTLS Enabled:**
+- ✅ Client certificate verification is **active**
+- ✅ Certificates must be signed by DigiCert High Assurance EV Root CA
+- ✅ Certificate downloaded automatically during EC2 provisioning
+- ✅ Both mTLS and X-Hub-Signature-256 verification required
+
+**Configuration:**
+```bash
+ENV=prod
+CLIENT_CA_CERT_PATH=certs/DigiCertHighAssuranceEVRootCA.pem  # Auto-downloaded
+WHATSAPP_APP_SECRET=your-app-secret-from-meta
+```
+
+**Server Logs:**
+```
+[INFO] Production environment detected - configuring mTLS
+[INFO] ✓ mTLS configured: Client certificates will be verified using CA from certs/DigiCertHighAssuranceEVRootCA.pem
+[INFO] Webhook request with verified mTLS client certificate
+```
+
+### Development/Local Environment (ENV != prod)
+
+**mTLS Disabled:**
+- ℹ️ Client certificate verification is **disabled**
+- ℹ️ Easier local testing without certificate setup
+- ✅ X-Hub-Signature-256 verification still **active** and required
+
+**Configuration:**
+```bash
+ENV=local  # or dev, staging, etc.
+WHATSAPP_APP_SECRET=your-app-secret-from-meta
+# CLIENT_CA_CERT_PATH not required
+```
+
+**Server Logs:**
+```
+[INFO] Development environment - mTLS disabled for easier local testing
+```
+
+### Summary
+
+| Feature | Production | Development |
+|---------|-----------|-------------|
+| **mTLS Certificate Verification** | ✅ Enabled | ❌ Disabled |
+| **X-Hub-Signature-256 Verification** | ✅ Enabled | ✅ Enabled |
+| **Certificate Auto-Download** | ✅ Yes (Terraform) | ❌ No (Manual) |
+| **Client Certificate Required** | ✅ Yes (webhooks) | ❌ No |
 
 ## Verification Flow
 
