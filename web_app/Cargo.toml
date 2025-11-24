@@ -63,6 +63,12 @@ log = "0.4.28"
 tokio = { version = "1.48", features = ["sync"] }
 chrono-tz = "0.10.4"
 
+# Cryptography for webhook signature verification
+hmac = "0.12.1"
+sha2 = "0.10.8"
+subtle = "2.6.1"
+hex = "0.4.3"
+
 # aws
 aws-config = { version = "1.8.11", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1.115.0"

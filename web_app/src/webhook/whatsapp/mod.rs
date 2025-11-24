@@ -10,11 +10,13 @@
 //! - [`routes`] - HTTP endpoint handlers for WhatsApp webhooks
 //! - [`schemas`] - Data structures for WhatsApp webhook payloads (incoming and outgoing)
 //! - [`client`] - WhatsApp API client for sending messages
+//! - [`security`] - Security utilities for webhook signature verification
 
 pub mod client;
 pub mod handler;
 pub mod routes;
 pub mod schemas;
+pub mod security;
 
 // Re-export commonly used items for convenience
 pub use routes::{receive, verify};

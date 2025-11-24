@@ -2,13 +2,18 @@
 //!
 //! This module handles incoming webhook requests from WhatsApp Business API.
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
+//!
+//! # Security
+//!
+//! The POST endpoint verifies webhook authenticity using X-Hub-Signature-256 header.
+//! This ensures that requests actually originate from Meta/Facebook.
 
-use super::{handler, schemas};
+use super::{handler, schemas, security};
 use crate::{
     config,
     front::{AppState, errors},
 };
-use ntex::web;
+use ntex::{util::Bytes, web};
 use serde::Deserialize;
 
 /// Query parameters for webhook verification
@@ -64,15 +69,62 @@ pub async fn verify(
 /// Receives webhook events from WhatsApp Business API.
 /// Processes incoming messages, status updates, and other events.
 ///
-/// Process webhook synchronously
-/// WhatsApp gives us 20 seconds to respond, which should be sufficient
+/// # Security
+///
+/// This endpoint verifies the X-Hub-Signature-256 header to ensure the request
+/// originates from Meta/Facebook. Requests with invalid or missing signatures
+/// are rejected with a 403 Forbidden response.
+///
+/// # Processing
+///
+/// Process webhook synchronously.
+/// WhatsApp gives us 20 seconds to respond, which should be sufficient.
 #[web::post("")]
 pub async fn receive(
-    payload: web::types::Json<schemas::WebhookPayload>,
+    req: web::HttpRequest,
+    body: Bytes,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
+    let app_config = config::APP_CONFIG
+        .get()
+        .expect("APP_CONFIG should be initialized before starting web server");
+
+    // Extract X-Hub-Signature-256 header
+    let signature = match req.headers().get("X-Hub-Signature-256") {
+        Some(header_value) => match header_value.to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                logfire::warn!("Invalid X-Hub-Signature-256 header: not valid UTF-8");
+                return Err(errors::UserError::Unauthorized.into());
+            }
+        },
+        None => {
+            logfire::warn!("Missing X-Hub-Signature-256 header in webhook request");
+            return Err(errors::UserError::Unauthorized.into());
+        }
+    };
+
+    // Verify the signature
+    if !security::verify_signature(signature, &body, &app_config.whatsapp_app_secret) {
+        logfire::warn!("Webhook signature verification failed - rejecting request");
+        return Err(errors::UserError::Unauthorized.into());
+    }
+
+    // Parse the JSON payload after signature verification
+    let payload: schemas::WebhookPayload = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            logfire::error!(
+                "Failed to parse webhook payload: {error}",
+                error = e.to_string()
+            );
+            return Err(errors::UserError::Unauthorized.into());
+        }
+    };
+
+    // Process the webhook
     if let Err(e) = handler::process_webhook(
-        payload.0,
+        payload,
         &app_state.whatsapp_client,
         &app_state.repo,
         &app_state.storage_service,
