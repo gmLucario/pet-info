@@ -17,6 +17,16 @@ pub struct MediaUploadResponse {
     pub id: String,
 }
 
+/// Typing indicator action
+#[derive(Debug, serde::Serialize)]
+struct TypingIndicator {
+    messaging_product: String,
+    recipient_type: String,
+    to: String,
+    #[serde(rename = "type")]
+    typing_action: String,
+}
+
 /// WhatsApp API client for sending messages and uploading media
 #[derive(Clone)]
 pub struct WhatsAppClient {
@@ -116,6 +126,31 @@ impl WhatsAppClient {
         payload: serde_json::Value,
     ) -> Result<WhatsAppMessageResponse> {
         self.send_message(&payload).await
+    }
+
+    /// Sends a typing indicator "on" to show the user that a message is being prepared
+    ///
+    /// This creates a visual feedback in the WhatsApp chat showing three dots
+    /// to indicate that a response is being typed.
+    ///
+    /// # Arguments
+    /// * `to` - Recipient's WhatsApp ID (phone number with country code)
+    ///
+    /// # Returns
+    /// * `Result<WhatsAppMessageResponse>` - Response from WhatsApp API
+    ///
+    /// # Example
+    /// ```no_run
+    /// client.send_typing_on("+1234567890".to_string()).await?;
+    /// ```
+    pub async fn send_typing_on(&self, to: String) -> Result<WhatsAppMessageResponse> {
+        let indicator = TypingIndicator {
+            messaging_product: "whatsapp".to_string(),
+            recipient_type: "individual".to_string(),
+            to,
+            typing_action: "typing_on".to_string(),
+        };
+        self.send_message(&indicator).await
     }
 
     /// Uploads media (document, image, etc.) to WhatsApp and returns media ID

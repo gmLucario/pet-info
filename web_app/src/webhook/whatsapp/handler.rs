@@ -75,7 +75,6 @@ async fn send_pet_info_to_user(
     user_id: i64,
     repo: &repo::ImplAppRepo,
 ) -> Result<()> {
-    // Get all pets for the user
     let pets = repo.get_all_pets_user_id(user_id).await?;
 
     if pets.is_empty() {
@@ -98,6 +97,8 @@ async fn send_pet_info_to_user(
 
     // Send interactive list message for each pet
     for pet in pets {
+        client.send_typing_on(to.to_string()).await.ok();
+
         let pet_name = pet.pet_name.clone();
         let external_id = pet.external_id;
 
@@ -146,6 +147,9 @@ async fn handle_interactive_response(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> Result<()> {
+    // Show typing indicator while processing the interactive response
+    client.send_typing_on(message.from.clone()).await.ok();
+
     let list_reply = message
         .interactive
         .as_ref()
@@ -237,12 +241,16 @@ pub async fn handle_user_message(
 ) -> Result<()> {
     match message.msg_type.as_str() {
         "text" if message.text.is_some() => {
+            // Show typing indicator while looking up user
+            client.send_typing_on(message.from.clone()).await.ok();
+
             let user = repo.get_user_app_by_phone(&message.from).await?;
             if let Some(user) = user {
                 send_pet_info_to_user(client, &message.from, user.id, repo).await?;
                 return Ok(());
             }
 
+            // User not found, send message with typing indicator already active
             client
             .send_text_message(
                 message.from.clone(),
