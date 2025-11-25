@@ -69,35 +69,19 @@ log "Installing certbot for Let's Encrypt..."
 sudo dnf install -y certbot python3-certbot-nginx
 log "✓ Certbot installed"
 
-# Create directory for Let's Encrypt ACME challenges
-log "Setting up Let's Encrypt directories..."
-sudo mkdir -p /var/www/certbot
-sudo chown -R nginx:nginx /var/www/certbot
-log "✓ Let's Encrypt directories created"
-
-# Copy Nginx configuration
-log "Configuring Nginx..."
-sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/nginx-pet-info.conf \
-    /etc/nginx/conf.d/pet-info.conf
-
-# Test Nginx configuration (will fail initially due to missing SSL certs, but validates syntax)
-log "Testing Nginx configuration syntax..."
-sudo nginx -t || log "WARNING: Nginx config test failed (expected if SSL certs not yet provisioned)"
-
-# Enable Nginx to start on boot
-sudo systemctl enable nginx
-log "✓ Nginx enabled to start on boot"
-
-# Provision Let's Encrypt SSL certificates via certbot
+# Provision Let's Encrypt SSL certificates via certbot (BEFORE configuring Nginx)
 log "Provisioning Let's Encrypt SSL certificates..."
 
 # Check if certificates already exist
 if [ -f /etc/letsencrypt/live/pet-info.link/fullchain.pem ]; then
     log "✓ SSL certificates already exist, skipping certbot"
+    CERTBOT_SUCCESS=true
 else
-    log "Attempting to obtain SSL certificates (requires DNS to be configured)..."
+    log "Attempting to obtain SSL certificates using standalone mode..."
+    log "Note: DNS must point to this server for verification to succeed"
 
-    # Try to obtain certificate with retries
+    # Try to obtain certificate with retries using standalone mode
+    # This doesn't require Nginx to be configured yet
     CERTBOT_MAX_RETRIES=3
     CERTBOT_RETRY_DELAY=30
     CERTBOT_SUCCESS=false
@@ -105,9 +89,9 @@ else
     for i in $(seq 1 $${CERTBOT_MAX_RETRIES}); do
         log "Certbot attempt $i/$${CERTBOT_MAX_RETRIES}..."
 
-        if sudo certbot --nginx -d pet-info.link -d www.pet-info.link \
+        if sudo certbot certonly --standalone -d pet-info.link -d www.pet-info.link \
             --non-interactive --agree-tos -m gmlukario@gmail.com \
-            --redirect 2>&1 | tee -a /var/log/user-data.log; then
+            --preferred-challenges http 2>&1 | tee -a /var/log/user-data.log; then
             CERTBOT_SUCCESS=true
             log "✓ SSL certificates obtained successfully"
             break
@@ -122,18 +106,43 @@ else
 
     if [ "$${CERTBOT_SUCCESS}" = false ]; then
         log "ERROR: Failed to obtain SSL certificates after $${CERTBOT_MAX_RETRIES} attempts"
-        log "This is likely because DNS is not yet pointing to this server"
-        log "You can manually run: sudo certbot --nginx -d pet-info.link -d www.pet-info.link"
-        log "Continuing with setup..."
+        log "This is likely because:"
+        log "  1. DNS is not yet pointing to this server"
+        log "  2. Port 80 is not accessible from the internet"
+        log "You can manually run: sudo certbot certonly --standalone -d pet-info.link -d www.pet-info.link"
+        log "Continuing with setup (Nginx will fail to start without certificates)..."
     fi
 fi
 
-# Start Nginx
-log "Starting Nginx..."
-if sudo systemctl start nginx; then
-    log "✓ Nginx started successfully"
+# Now configure Nginx (after certificates exist)
+log "Configuring Nginx..."
+sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/nginx-pet-info.conf \
+    /etc/nginx/conf.d/pet-info.conf
+
+# Test Nginx configuration
+log "Testing Nginx configuration..."
+if sudo nginx -t; then
+    log "✓ Nginx configuration test passed"
 else
-    log "WARNING: Failed to start Nginx (check logs: sudo journalctl -u nginx)"
+    log "ERROR: Nginx configuration test failed"
+    log "Check logs: sudo nginx -t"
+fi
+
+# Enable and start Nginx
+sudo systemctl enable nginx
+log "✓ Nginx enabled to start on boot"
+
+if [ "$${CERTBOT_SUCCESS}" = true ]; then
+    log "Starting Nginx..."
+    if sudo systemctl start nginx; then
+        log "✓ Nginx started successfully"
+    else
+        log "ERROR: Failed to start Nginx"
+        log "Check logs: sudo journalctl -u nginx -n 50"
+    fi
+else
+    log "WARNING: Skipping Nginx start (SSL certificates not available)"
+    log "After obtaining certificates, run: sudo systemctl start nginx"
 fi
 
 # Wait for EBS volume to be attached
