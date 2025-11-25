@@ -124,14 +124,19 @@ resource "null_resource" "upload_ssl_certificates" {
     }
   }
 
-  # Move SSL certificates to final location
+  # Move SSL certificates to final location and start Nginx
   provisioner "remote-exec" {
     inline = [
       "mkdir -p /home/ec2-user/certs",
       "mv /tmp/server.crt /home/ec2-user/certs/server.crt",
       "mv /tmp/server.key /home/ec2-user/certs/server.key",
       "chmod 644 /home/ec2-user/certs/server.crt",
-      "chmod 600 /home/ec2-user/certs/server.key"
+      "chmod 600 /home/ec2-user/certs/server.key",
+      "echo 'SSL certificates uploaded, testing Nginx configuration...'",
+      "sudo nginx -t",
+      "echo 'Starting Nginx...'",
+      "sudo systemctl start nginx",
+      "echo 'Nginx started successfully'"
     ]
 
     connection {

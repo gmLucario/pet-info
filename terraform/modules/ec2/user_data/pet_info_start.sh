@@ -64,30 +64,15 @@ sudo chmod 755 /etc/nginx/certs
 sudo chmod 644 /etc/nginx/certs/*
 log "✓ mTLS certificates configured for Nginx"
 
-# Configure Nginx
+# Configure Nginx (but don't start it yet - SSL certs will be uploaded by Terraform provisioner)
 log "Configuring Nginx..."
 sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/nginx-pet-info.conf \
     /etc/nginx/conf.d/pet-info.conf
 
-# Test Nginx configuration
-log "Testing Nginx configuration..."
-if sudo nginx -t; then
-    log "✓ Nginx configuration test passed"
-else
-    log "ERROR: Nginx configuration test failed"
-    log "Check logs: sudo nginx -t"
-fi
-
-# Enable and start Nginx
-log "Enabling and starting Nginx..."
+# Enable Nginx to start on boot (but don't start it yet)
+log "Enabling Nginx for startup..."
 sudo systemctl enable nginx
-if sudo systemctl start nginx; then
-    log "✓ Nginx started successfully"
-else
-    log "ERROR: Failed to start Nginx"
-    log "Check logs: sudo journalctl -u nginx -n 50"
-    log "Check logs: sudo nginx -t"
-fi
+log "✓ Nginx configured and enabled (will be started after SSL certificates are uploaded)"
 
 # Wait for EBS volume to be attached
 log "Waiting for EBS volume to be attached..."
