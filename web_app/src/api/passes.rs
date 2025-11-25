@@ -66,12 +66,13 @@ mod pass_config {
     pub const DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 
     // iOS 18.5 compatible colors (RGB format required)
+    // Soft, modern pastel colors for aesthetic pet cards
     /// Text color for pass content
     pub const FOREGROUND_COLOR: &str = "rgb(255, 255, 255)";
-    /// Background color for the pass
-    pub const BACKGROUND_COLOR: &str = "rgb(60, 60, 60)";
-    /// Label text color
-    pub const LABEL_COLOR: &str = "rgb(255, 255, 255)";
+    /// Background color for the pass - soft sky blue
+    pub const BACKGROUND_COLOR: &str = "rgb(100, 181, 246)";
+    /// Label text color - off-white for subtle labels
+    pub const LABEL_COLOR: &str = "rgb(245, 245, 245)";
 }
 
 /// Generates a properly signed Apple Wallet pass for a pet.
@@ -143,7 +144,7 @@ fn create_pass_schema(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
         "passTypeIdentifier": pass_config::PASS_TYPE_IDENTIFIER,
         "teamIdentifier": pass_config::TEAM_IDENTIFIER,
         "serialNumber": pet_info.external_id,
-        "logoText": "Pet Info Pass",
+        "logoText": "🐾 Mascota",
 
         // iOS 18.5 styling
         "labelColor": pass_config::LABEL_COLOR,
@@ -157,13 +158,61 @@ fn create_pass_schema(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
         "barcodes": [{
             "message": format!("https://pet-info.link/info/{}", pet_info.external_id),
             "format": "PKBarcodeFormatQR",
-            "altText": "Pet Info public profile",
+            "altText": "Perfil público de la mascota",
             "messageEncoding": "iso-8859-1"
         }],
 
         // Pass content
         "generic": create_generic_fields(pet_info)
     })
+}
+
+/// Formats sex in Spanish for display on the pass.
+///
+/// Converts the Sex enum to appropriate Spanish text.
+///
+/// ## Parameters
+/// - `sex`: Reference to the Sex enum (Male/Female)
+///
+/// ## Returns
+/// Spanish string representation: "Macho" or "Hembra"
+fn format_sex_spanish(sex: &crate::api::pet::Sex) -> String {
+    match sex {
+        crate::api::pet::Sex::Male => "Macho".to_string(),
+        crate::api::pet::Sex::Female => "Hembra".to_string(),
+    }
+}
+
+/// Formats optional weight value for display on the pass.
+///
+/// Converts weight to a formatted string with units, or returns
+/// a placeholder if no weight is recorded.
+///
+/// ## Parameters
+/// - `weight`: Optional weight value in kilograms
+///
+/// ## Returns
+/// Formatted weight string (e.g., "15.5 kg") or "No registrado"
+fn format_weight(weight: &Option<f64>) -> String {
+    weight
+        .map(|w| format!("{:.1} kg", w))
+        .unwrap_or_else(|| "No registrado".to_string())
+}
+
+/// Converts HTML content to plain text for pass display.
+///
+/// Uses the html2text crate to strip HTML tags and convert
+/// formatted content to readable plain text suitable for display
+/// on the Apple Wallet pass back.
+///
+/// ## Parameters
+/// - `html_content`: String containing HTML markup
+///
+/// ## Returns
+/// Plain text version of the content
+fn convert_html_to_text(html_content: &str) -> String {
+    html2text::from_read(html_content.as_bytes(), 80)
+        .unwrap_or_else(|_| html_content.to_string())
 }
 
 /// Creates the generic pass fields structure.
@@ -193,32 +242,37 @@ fn create_generic_fields(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
         "primaryFields": [
             {
                 "key": "name",
-                "label": "Nombre",
-                "value": &pet_info.name.to_lowercase(),
+                "label": "Mascota",
+                "value": &pet_info.name,
             },
         ],
         "secondaryFields": [
-            {
-                "key": "age",
-                "label": "Edad",
-                "value": &pet_info.fmt_age
-            },
             {
                 "key": "breed",
                 "label": "Raza",
                 "value": &pet_info.pet_breed
             },
+            {
+                "key": "age",
+                "label": "Edad",
+                "value": &pet_info.fmt_age
+            },
         ],
         "auxiliaryFields": [
             {
-                "key": "spayed",
-                "label": "Esterilizada",
-                "value": if pet_info.is_spaying_neutering { "Si" } else { "No" }
+                "key": "sex",
+                "label": "Sexo",
+                "value": format_sex_spanish(&pet_info.sex)
             },
             {
-                "key": "sex",
-                "label": "Sex",
-                "value": format!("{:?}", pet_info.sex)
+                "key": "weight",
+                "label": "Peso",
+                "value": format_weight(&pet_info.last_weight)
+            },
+            {
+                "key": "spayed",
+                "label": "Esterilizado/a",
+                "value": if pet_info.is_spaying_neutering { "Sí" } else { "No" }
             },
         ],
         "backFields": create_back_fields(pet_info),
@@ -230,7 +284,7 @@ fn create_generic_fields(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
 ///
 /// Back fields are displayed when the user flips the pass over in Apple Wallet.
 /// This is where detailed information is shown that doesn't fit on the front.
-/// Currently includes the pet's unique identifier for reference purposes.
+/// Includes the pet's unique identifier and the about section (with HTML converted to text).
 ///
 /// ## Parameters
 /// - `pet_info`: Pet information schema
@@ -238,11 +292,23 @@ fn create_generic_fields(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
 /// ## Returns
 /// A vector of `serde_json::Value` objects representing each back field
 fn create_back_fields(pet_info: &PetPublicInfoSchema) -> Vec<serde_json::Value> {
-    vec![serde_json::json!({
+    let mut fields = vec![serde_json::json!({
         "key": "pet_id",
-        "label": "Pet ID",
+        "label": "ID de Mascota",
         "value": pet_info.external_id
-    })]
+    })];
+
+    // Add about section if not empty
+    if !pet_info.about_pet.is_empty() {
+        let about_text = convert_html_to_text(&pet_info.about_pet);
+        fields.push(serde_json::json!({
+            "key": "about",
+            "label": "Acerca de",
+            "value": about_text
+        }));
+    }
+
+    fields
 }
 
 /// Creates a signed package with proper certificate chain.
