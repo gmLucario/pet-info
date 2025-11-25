@@ -198,16 +198,26 @@ async fn handle_interactive_response(
             client.send_document_message(&document_message).await?;
         }
         "tarjeta" => {
-            // Send Apple Wallet pass link
-            client
-                .send_text_message(
-                    message.from.clone(),
-                    format!(
-                        "Tarjeta digital: https://pet-info.link/pet/pass/{}",
-                        external_id
-                    ),
-                )
+            // Generate and send Apple Wallet pass
+            let pet = repo.get_pet_by_external_id(external_id).await?;
+            let pet_public_info: crate::api::pet::PetPublicInfoSchema = pet.into();
+
+            let pkpass_bytes = crate::api::passes::generate_pet_pass(
+                &pet_public_info,
+                storage_service,
+            )
+            .await?;
+
+            let filename = format!("{}.pkpass", pet_public_info.name).to_lowercase();
+            let media_id = client
+                .upload_media(pkpass_bytes, "application/vnd.apple.pkpass", &filename)
                 .await?;
+
+            // Send document message with media ID
+            let document_message =
+                OutgoingDocumentMessage::new_with_id(message.from.clone(), media_id, filename);
+
+            client.send_document_message(&document_message).await?;
         }
         _ => {
             logfire::warn!(
