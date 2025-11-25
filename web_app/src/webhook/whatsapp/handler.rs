@@ -198,7 +198,7 @@ async fn handle_interactive_response(
             client.send_document_message(&document_message).await?;
         }
         "tarjeta" => {
-            // Send Apple Wallet pass link
+            // Send Apple Wallet pass link (WhatsApp doesn't support .pkpass files)
             client
                 .send_text_message(
                     message.from.clone(),

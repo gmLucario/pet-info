@@ -159,6 +159,11 @@ resource "null_resource" "upload_ssl_certificates" {
 resource "null_resource" "upload_pass_certificates" {
   depends_on = [null_resource.deploy_app]
 
+  # Deploy only on initial instance creation
+  triggers = {
+    instance_id = aws_instance.app_instance.id
+  }
+
   # Upload pass certificate
   provisioner "file" {
     source      = var.pass_cert_path
