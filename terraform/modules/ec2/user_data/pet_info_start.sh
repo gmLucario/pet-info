@@ -106,7 +106,7 @@ else
         log "Certbot attempt $i/$CERTBOT_MAX_RETRIES..."
 
         if sudo certbot --nginx -d pet-info.link -d www.pet-info.link \
-            --non-interactive --agree-tos -m admin@pet-info.link \
+            --non-interactive --agree-tos -m gmlukario@gmail.com \
             --redirect 2>&1 | tee -a /var/log/user-data.log; then
             CERTBOT_SUCCESS=true
             log "✓ SSL certificates obtained successfully"
