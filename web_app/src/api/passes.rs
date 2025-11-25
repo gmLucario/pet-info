@@ -66,12 +66,9 @@ mod pass_config {
     pub const DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 
     // iOS 18.5 compatible colors (RGB format required)
-    // Soft, modern pastel colors for aesthetic pet cards
     /// Text color for pass content
     pub const FOREGROUND_COLOR: &str = "rgb(255, 255, 255)";
-    /// Background color for the pass - soft sky blue
     pub const BACKGROUND_COLOR: &str = "rgb(156, 175, 136)";
-    /// Label text color - off-white for subtle labels
     pub const LABEL_COLOR: &str = "rgb(245, 245, 245)";
 }
 
@@ -136,15 +133,16 @@ pub async fn generate_pet_pass(
 fn create_pass_schema(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
     let now = Utc::now();
     let expiration = now + Duration::days(365);
+    let pet_name = pet_info.name.to_uppercase();
 
     serde_json::json!({
         "formatVersion": 1,
         "organizationName": pass_config::ORGANIZATION_NAME,
-        "description": format!("Pet-Info Pass: {}", &pet_info.name.to_uppercase()),
+        "description": format!("Pet-Info Pass: {}", &pet_name),
         "passTypeIdentifier": pass_config::PASS_TYPE_IDENTIFIER,
         "teamIdentifier": pass_config::TEAM_IDENTIFIER,
         "serialNumber": pet_info.external_id,
-        "logoText": format!("🐾 Pet-Info {}", &pet_info.name.to_uppercase()),
+        "logoText": format!("🐾 Pet-Info {}", &pet_name),
 
         // iOS 18.5 styling
         "labelColor": pass_config::LABEL_COLOR,
