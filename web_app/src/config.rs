@@ -92,26 +92,10 @@ pub struct AppConfig {
     pub wep_server_host: String,
 
     /// Port for web server binding (NON-SENSITIVE)
-    /// Common values: 80 (HTTP), 443 (HTTPS), 8080 (dev)
+    /// Note: Application binds to localhost:8080 (HTTP)
+    /// Nginx reverse proxy handles HTTPS/TLS on port 443
     #[serde(deserialize_with = "deserialize_string_to_u64")]
     pub wep_server_port: u64,
-
-    /// Path to SSL private key file (SENSITIVE PATH)
-    /// Security: File should have 600 permissions, store path securely
-    /// Example: "/etc/ssl/private/server.key"
-    #[envconfig(default = "server.key")]
-    pub private_key_path: String,
-
-    /// Path to SSL certificate file (NON-SENSITIVE)
-    /// Example: "/etc/ssl/certs/server.crt"
-    #[envconfig(default = "server.crt")]
-    pub certificate_path: String,
-
-    /// Path to client CA certificate for mTLS verification (NON-SENSITIVE)
-    /// This certificate is used to verify client certificates from Facebook/Meta webhooks
-    /// Example: "/etc/ssl/certs/DigiCertHighAssuranceEVRootCA.pem"
-    #[envconfig(default = "certs/DigiCertHighAssuranceEVRootCA.pem")]
-    pub client_ca_cert_path: String,
 
     /// 🔒 SENSITIVE: CSRF protection password (UUID format)
     /// Security: Generate using cryptographically secure random generator
@@ -147,12 +131,6 @@ pub struct AppConfig {
     /// Security: Used to verify webhook requests from WhatsApp
     /// This token must match the value configured in WhatsApp Business API dashboard
     pub whatsapp_verify_token: String,
-
-    /// 🔒 SENSITIVE: WhatsApp App Secret for webhook signature verification
-    /// Security: Used to verify X-Hub-Signature-256 header in webhook POST requests
-    /// This is your app's secret from the Facebook/Meta App Dashboard
-    /// Required for validating that webhook requests actually come from Meta
-    pub whatsapp_app_secret: String,
 
     /// AWS Step Functions ARN for notifications (SEMI-SENSITIVE)
     /// Security: Contains account information, restrict access

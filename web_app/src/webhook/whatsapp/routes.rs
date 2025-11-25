@@ -5,10 +5,11 @@
 //!
 //! # Security
 //!
-//! The POST endpoint verifies webhook authenticity using X-Hub-Signature-256 header.
+//! The POST endpoint verifies webhook authenticity using mTLS client certificates.
+//! Nginx reverse proxy handles the TLS layer verification and passes headers to this application.
 //! This ensures that requests actually originate from Meta/Facebook.
 
-use super::{handler, schemas, security};
+use super::{handler, schemas};
 use crate::{
     config,
     front::{AppState, errors},
@@ -71,9 +72,9 @@ pub async fn verify(
 ///
 /// # Security
 ///
-/// This endpoint verifies the X-Hub-Signature-256 header to ensure the request
-/// originates from Meta/Facebook. Requests with invalid or missing signatures
-/// are rejected with a 403 Forbidden response.
+/// This endpoint verifies mTLS client certificate information passed by Nginx reverse proxy.
+/// Nginx handles the TLS layer verification and passes verification headers.
+/// Requests without valid mTLS certificates are rejected with a 403 Forbidden response.
 ///
 /// # Processing
 ///
@@ -89,44 +90,65 @@ pub async fn receive(
         .get()
         .expect("APP_CONFIG should be initialized before starting web server");
 
-    // Step 1: Verify mTLS client certificate (if in production)
+    // Verify mTLS client certificate via Nginx headers (production only)
     if app_config.is_prod() {
-        // Check if a client certificate was provided and verified by OpenSSL
-        // The certificate verification happens at the TLS layer
-        // If we reach here with a verified certificate, it means:
-        // 1. A client certificate was presented
-        // 2. It was signed by our trusted CA (DigiCert)
-        // 3. It hasn't expired
-        // 4. The certificate chain is valid
-
-        // Note: ntex/OpenSSL handles the verification. If the certificate is invalid,
-        // the TLS handshake will fail before we reach this point.
-        // We just log that mTLS was successful.
-        logfire::info!("Webhook request with verified mTLS client certificate");
-    }
-
-    // Step 2: Extract and verify X-Hub-Signature-256 header
-    let signature = match req.headers().get("X-Hub-Signature-256") {
-        Some(header_value) => match header_value.to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                logfire::warn!("Invalid X-Hub-Signature-256 header: not valid UTF-8");
+        // Step 1: Check X-Client-Cert-Verified header
+        let cert_verified = match req.headers().get("X-Client-Cert-Verified") {
+            Some(header_value) => match header_value.to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    logfire::warn!("Invalid X-Client-Cert-Verified header: not valid UTF-8");
+                    return Err(errors::UserError::Unauthorized.into());
+                }
+            },
+            None => {
+                logfire::warn!("Missing X-Client-Cert-Verified header - mTLS verification failed");
                 return Err(errors::UserError::Unauthorized.into());
             }
-        },
-        None => {
-            logfire::warn!("Missing X-Hub-Signature-256 header in webhook request");
+        };
+
+        if cert_verified != "SUCCESS" {
+            let status = cert_verified.to_string();
+            logfire::warn!(
+                "Client certificate verification failed: {status}",
+                status = status
+            );
             return Err(errors::UserError::Unauthorized.into());
         }
-    };
 
-    // Step 3: Verify the HMAC signature
-    if !security::verify_signature(signature, &body, &app_config.whatsapp_app_secret) {
-        logfire::warn!("Webhook signature verification failed - rejecting request");
-        return Err(errors::UserError::Unauthorized.into());
+        // Step 2: Verify the Common Name (CN) from X-Client-Cert-DN header
+        let cert_dn = match req.headers().get("X-Client-Cert-DN") {
+            Some(header_value) => match header_value.to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    logfire::warn!("Invalid X-Client-Cert-DN header: not valid UTF-8");
+                    return Err(errors::UserError::Unauthorized.into());
+                }
+            },
+            None => {
+                logfire::warn!("Missing X-Client-Cert-DN header");
+                return Err(errors::UserError::Unauthorized.into());
+            }
+        };
+
+        // Verify the CN matches Meta's webhook certificate
+        if !cert_dn.contains("CN=client.webhooks.fbclientcerts.com") {
+            let dn = cert_dn.to_string();
+            logfire::warn!(
+                "Client certificate CN verification failed. Expected 'CN=client.webhooks.fbclientcerts.com', got: {dn}",
+                dn = dn
+            );
+            return Err(errors::UserError::Unauthorized.into());
+        }
+
+        logfire::info!(
+            "Webhook request authenticated via mTLS - CN: client.webhooks.fbclientcerts.com"
+        );
+    } else {
+        logfire::info!("Development environment - skipping mTLS verification");
     }
 
-    // Parse the JSON payload after signature verification
+    // Parse the JSON payload after mTLS verification
     let payload: schemas::WebhookPayload = match serde_json::from_slice(&body) {
         Ok(p) => p,
         Err(e) => {

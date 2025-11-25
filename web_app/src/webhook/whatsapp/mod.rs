@@ -7,16 +7,19 @@
 //! ## Submodules
 //!
 //! - [`handler`] - Business logic for processing WhatsApp webhook events
-//! - [`routes`] - HTTP endpoint handlers for WhatsApp webhooks
+//! - [`routes`] - HTTP endpoint handlers for WhatsApp webhooks (includes mTLS header verification)
 //! - [`schemas`] - Data structures for WhatsApp webhook payloads (incoming and outgoing)
 //! - [`client`] - WhatsApp API client for sending messages
-//! - [`security`] - Security utilities for webhook signature verification
+//!
+//! ## Security
+//!
+//! Webhook security is implemented via Nginx reverse proxy with mTLS (Mutual TLS).
+//! See `WHATSAPP_WEBHOOK_SECURITY.md` for details.
 
 pub mod client;
 pub mod handler;
 pub mod routes;
 pub mod schemas;
-pub mod security;
 
 // Re-export commonly used items for convenience
 pub use routes::{receive, verify};

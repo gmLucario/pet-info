@@ -1,219 +1,332 @@
 # WhatsApp Webhook Security Setup
 
-This document explains how to secure your WhatsApp webhook endpoints using **mTLS (Mutual TLS)** and **X-Hub-Signature-256** verification.
+This document explains how to secure your WhatsApp webhook endpoints using **Nginx reverse proxy with mTLS (Mutual TLS)** certificate verification.
 
 ## Overview
 
-WhatsApp/Meta webhooks use a **dual-layer security approach** to ensure webhook requests are authentic and haven't been tampered with. This implementation provides robust security by:
+This implementation uses **Nginx as a reverse proxy** to handle all TLS/mTLS operations, providing robust security by:
 
-1. ✅ **mTLS (Mutual TLS)**: Verifying client certificates from Meta/Facebook at the TLS layer
-2. ✅ **X-Hub-Signature-256**: Verifying HMAC signatures to ensure payload integrity
-3. ✅ Using constant-time comparison to prevent timing attacks
-4. ✅ Rejecting requests with invalid or missing authentication
+1. ✅ **Nginx handles HTTPS/TLS**: All external traffic encrypted with Let's Encrypt certificates
+2. ✅ **mTLS (Mutual TLS)**: Verifying client certificates from Meta/Facebook at the TLS layer
+3. ✅ **CN verification**: Ensuring certificate Common Name matches `client.webhooks.fbclientcerts.com`
+4. ✅ **Application verification**: Rust app validates Nginx-provided headers for defense-in-depth
+5. ✅ **Separation of concerns**: TLS handled by Nginx, business logic in Rust application
+
+## Architecture
+
+```
+┌─────────────┐
+│ WhatsApp/   │
+│ Meta        │
+└──────┬──────┘
+       │
+       │ HTTPS + mTLS client cert
+       │ (client.webhooks.fbclientcerts.com)
+       ▼
+┌──────────────────────────────────────┐
+│ Nginx Reverse Proxy (Port 443)      │
+│                                      │
+│  • Verifies HTTPS/TLS                │
+│  • Verifies client certificate       │
+│    - Signed by DigiCert Root CA      │
+│    - CN = client.webhooks...         │
+│  • Adds headers:                     │
+│    - X-Client-Cert-Verified          │
+│    - X-Client-Cert-DN                │
+└──────┬───────────────────────────────┘
+       │
+       │ HTTP (localhost only)
+       │ + Verification headers
+       ▼
+┌──────────────────────────────────────┐
+│ Rust App (localhost:8080)            │
+│                                      │
+│  • Validates Nginx headers           │
+│  • Processes webhook payload         │
+│  • Business logic                    │
+└──────────────────────────────────────┘
+```
 
 ## Security Implementation
 
-### Dual-Layer Security Architecture
-
-This implementation uses **defense in depth** with two independent security layers:
-
-#### Layer 1: mTLS (Mutual TLS) Certificate Verification
+### mTLS Certificate Verification (Nginx Layer)
 
 1. **Meta presents client certificate**: When Meta sends a webhook request, they present a client certificate during the TLS handshake
-2. **Server verifies certificate**: The OpenSSL layer automatically verifies:
+2. **Nginx verifies certificate**: Nginx automatically verifies:
    - Certificate is signed by DigiCert High Assurance EV Root CA
    - Certificate hasn't expired
    - Certificate chain is valid
-   - Certificate matches `client.webhooks.fbclientcerts.com`
-3. **TLS handshake fails if invalid**: If the certificate is invalid, the connection is rejected at the TLS layer before reaching your application
+   - Certificate Common Name (CN) matches `client.webhooks.fbclientcerts.com`
+3. **Connection rejected if invalid**: If the certificate is invalid or CN doesn't match, Nginx returns 403 before reaching your application
+4. **Headers passed to app**: On success, Nginx forwards the request with verification headers
 
-#### Layer 2: X-Hub-Signature-256 HMAC Verification
+### Application Layer Verification (Rust)
 
-1. **Meta signs the payload**: When Meta sends a webhook request, they compute an HMAC-SHA256 signature using your app secret
-2. **Signature is sent in header**: The signature is included in the `X-Hub-Signature-256` header with format: `sha256=<hex_signature>`
-3. **Your server verifies**: Before processing any webhook, the server:
-   - Extracts the signature from the header
-   - Computes HMAC-SHA256 of the raw request body using your app secret
-   - Compares the computed signature with the received signature using constant-time comparison
-   - Only processes the request if signatures match
-
-### Why Two Layers?
-
-- **mTLS**: Verifies the identity of the sender (Meta/Facebook)
-- **X-Hub-Signature-256**: Verifies the integrity of the message content
-- **Defense in depth**: Even if one layer is compromised, the other provides protection
+1. **Checks X-Client-Cert-Verified header**: Must be "SUCCESS"
+2. **Validates X-Client-Cert-DN header**: Must contain "CN=client.webhooks.fbclientcerts.com"
+3. **Defense-in-depth**: Provides additional validation beyond Nginx layer
 
 ### Code Location
 
-- **mTLS configuration**: `web_app/src/main.rs` (setup_ssl_acceptor function, production only)
+- **Nginx configuration**: `terraform/modules/ec2/files/nginx-pet-info.conf`
 - **Certificate provisioning**: `terraform/modules/ec2/user_data/pet_info_start.sh`
-- **Signature verification**: `web_app/src/webhook/whatsapp/security.rs`
 - **Webhook endpoint**: `web_app/src/webhook/whatsapp/routes.rs`
 - **Configuration**: `web_app/src/config.rs`
-- **CA Certificate**: `certs/DigiCertHighAssuranceEVRootCA.pem`
+- **CA Certificate**: `/etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem` (auto-downloaded)
 
 ## Configuration
 
-### Step 1: Download DigiCert Root CA Certificate
+### Automatic Setup (Production)
 
-**For Production Deployments:**
+The entire infrastructure is **automatically configured** during EC2 instance provisioning via the Terraform user_data script (`terraform/modules/ec2/user_data/pet_info_start.sh`):
 
-The certificate is **automatically downloaded** during EC2 instance provisioning via the Terraform user_data script (`terraform/modules/ec2/user_data/pet_info_start.sh`).
+✅ **Nginx installation**
+✅ **DigiCert root CA certificate download** (to `/etc/nginx/certs/`)
+✅ **Nginx configuration deployment**
+✅ **Certbot installation** (for Let's Encrypt SSL certificates)
+✅ **Directory setup** for ACME challenges
 
-✅ **No manual intervention required** - certificates are provisioned automatically!
+**No manual intervention required** - everything is provisioned automatically!
 
-**For Development/Testing:**
+### Manual Setup (Development/Testing)
 
-Download the DigiCert High Assurance EV Root CA certificate manually:
+If you need to set up Nginx with mTLS manually for testing:
+
+#### 1. Install Nginx
 
 ```bash
+sudo dnf install -y nginx
+```
+
+#### 2. Download DigiCert Root CA Certificate
+
+```bash
+# Create certificate directory
+sudo mkdir -p /etc/nginx/certs
+
 # Download the certificate
-mkdir -p certs
-cd certs
-wget -q "https://cacerts.digicert.com/DigiCertHighAssuranceEVRootCA.crt"
+sudo wget -q "https://cacerts.digicert.com/DigiCertHighAssuranceEVRootCA.crt" \
+  -O /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.crt
 
 # Convert from DER to PEM format
-openssl x509 -inform DER -in DigiCertHighAssuranceEVRootCA.crt \
-  -out DigiCertHighAssuranceEVRootCA.pem
+sudo openssl x509 -inform DER -in /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.crt \
+  -out /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem
+
+# Set proper permissions
+sudo chmod 755 /etc/nginx/certs
+sudo chmod 644 /etc/nginx/certs/*
 ```
 
 **Certificate Details:**
 - **Subject**: CN=DigiCert High Assurance EV Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
 - **Valid Until**: November 10, 2031
 - **Purpose**: Verify Meta's client certificates for webhook requests
-- **Note**: Certificate files are excluded from git (see `.gitignore`) as they're auto-downloaded in production
+- **Location**: `/etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem`
 
-### Step 2: Configure Environment Variables
-
-Add the following environment variables to your configuration:
+#### 3. Install Certbot for Let's Encrypt
 
 ```bash
-# WhatsApp App Secret for HMAC signature verification
-WHATSAPP_APP_SECRET="your-app-secret-from-meta"
+sudo dnf install -y certbot python3-certbot-nginx
 
-# Path to DigiCert root CA certificate for mTLS (optional, uses default if not set)
-CLIENT_CA_CERT_PATH="certs/DigiCertHighAssuranceEVRootCA.pem"
+# Create directory for ACME challenges
+sudo mkdir -p /var/www/certbot
+sudo chown -R nginx:nginx /var/www/certbot
 ```
 
-### Step 3: Where to Find Your App Secret
-
-1. Go to the [Meta for Developers](https://developers.facebook.com/) dashboard
-2. Navigate to your app
-3. Go to **Settings** → **Basic**
-4. Find your **App Secret** (you may need to click "Show" to reveal it)
-5. Copy the secret and add it to your environment configuration
-
-### For AWS SSM Parameter Store
-
-If using the `ssm` feature, add these parameters:
+#### 4. Deploy Nginx Configuration
 
 ```bash
-# App Secret
-Parameter Name: /pet-info/WHATSAPP_APP_SECRET
-Type: SecureString
-Value: your-app-secret-from-meta
+# Copy configuration file
+sudo cp terraform/modules/ec2/files/nginx-pet-info.conf /etc/nginx/conf.d/pet-info.conf
 
-# Client CA certificate path (optional)
-Parameter Name: /pet-info/CLIENT_CA_CERT_PATH
-Type: String
-Value: certs/DigiCertHighAssuranceEVRootCA.pem
+# Test configuration
+sudo nginx -t
+
+# Enable Nginx
+sudo systemctl enable nginx
 ```
+
+#### 5. Obtain SSL Certificate
+
+After deploying your EC2 instance and configuring DNS to point to your server:
+
+```bash
+sudo certbot --nginx -d pet-info.link -d www.pet-info.link \
+  --non-interactive --agree-tos -m your-email@example.com
+```
+
+This will automatically:
+- Obtain SSL certificates from Let's Encrypt
+- Configure Nginx to use them
+- Set up automatic renewal
+
+#### 6. Start Nginx
+
+```bash
+sudo systemctl start nginx
+```
+
+### Environment Variables
+
+Only the following WhatsApp-related environment variables are required:
+
+```bash
+# WhatsApp webhook verification token (for GET verification endpoint)
+WHATSAPP_VERIFY_TOKEN="your-verify-token"
+
+# WhatsApp Business API credentials
+WHATSAPP_BUSINESS_PHONE_NUMBER_ID="your-phone-number-id"
+WHATSAPP_BUSINESS_AUTH="your-auth-token"
+```
+
+**Note**: No SSL/TLS certificate paths or app secrets are needed in the Rust application configuration - Nginx handles all TLS operations.
 
 ## Testing
 
-The implementation includes comprehensive tests:
+### Testing Nginx Configuration
+
+```bash
+# Validate Nginx configuration syntax
+sudo nginx -t
+
+# Check Nginx is running
+sudo systemctl status nginx
+
+# View Nginx logs
+sudo tail -f /var/log/nginx/pet-info-access.log
+sudo tail -f /var/log/nginx/pet-info-error.log
+```
+
+### Testing mTLS Verification
+
+Test that Nginx correctly rejects requests without valid client certificates:
+
+```bash
+# Should fail - no client certificate
+curl -v https://pet-info.link/webhook/whatsapp
+
+# Should succeed - regular GET request (webhook verification)
+curl -v "https://pet-info.link/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test123"
+```
+
+### Testing Application Layer
 
 ```bash
 cd web_app
-cargo test security
+cargo test
 ```
-
-### Test Coverage
-
-- ✅ Valid signature verification
-- ✅ Invalid signature rejection
-- ✅ Wrong secret detection
-- ✅ Tampered payload detection
-- ✅ Invalid header format handling
-- ✅ Invalid hex encoding handling
 
 ## Security Best Practices
 
-### 1. Keep Your App Secret Secure
+### 1. Certificate Security
 
-- ⚠️ **NEVER** commit your app secret to version control
-- ⚠️ **NEVER** expose it in logs or error messages
-- ✅ Use environment variables or secret management systems
-- ✅ Use AWS SSM Parameter Store SecureString in production
-- ✅ Rotate your app secret regularly
+- ✅ DigiCert root CA certificate is public and safe to distribute
+- ✅ Let's Encrypt certificates automatically renewed by certbot
+- ✅ Private keys protected with file system permissions (600)
+- ⚠️ **NEVER** commit private keys to version control
 
 ### 2. Monitor Failed Verification Attempts
 
-Failed webhook verifications are logged with `logfire::warn!`. Monitor these logs for potential security issues:
+Failed mTLS verifications are logged by Nginx and the Rust application. Monitor these logs for potential security issues:
 
+**Nginx logs** (`/var/log/nginx/pet-info-error.log`):
+```
+SSL_do_handshake() failed (SSL: error:14094412:SSL routines:ssl3_read_bytes:sslv3 alert bad certificate)
+```
+
+**Application logs**:
 ```rust
-logfire::warn!("Webhook signature verification failed - rejecting request");
+logfire::warn!("Missing X-Client-Cert-Verified header - mTLS verification failed");
+logfire::warn!("Client certificate CN verification failed");
 ```
 
 ### 3. HTTPS Only
 
-Always use HTTPS for webhook endpoints. The signature verification protects against tampering, but HTTPS protects against eavesdropping.
+Nginx enforces HTTPS for all external traffic. HTTP requests on port 80 are automatically redirected to HTTPS on port 443.
 
 ### 4. Rate Limiting
 
-Consider implementing rate limiting on webhook endpoints to prevent abuse.
+Consider adding Nginx rate limiting for webhook endpoints:
+
+```nginx
+# Add to nginx-pet-info.conf
+limit_req_zone $binary_remote_addr zone=webhook_limit:10m rate=10r/s;
+
+location /webhook/whatsapp {
+    limit_req zone=webhook_limit burst=20 nodelay;
+    # ... rest of configuration
+}
+```
+
+### 5. Firewall Configuration
+
+Ensure your EC2 security group allows:
+- Port 443 (HTTPS) from WhatsApp/Meta IP ranges
+- Port 80 (HTTP) for Let's Encrypt challenges
+- Block direct access to port 8080 (Rust app) from external IPs
 
 ## Environment-Specific Behavior
 
 ### Production Environment (ENV=prod)
 
-**mTLS Enabled:**
-- ✅ Client certificate verification is **active**
-- ✅ Certificates must be signed by DigiCert High Assurance EV Root CA
-- ✅ Certificate downloaded automatically during EC2 provisioning
-- ✅ Both mTLS and X-Hub-Signature-256 verification required
+**mTLS Enabled via Nginx:**
+- ✅ Nginx handles all TLS/mTLS verification
+- ✅ Client certificates verified against DigiCert High Assurance EV Root CA
+- ✅ CN verification enforced (`client.webhooks.fbclientcerts.com`)
+- ✅ Rust application validates Nginx headers for defense-in-depth
+- ✅ Certificate automatically downloaded during EC2 provisioning
 
-**Configuration:**
+**Infrastructure:**
 ```bash
 ENV=prod
-CLIENT_CA_CERT_PATH=certs/DigiCertHighAssuranceEVRootCA.pem  # Auto-downloaded
-WHATSAPP_APP_SECRET=your-app-secret-from-meta
+
+# Nginx automatically configured with:
+# - HTTPS/TLS on port 443 (Let's Encrypt)
+# - mTLS client verification
+# - DigiCert root CA at /etc/nginx/certs/
+
+# Rust app configuration:
+WHATSAPP_VERIFY_TOKEN=your-verify-token
+# (No SSL/TLS configuration needed)
 ```
 
 **Server Logs:**
 ```
-[INFO] Production environment detected - configuring mTLS
-[INFO] ✓ mTLS configured: Client certificates will be verified using CA from certs/DigiCertHighAssuranceEVRootCA.pem
-[INFO] Webhook request with verified mTLS client certificate
+[Nginx] SSL_do_handshake() successful with client certificate
+[App]   Webhook request authenticated via mTLS - CN: client.webhooks.fbclientcerts.com
 ```
 
 ### Development/Local Environment (ENV != prod)
 
 **mTLS Disabled:**
-- ℹ️ Client certificate verification is **disabled**
-- ℹ️ Easier local testing without certificate setup
-- ✅ X-Hub-Signature-256 verification still **active** and required
+- ℹ️ Application skips mTLS header validation in development
+- ℹ️ Easier local testing without Nginx setup
+- ⚠️ **Do not expose development endpoints to the internet**
 
 **Configuration:**
 ```bash
 ENV=local  # or dev, staging, etc.
-WHATSAPP_APP_SECRET=your-app-secret-from-meta
-# CLIENT_CA_CERT_PATH not required
+
+# Run Rust app directly (no Nginx):
+# Binds to localhost:8080 (HTTP only)
 ```
 
 **Server Logs:**
 ```
-[INFO] Development environment - mTLS disabled for easier local testing
+[INFO] Starting server on http://127.0.0.1:8080 (behind Nginx reverse proxy)
+[INFO] Development environment - skipping mTLS verification
 ```
 
 ### Summary
 
 | Feature | Production | Development |
 |---------|-----------|-------------|
-| **mTLS Certificate Verification** | ✅ Enabled | ❌ Disabled |
-| **X-Hub-Signature-256 Verification** | ✅ Enabled | ✅ Enabled |
+| **Nginx Reverse Proxy** | ✅ Required | ❌ Optional |
+| **HTTPS/TLS (Nginx)** | ✅ Enabled (Port 443) | ❌ Disabled |
+| **mTLS Certificate Verification** | ✅ Enabled (Nginx) | ❌ Disabled |
+| **CN Verification** | ✅ Required | ❌ Skipped |
 | **Certificate Auto-Download** | ✅ Yes (Terraform) | ❌ No (Manual) |
-| **Client Certificate Required** | ✅ Yes (webhooks) | ❌ No |
+| **Application Binding** | localhost:8080 | localhost:8080 |
 
 ## Verification Flow
 
@@ -223,127 +336,211 @@ WHATSAPP_APP_SECRET=your-app-secret-from-meta
 └────────┬────────┘
          │
          │ 1. Prepare webhook request
-         │    - Sign payload: HMAC-SHA256(payload, app_secret)
          │    - Prepare client certificate (client.webhooks.fbclientcerts.com)
+         │    - Prepare webhook payload
          │
          ▼
 ┌────────────────────────────────────────────────┐
-│  TLS Handshake with mTLS                       │
-│  ┌──────────────────────────────────────────┐  │
-│  │ Meta presents client certificate         │  │
-│  │ Signed by: DigiCert High Assurance       │  │
-│  │                                           │  │
-│  │ Server verifies:                          │  │
-│  │  ✓ Certificate chain valid               │  │
-│  │  ✓ Signed by trusted CA (DigiCert)       │  │
-│  │  ✓ Not expired                           │  │
-│  │  ✓ Hostname matches                      │  │
-│  └──────────────────────────────────────────┘  │
-│         │                                       │
-│         ├─── ✅ Valid → TLS connection         │
-│         └─── ❌ Invalid → Connection rejected  │
+│  Nginx Reverse Proxy (Port 443)               │
+│                                                │
+│  Step 1: TLS Handshake with mTLS              │
+│  ┌──────────────────────────────────────────┐ │
+│  │ Meta presents client certificate         │ │
+│  │ Signed by: DigiCert High Assurance       │ │
+│  │                                           │ │
+│  │ Nginx verifies:                           │ │
+│  │  ✓ Certificate chain valid               │ │
+│  │  ✓ Signed by trusted CA (DigiCert)       │ │
+│  │  ✓ Not expired                           │ │
+│  │  ✓ CN = client.webhooks.fbclientcerts... │ │
+│  └──────────────────────────────────────────┘ │
+│         │                                      │
+│         ├─── ✅ Valid → Continue               │
+│         └─── ❌ Invalid → 403 Forbidden        │
 └────────┬───────────────────────────────────────┘
+         │
+         │ 2. Nginx adds verification headers:
+         │    X-Client-Cert-Verified: SUCCESS
+         │    X-Client-Cert-DN: CN=client.webhooks...
          │
          ▼
 ┌────────────────────────────────────────────┐
-│  POST /webhook/whatsapp                    │
+│  POST http://localhost:8080/webhook/...   │
 │  Headers:                                  │
-│    X-Hub-Signature-256: sha256=abc123...  │
+│    X-Client-Cert-Verified: SUCCESS        │
+│    X-Client-Cert-DN: CN=client.webhooks...│
 │  Body: {"object":"whatsapp_business_...}   │
 └────────┬───────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────┐
-│  Application Layer (Your Server)        │
+│  Rust Application (localhost:8080)      │
 │                                         │
-│  Step 1: mTLS verified (TLS layer)      │
-│  ✓ Client certificate validated         │
+│  Step 1: Check X-Client-Cert-Verified   │
+│    ✓ Must be "SUCCESS"                  │
 │                                         │
-│  Step 2: Extract X-Hub-Signature-256    │
-│  Step 3: Compute HMAC-SHA256(body)      │
-│  Step 4: Constant-time compare          │
+│  Step 2: Check X-Client-Cert-DN         │
+│    ✓ Must contain "CN=client.webhooks...│
+│                                         │
+│  Step 3: Parse and process webhook      │
 └────────┬────────────────────────────────┘
          │
-         ├─── ✅ Both layers valid → Process webhook
+         ├─── ✅ All checks pass → Process webhook
          │
-         └─── ❌ Any layer fails → Reject with 403
+         └─── ❌ Any check fails → Reject with 403
 ```
 
 ## API Behavior
 
-### Successful Request
+### Successful Request (With mTLS)
 
 ```http
-POST /webhook/whatsapp HTTP/1.1
+POST /webhook/whatsapp HTTPS/1.1
+Host: pet-info.link
 Content-Type: application/json
-X-Hub-Signature-256: sha256=abc123...
+[Client Certificate: CN=client.webhooks.fbclientcerts.com]
 
 {"object":"whatsapp_business_account",...}
 
+→ [Nginx verifies mTLS] → [Adds headers] → [Forwards to app]
 → 200 OK
 {"status":"received"}
 ```
 
-### Failed Verification
+### Failed mTLS Verification (No Certificate)
 
 ```http
-POST /webhook/whatsapp HTTP/1.1
+POST /webhook/whatsapp HTTPS/1.1
+Host: pet-info.link
 Content-Type: application/json
-X-Hub-Signature-256: sha256=invalid...
+[No Client Certificate]
 
 {"object":"whatsapp_business_account",...}
 
+→ [Nginx rejects at TLS layer]
 → 403 Forbidden
 ```
 
-### Missing Signature
+### Failed CN Verification (Wrong Certificate)
 
 ```http
-POST /webhook/whatsapp HTTP/1.1
+POST /webhook/whatsapp HTTPS/1.1
+Host: pet-info.link
 Content-Type: application/json
+[Client Certificate: CN=wrong.example.com]
 
 {"object":"whatsapp_business_account",...}
 
+→ [Nginx rejects - CN mismatch]
 → 403 Forbidden
 ```
 
 ## Troubleshooting
 
-### Signature Verification Failing
+### mTLS Verification Failing
 
-1. **Check your app secret**: Ensure the `WHATSAPP_APP_SECRET` environment variable matches your Meta app's secret
-2. **Check the signature header**: The header must be exactly `X-Hub-Signature-256` (case-sensitive)
-3. **Verify you're using the raw body**: Signature must be computed on raw bytes, not parsed JSON
-4. **Check for middleware interference**: Ensure no middleware is modifying the request body before verification
+**Issue: Nginx returns 403 for webhook requests**
+
+1. **Check Nginx logs**:
+   ```bash
+   sudo tail -f /var/log/nginx/pet-info-error.log
+   ```
+   Look for SSL/TLS handshake errors
+
+2. **Verify DigiCert certificate is installed**:
+   ```bash
+   ls -la /etc/nginx/certs/
+   # Should show DigiCertHighAssuranceEVRootCA.pem
+   ```
+
+3. **Verify Nginx configuration**:
+   ```bash
+   sudo nginx -t
+   # Should show "syntax is ok" and "test is successful"
+   ```
+
+4. **Check certificate permissions**:
+   ```bash
+   sudo chmod 644 /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem
+   ```
+
+**Issue: Application returns 403 with missing header errors**
+
+1. **Ensure production environment**:
+   ```bash
+   echo $ENV
+   # Should be "prod" for mTLS verification
+   ```
+
+2. **Check Nginx is properly forwarding headers**:
+   ```bash
+   # View access logs to see forwarded headers
+   sudo tail -f /var/log/nginx/pet-info-access.log
+   ```
+
+3. **Verify application logs**:
+   ```bash
+   # Look for specific error messages
+   # "Missing X-Client-Cert-Verified header"
+   # "Client certificate CN verification failed"
+   ```
 
 ### Common Issues
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| 403 Forbidden | Wrong app secret | Verify your app secret matches Meta dashboard |
-| 403 Forbidden | Missing header | Ensure Meta is configured to send webhooks |
-| 403 Forbidden | Invalid hex | Check if there's middleware modifying headers |
-| Parse error | Body modified | Ensure signature verification happens before parsing |
+| 403 Forbidden (Nginx) | No client certificate | Ensure Meta is sending client certificate |
+| 403 Forbidden (Nginx) | Wrong CN | Verify certificate CN matches client.webhooks.fbclientcerts.com |
+| 403 Forbidden (App) | Missing headers | Check Nginx is forwarding X-Client-Cert-* headers |
+| SSL handshake failed | Wrong CA certificate | Re-download DigiCert root CA certificate |
+| Connection refused | Nginx not running | `sudo systemctl start nginx` |
+| Certificate expired | Let's Encrypt renewal failed | Run `sudo certbot renew` |
+
+### Testing Locally
+
+For local development without Nginx:
+
+```bash
+# Set environment to development
+export ENV=local
+
+# Run application
+cd web_app
+cargo run
+
+# Application will bind to localhost:8080 without mTLS verification
+```
 
 ## References
 
-- [Facebook Webhook Security Best Practices](https://stackoverflow.com/questions/36620841/what-is-the-best-practice-to-secure-your-facebook-chatbot-webhook)
-- [WhatsApp Cloud API Webhook Signature Verification](https://stackoverflow.com/questions/73820222/whatsapp-cloud-api-unable-to-verify-webhook-signature)
-- [HMAC-SHA256 Signature Verification Guide](https://hookdeck.com/webhooks/guides/how-to-implement-sha256-webhook-signature-verification)
+- [Meta/Facebook Webhook mTLS Documentation](https://developers.facebook.com/docs/graph-api/webhooks/getting-started#mtls-for-webhooks)
+- [Nginx SSL/TLS Configuration](https://nginx.org/en/docs/http/ngx_http_ssl_module.html)
+- [Nginx Client Certificate Verification](https://nginx.org/en/docs/http/ngx_http_ssl_module.html#ssl_verify_client)
+- [Let's Encrypt with Nginx](https://certbot.eff.org/instructions?ws=nginx)
+- [DigiCert Root Certificates](https://www.digicert.com/kb/digicert-root-certificates.htm)
 
 ## Support
 
 If you encounter issues with webhook security:
 
-1. Check the logs for specific error messages
-2. Verify your Meta app configuration
-3. Test with the included test suite
-4. Review this documentation for common issues
+1. Check Nginx logs (`/var/log/nginx/pet-info-error.log`)
+2. Check application logs
+3. Verify Meta app configuration in Facebook Dashboard
+4. Test Nginx configuration with `sudo nginx -t`
+5. Review this documentation for common issues
+
+## Architecture Benefits
+
+This Nginx reverse proxy implementation provides:
+
+- ✅ **Separation of concerns**: TLS/mTLS handled by Nginx, business logic in Rust
+- ✅ **Industry standard**: Nginx is battle-tested for TLS/mTLS
+- ✅ **Zero cost**: No additional AWS resources required (ALB would cost $25-45/month)
+- ✅ **Simplified application**: No SSL/TLS dependencies in Rust application
+- ✅ **Easy SSL management**: Let's Encrypt with automatic renewal
+- ✅ **Performance**: Nginx handles TLS termination efficiently
+- ✅ **Security**: mTLS at network edge, defense-in-depth with application validation
 
 ---
 
-**Note**: This implementation uses **dual-layer security** with both:
-1. **mTLS (Mutual TLS)** - Client certificate verification at the TLS layer
-2. **X-Hub-Signature-256** (HMAC-SHA256) - Payload signature verification at the application layer
-
-This provides defense-in-depth security for Meta/Facebook/WhatsApp webhooks.
+**Implementation**: This setup uses **Nginx reverse proxy** to handle all TLS/mTLS operations, with the Rust application providing defense-in-depth validation of Nginx-provided headers.
