@@ -747,6 +747,8 @@ pub async fn get_full_info(
     user_id: i64,
     repo: &repo::ImplAppRepo,
 ) -> anyhow::Result<PetFullInfo> {
+    let _span = logfire::span!("get_pet_full_info").entered();
+
     let pet = repo.get_pet_by_id(pet_id, user_id).await?;
     let external_id = pet.external_id;
     let pet_id = pet.id;
@@ -826,6 +828,8 @@ pub async fn generate_pdf_report_bytes(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<Vec<u8>> {
+    let _span = logfire::span!("generate_pdf_report_bytes").entered();
+
     let pet_full_info = get_full_info(pet_id, user_id, repo).await?;
 
     let now = chrono::Utc::now().date_naive();

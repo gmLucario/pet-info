@@ -89,24 +89,6 @@ impl World for TypstWorld {
     }
 }
 
-/// Converts Typst markup content to PDF bytes.
-///
-/// # Arguments
-/// * `content` - Typst markup text to compile
-///
-/// # Returns
-/// PDF document as bytes
-///
-/// # Errors
-/// Returns error if compilation or PDF generation fails
-pub fn create_pdf_bytes_from_str(content: &str) -> Result<Vec<u8>> {
-    let world = TypstWorld::new(content)?;
-    let document = typst::compile(&world)
-        .output
-        .map_err(|e| anyhow::anyhow!("Compilation failed: {:?}", e))?;
-    typst_pdf::pdf(&document, &PdfOptions::default())
-        .map_err(|e| anyhow::anyhow!("PDF generation failed: {:?}", e))
-}
 
 /// Converts Typst markup content with multiple embedded images to PDF bytes.
 ///
@@ -123,6 +105,8 @@ pub fn create_pdf_bytes_with_images(
     content: &str,
     images: Vec<(Vec<u8>, &str)>,
 ) -> Result<Vec<u8>> {
+    let _span = logfire::span!("create_pdf_bytes_with_images").entered();
+
     let world = TypstWorld::with_images(content, images)?;
     let document = typst::compile(&world)
         .output
