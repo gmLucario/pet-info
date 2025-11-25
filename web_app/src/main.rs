@@ -24,8 +24,6 @@ use ntex::web;
 use ntex_cors::Cors;
 use ntex_identity::{CookieIdentityPolicy, IdentityService};
 use ntex_session::CookieSession;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
-use rust_decimal::prelude::ToPrimitive;
 
 #[ntex::main]
 async fn main() -> anyhow::Result<()> {
@@ -84,37 +82,6 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Configures SSL acceptor for production environments
-fn setup_ssl_acceptor() -> anyhow::Result<openssl::ssl::SslAcceptorBuilder> {
-    let mut ssl_acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())
-        .map_err(|e| anyhow::anyhow!("Failed to create SSL acceptor: {}", e))?;
-
-    let app_config = config::APP_CONFIG
-        .get()
-        .context("failed to get app config")?;
-    ssl_acceptor
-        .set_private_key_file(&app_config.private_key_path, SslFiletype::PEM)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load private key from {}: {}",
-                app_config.private_key_path,
-                e
-            )
-        })?;
-
-    ssl_acceptor
-        .set_certificate_chain_file(&app_config.certificate_path)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load certificate chain from {}: {}",
-                app_config.certificate_path,
-                e
-            )
-        })?;
-
-    Ok(ssl_acceptor)
-}
-
 /// Creates application state from the provided services
 fn create_app_state(
     csrf_key: [u8; 32],
@@ -133,7 +100,9 @@ fn create_app_state(
     })
 }
 
-/// Configures and starts the web server with appropriate SSL settings
+/// Configures and starts the web server
+/// Note: Server runs on localhost:8080 (HTTP only)
+/// TLS/mTLS is handled by Nginx reverse proxy
 async fn configure_and_run_server(
     csrf_key: [u8; 32],
     session_key: [u8; 32],
@@ -145,10 +114,10 @@ async fn configure_and_run_server(
     let app_config = config::APP_CONFIG
         .get()
         .context("failed to get app config")?;
-    let server_addr = (
-        "0.0.0.0",
-        app_config.wep_server_port.to_u16().unwrap_or(443),
-    );
+
+    // Server binds to localhost:8080
+    // Nginx reverse proxy handles HTTPS/TLS/mTLS on port 443
+    let server_addr = ("127.0.0.1", 8080);
 
     let server = web::server(move || {
         web::App::new()
@@ -212,14 +181,8 @@ async fn configure_and_run_server(
             )
     });
 
-    let bound_server = if app_config.is_prod() {
-        let ssl_acceptor = setup_ssl_acceptor()?;
-        server.bind_openssl(server_addr, ssl_acceptor)?
-    } else {
-        server.bind(server_addr)?
-    };
-
-    bound_server
+    server
+        .bind(server_addr)?
         .run()
         .await
         .map_err(|e| anyhow::anyhow!("Server error: {}", e))

@@ -39,6 +39,7 @@ variable "cert_details" {
     server_path = string
     key_path    = string
   })
+  description = "SSL certificate paths for Nginx HTTPS"
 }
 
 variable "instance_envs" {

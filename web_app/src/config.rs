@@ -92,20 +92,10 @@ pub struct AppConfig {
     pub wep_server_host: String,
 
     /// Port for web server binding (NON-SENSITIVE)
-    /// Common values: 80 (HTTP), 443 (HTTPS), 8080 (dev)
+    /// Note: Application binds to localhost:8080 (HTTP)
+    /// Nginx reverse proxy handles HTTPS/TLS on port 443
     #[serde(deserialize_with = "deserialize_string_to_u64")]
     pub wep_server_port: u64,
-
-    /// Path to SSL private key file (SENSITIVE PATH)
-    /// Security: File should have 600 permissions, store path securely
-    /// Example: "/etc/ssl/private/server.key"
-    #[envconfig(default = "server.key")]
-    pub private_key_path: String,
-
-    /// Path to SSL certificate file (NON-SENSITIVE)
-    /// Example: "/etc/ssl/certs/server.crt"
-    #[envconfig(default = "server.crt")]
-    pub certificate_path: String,
 
     /// 🔒 SENSITIVE: CSRF protection password (UUID format)
     /// Security: Generate using cryptographically secure random generator

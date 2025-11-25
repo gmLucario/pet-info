@@ -2,13 +2,19 @@
 //!
 //! This module handles incoming webhook requests from WhatsApp Business API.
 //! It implements both the verification endpoint (GET) and the webhook receiver (POST).
+//!
+//! # Security
+//!
+//! The POST endpoint verifies webhook authenticity using mTLS client certificates.
+//! Nginx reverse proxy handles the TLS layer verification and passes headers to this application.
+//! This ensures that requests actually originate from Meta/Facebook.
 
 use super::{handler, schemas};
 use crate::{
     config,
     front::{AppState, errors},
 };
-use ntex::web;
+use ntex::{util::Bytes, web};
 use serde::Deserialize;
 
 /// Query parameters for webhook verification
@@ -64,15 +70,94 @@ pub async fn verify(
 /// Receives webhook events from WhatsApp Business API.
 /// Processes incoming messages, status updates, and other events.
 ///
-/// Process webhook synchronously
-/// WhatsApp gives us 20 seconds to respond, which should be sufficient
+/// # Security
+///
+/// This endpoint verifies mTLS client certificate information passed by Nginx reverse proxy.
+/// Nginx handles the TLS layer verification and passes verification headers.
+/// Requests without valid mTLS certificates are rejected with a 403 Forbidden response.
+///
+/// # Processing
+///
+/// Process webhook synchronously.
+/// WhatsApp gives us 20 seconds to respond, which should be sufficient.
 #[web::post("")]
 pub async fn receive(
-    payload: web::types::Json<schemas::WebhookPayload>,
+    req: web::HttpRequest,
+    body: Bytes,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
+    let app_config = config::APP_CONFIG
+        .get()
+        .expect("APP_CONFIG should be initialized before starting web server");
+
+    // Verify mTLS client certificate via Nginx headers (production only)
+    if app_config.is_prod() {
+        // Step 1: Check X-Client-Cert-Verified header
+        let cert_verified = match req.headers().get("X-Client-Cert-Verified") {
+            Some(header_value) => match header_value.to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    logfire::warn!("Invalid X-Client-Cert-Verified header: not valid UTF-8");
+                    return Err(errors::UserError::Unauthorized.into());
+                }
+            },
+            None => {
+                logfire::warn!("Missing X-Client-Cert-Verified header - mTLS verification failed");
+                return Err(errors::UserError::Unauthorized.into());
+            }
+        };
+
+        if cert_verified != "SUCCESS" {
+            let status = cert_verified.to_string();
+            logfire::warn!(
+                "Client certificate verification failed: {status}",
+                status = status
+            );
+            return Err(errors::UserError::Unauthorized.into());
+        }
+
+        // Step 2: Verify the Common Name (CN) from X-Client-Cert-DN header
+        let cert_dn = match req.headers().get("X-Client-Cert-DN") {
+            Some(header_value) => match header_value.to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    logfire::warn!("Invalid X-Client-Cert-DN header: not valid UTF-8");
+                    return Err(errors::UserError::Unauthorized.into());
+                }
+            },
+            None => {
+                logfire::warn!("Missing X-Client-Cert-DN header");
+                return Err(errors::UserError::Unauthorized.into());
+            }
+        };
+
+        // Verify the CN matches Meta's webhook certificate
+        if !cert_dn.contains("CN=client.webhooks.fbclientcerts.com") {
+            let dn = cert_dn.to_string();
+            logfire::warn!(
+                "Client certificate CN verification failed. Expected 'CN=client.webhooks.fbclientcerts.com', got: {dn}",
+                dn = dn
+            );
+            return Err(errors::UserError::Unauthorized.into());
+        }
+
+    }
+
+    // Parse the JSON payload after mTLS verification
+    let payload: schemas::WebhookPayload = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            logfire::error!(
+                "Failed to parse webhook payload: {error}",
+                error = e.to_string()
+            );
+            return Err(errors::UserError::Unauthorized.into());
+        }
+    };
+
+    // Process the webhook
     if let Err(e) = handler::process_webhook(
-        payload.0,
+        payload,
         &app_state.whatsapp_client,
         &app_state.repo,
         &app_state.storage_service,

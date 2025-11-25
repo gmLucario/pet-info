@@ -67,7 +67,42 @@ resource "null_resource" "deploy_app" {
     }
   }
 
-  # Copy SSL certificates
+  # Move binary to final location and start the application
+  provisioner "remote-exec" {
+    inline = concat([
+      "mkdir -p /home/ec2-user/pet-info/web_app",
+      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
+      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
+      ], [
+      for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
+      ], [
+      "cd /home/ec2-user/pet-info/web_app",
+      "source ~/.bashrc && nohup ./pet-info > /dev/null 2>&1 &",
+      "sleep 2",
+      "echo 'Server started in background'"
+    ])
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
+# Upload SSL certificates for Nginx HTTPS
+resource "null_resource" "upload_ssl_certificates" {
+  depends_on = [null_resource.deploy_app]
+
+  # Force re-upload on every deployment
+  triggers = {
+    instance_id = aws_instance.app_instance.id
+    always_run  = timestamp()
+  }
+
+  # Upload server certificate
   provisioner "file" {
     source      = var.cert_details.server_path
     destination = "/tmp/server.crt"
@@ -81,6 +116,7 @@ resource "null_resource" "deploy_app" {
     }
   }
 
+  # Upload server private key
   provisioner "file" {
     source      = var.cert_details.key_path
     destination = "/tmp/server.key"
@@ -94,25 +130,20 @@ resource "null_resource" "deploy_app" {
     }
   }
 
-  # Move binary and certificates to final location
+  # Move SSL certificates to final location and start Nginx
   provisioner "remote-exec" {
-    inline = concat([
-      "mkdir -p /home/ec2-user/pet-info/web_app",
-      "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
-      "mv /tmp/server.crt ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
-      "mv /tmp/server.key ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
-      "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
-      "chmod 644 ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
-      "chmod 600 ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
-      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
-      ], [
-      for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
-      ], [
-      "cd /home/ec2-user/pet-info/web_app",
-      "source ~/.bashrc && nohup ./pet-info > /dev/null 2>&1 &",
-      "sleep 2",
-      "echo 'Server started in background'"
-    ])
+    inline = [
+      "mkdir -p /home/ec2-user/certs",
+      "mv /tmp/server.crt /home/ec2-user/certs/server.crt",
+      "mv /tmp/server.key /home/ec2-user/certs/server.key",
+      "chmod 644 /home/ec2-user/certs/server.crt",
+      "chmod 600 /home/ec2-user/certs/server.key",
+      "echo 'SSL certificates uploaded, testing Nginx configuration...'",
+      "sudo nginx -t",
+      "echo 'Starting Nginx...'",
+      "sudo systemctl start nginx",
+      "echo 'Nginx started successfully'"
+    ]
 
     connection {
       type        = "ssh"
@@ -212,7 +243,15 @@ resource "aws_security_group" "web_app_sg" {
   }
 
   ingress {
-    description = "HTTPS traffic from api gateway"
+    description = "HTTP traffic for LetsEncrypt ACME challenges"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS traffic"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
