@@ -84,15 +84,57 @@ sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/nginx-pet-info.conf 
 log "Testing Nginx configuration syntax..."
 sudo nginx -t || log "WARNING: Nginx config test failed (expected if SSL certs not yet provisioned)"
 
-# Note: SSL certificates will be provisioned separately via certbot
-# For initial setup, you'll need to run:
-# sudo certbot --nginx -d pet-info.link -d www.pet-info.link --non-interactive --agree-tos -m your-email@example.com
-
-log "✓ Nginx configured (SSL certificates need to be provisioned separately)"
-
-# Enable and start Nginx (will be started after SSL cert provisioning)
+# Enable Nginx to start on boot
 sudo systemctl enable nginx
 log "✓ Nginx enabled to start on boot"
+
+# Provision Let's Encrypt SSL certificates via certbot
+log "Provisioning Let's Encrypt SSL certificates..."
+
+# Check if certificates already exist
+if [ -f /etc/letsencrypt/live/pet-info.link/fullchain.pem ]; then
+    log "✓ SSL certificates already exist, skipping certbot"
+else
+    log "Attempting to obtain SSL certificates (requires DNS to be configured)..."
+
+    # Try to obtain certificate with retries
+    CERTBOT_MAX_RETRIES=3
+    CERTBOT_RETRY_DELAY=30
+    CERTBOT_SUCCESS=false
+
+    for i in $(seq 1 $CERTBOT_MAX_RETRIES); do
+        log "Certbot attempt $i/$CERTBOT_MAX_RETRIES..."
+
+        if sudo certbot --nginx -d pet-info.link -d www.pet-info.link \
+            --non-interactive --agree-tos -m admin@pet-info.link \
+            --redirect 2>&1 | tee -a /var/log/user-data.log; then
+            CERTBOT_SUCCESS=true
+            log "✓ SSL certificates obtained successfully"
+            break
+        else
+            log "WARNING: Certbot failed (attempt $i/$CERTBOT_MAX_RETRIES)"
+            if [ $i -lt $CERTBOT_MAX_RETRIES ]; then
+                log "Retrying in ${CERTBOT_RETRY_DELAY}s..."
+                sleep $CERTBOT_RETRY_DELAY
+            fi
+        fi
+    done
+
+    if [ "$CERTBOT_SUCCESS" = false ]; then
+        log "ERROR: Failed to obtain SSL certificates after $CERTBOT_MAX_RETRIES attempts"
+        log "This is likely because DNS is not yet pointing to this server"
+        log "You can manually run: sudo certbot --nginx -d pet-info.link -d www.pet-info.link"
+        log "Continuing with setup..."
+    fi
+fi
+
+# Start Nginx
+log "Starting Nginx..."
+if sudo systemctl start nginx; then
+    log "✓ Nginx started successfully"
+else
+    log "WARNING: Failed to start Nginx (check logs: sudo journalctl -u nginx)"
+fi
 
 # Wait for EBS volume to be attached
 log "Waiting for EBS volume to be attached..."
