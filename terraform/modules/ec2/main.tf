@@ -180,7 +180,7 @@ resource "aws_security_group" "web_app_sg" {
   }
 
   ingress {
-    description = "HTTP traffic for Let's Encrypt ACME challenges"
+    description = "HTTP traffic for LetsEncrypt ACME challenges"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
