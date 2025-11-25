@@ -34,13 +34,6 @@ variable "user_data_path" {
   description = "script to run when instance is initiated"
 }
 
-variable "cert_details" {
-  type = object({
-    server_path = string
-    key_path    = string
-  })
-}
-
 variable "instance_envs" {
   type      = map(string)
   sensitive = true

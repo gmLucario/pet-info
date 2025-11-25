@@ -67,44 +67,12 @@ resource "null_resource" "deploy_app" {
     }
   }
 
-  # Copy SSL certificates
-  provisioner "file" {
-    source      = var.cert_details.server_path
-    destination = "/tmp/server.crt"
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-
-  provisioner "file" {
-    source      = var.cert_details.key_path
-    destination = "/tmp/server.key"
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-
-  # Move binary and certificates to final location
+  # Move binary to final location and start the application
   provisioner "remote-exec" {
     inline = concat([
       "mkdir -p /home/ec2-user/pet-info/web_app",
       "mv /tmp/pet-info /home/ec2-user/pet-info/web_app/pet-info",
-      "mv /tmp/server.crt ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
-      "mv /tmp/server.key ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
       "chmod +x /home/ec2-user/pet-info/web_app/pet-info",
-      "chmod 644 ${var.sensitive_instance_envs["CERTIFICATE_PATH"].value}",
-      "chmod 600 ${var.sensitive_instance_envs["PRIVATE_KEY_PATH"].value}",
-      "sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info",
       ], [
       for key, value in var.instance_envs : "echo 'export ${key}=${value}' >> /home/ec2-user/.bashrc"
       ], [
@@ -212,7 +180,15 @@ resource "aws_security_group" "web_app_sg" {
   }
 
   ingress {
-    description = "HTTPS traffic from api gateway"
+    description = "HTTP traffic for Let's Encrypt ACME challenges"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS traffic"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
