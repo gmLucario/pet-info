@@ -102,8 +102,8 @@ else
     CERTBOT_RETRY_DELAY=30
     CERTBOT_SUCCESS=false
 
-    for i in $(seq 1 $CERTBOT_MAX_RETRIES); do
-        log "Certbot attempt $i/$CERTBOT_MAX_RETRIES..."
+    for i in $(seq 1 $${CERTBOT_MAX_RETRIES}); do
+        log "Certbot attempt $i/$${CERTBOT_MAX_RETRIES}..."
 
         if sudo certbot --nginx -d pet-info.link -d www.pet-info.link \
             --non-interactive --agree-tos -m gmlukario@gmail.com \
@@ -112,16 +112,16 @@ else
             log "✓ SSL certificates obtained successfully"
             break
         else
-            log "WARNING: Certbot failed (attempt $i/$CERTBOT_MAX_RETRIES)"
-            if [ $i -lt $CERTBOT_MAX_RETRIES ]; then
-                log "Retrying in ${CERTBOT_RETRY_DELAY}s..."
-                sleep $CERTBOT_RETRY_DELAY
+            log "WARNING: Certbot failed (attempt $i/$${CERTBOT_MAX_RETRIES})"
+            if [ $i -lt $${CERTBOT_MAX_RETRIES} ]; then
+                log "Retrying in $${CERTBOT_RETRY_DELAY}s..."
+                sleep $${CERTBOT_RETRY_DELAY}
             fi
         fi
     done
 
-    if [ "$CERTBOT_SUCCESS" = false ]; then
-        log "ERROR: Failed to obtain SSL certificates after $CERTBOT_MAX_RETRIES attempts"
+    if [ "$${CERTBOT_SUCCESS}" = false ]; then
+        log "ERROR: Failed to obtain SSL certificates after $${CERTBOT_MAX_RETRIES} attempts"
         log "This is likely because DNS is not yet pointing to this server"
         log "You can manually run: sudo certbot --nginx -d pet-info.link -d www.pet-info.link"
         log "Continuing with setup..."
