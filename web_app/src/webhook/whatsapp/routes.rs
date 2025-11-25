@@ -140,7 +140,6 @@ pub async fn receive(
             );
             return Err(errors::UserError::Unauthorized.into());
         }
-
     }
 
     // Parse the JSON payload after mTLS verification

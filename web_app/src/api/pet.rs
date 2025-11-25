@@ -892,10 +892,10 @@ pub async fn generate_pdf_report_bytes(
     )?;
 
     let mut images = vec![(qr_code_data, "qr.png")];
-    if let Some(pet_pic) = pet_pic_option {
-        if let Some(ref filename) = image_filename {
-            images.push((pet_pic.body, filename.as_str()));
-        }
+    if let Some(pet_pic) = pet_pic_option
+        && let Some(ref filename) = image_filename
+    {
+        images.push((pet_pic.body, filename.as_str()));
     }
 
     crate::api::pdf_handler::create_pdf_bytes_with_images(&content, images)

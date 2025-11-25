@@ -89,7 +89,6 @@ impl World for TypstWorld {
     }
 }
 
-
 /// Converts Typst markup content with multiple embedded images to PDF bytes.
 ///
 /// # Arguments
