@@ -96,6 +96,12 @@ resource "null_resource" "deploy_app" {
 resource "null_resource" "upload_ssl_certificates" {
   depends_on = [null_resource.deploy_app]
 
+  # Force re-upload on every deployment
+  triggers = {
+    instance_id = aws_instance.app_instance.id
+    always_run  = timestamp()
+  }
+
   # Upload server certificate
   provisioner "file" {
     source      = var.cert_details.server_path
