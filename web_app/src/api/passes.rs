@@ -70,7 +70,7 @@ mod pass_config {
     /// Text color for pass content
     pub const FOREGROUND_COLOR: &str = "rgb(255, 255, 255)";
     /// Background color for the pass - soft sky blue
-    pub const BACKGROUND_COLOR: &str = "rgb(100, 181, 246)";
+    pub const BACKGROUND_COLOR: &str = "rgb(156, 175, 136)";
     /// Label text color - off-white for subtle labels
     pub const LABEL_COLOR: &str = "rgb(245, 245, 245)";
 }
@@ -140,11 +140,11 @@ fn create_pass_schema(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
     serde_json::json!({
         "formatVersion": 1,
         "organizationName": pass_config::ORGANIZATION_NAME,
-        "description": format!("Pet Info Pass: {}", &pet_info.name),
+        "description": format!("Pet-Info Pass: {}", &pet_info.name.to_uppercase()),
         "passTypeIdentifier": pass_config::PASS_TYPE_IDENTIFIER,
         "teamIdentifier": pass_config::TEAM_IDENTIFIER,
         "serialNumber": pet_info.external_id,
-        "logoText": "🐾 Mascota",
+        "logoText": format!("🐾 Pet-Info {}", &pet_info.name.to_uppercase()),
 
         // iOS 18.5 styling
         "labelColor": pass_config::LABEL_COLOR,
@@ -211,8 +211,7 @@ fn format_weight(weight: &Option<f64>) -> String {
 /// ## Returns
 /// Plain text version of the content
 fn convert_html_to_text(html_content: &str) -> String {
-    html2text::from_read(html_content.as_bytes(), 80)
-        .unwrap_or_else(|_| html_content.to_string())
+    html2text::from_read(html_content.as_bytes(), 80).unwrap_or_else(|_| html_content.to_string())
 }
 
 /// Creates the generic pass fields structure.
@@ -242,7 +241,7 @@ fn create_generic_fields(pet_info: &PetPublicInfoSchema) -> serde_json::Value {
         "primaryFields": [
             {
                 "key": "name",
-                "label": "Mascota",
+                "label": "Nombre",
                 "value": &pet_info.name,
             },
         ],
