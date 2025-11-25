@@ -34,6 +34,14 @@ variable "user_data_path" {
   description = "script to run when instance is initiated"
 }
 
+variable "cert_details" {
+  type = object({
+    server_path = string
+    key_path    = string
+  })
+  description = "SSL certificate paths for Nginx HTTPS"
+}
+
 variable "instance_envs" {
   type      = map(string)
   sensitive = true
@@ -42,14 +50,6 @@ variable "instance_envs" {
 variable "git_branch" {
   type        = string
   description = "Git branch to clone from repository"
-}
-
-variable "cert_details" {
-  type = object({
-    server_path = string
-    key_path    = string
-  })
-  description = "SSL certificate paths for Nginx HTTPS"
 }
 
 variable "pass_cert_path" {

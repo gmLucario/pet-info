@@ -141,11 +141,6 @@ pub async fn receive(
             return Err(errors::UserError::Unauthorized.into());
         }
 
-        logfire::info!(
-            "Webhook request authenticated via mTLS - CN: client.webhooks.fbclientcerts.com"
-        );
-    } else {
-        logfire::info!("Development environment - skipping mTLS verification");
     }
 
     // Parse the JSON payload after mTLS verification

@@ -181,8 +181,6 @@ async fn configure_and_run_server(
             )
     });
 
-    logfire::info!("Starting server on http://127.0.0.1:8080 (behind Nginx reverse proxy)");
-
     server
         .bind(server_addr)?
         .run()
