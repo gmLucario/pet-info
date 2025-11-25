@@ -44,6 +44,14 @@ variable "git_branch" {
   description = "Git branch to clone from repository"
 }
 
+variable "cert_details" {
+  type = object({
+    server_path = string
+    key_path    = string
+  })
+  description = "SSL certificate paths for Nginx HTTPS"
+}
+
 variable "pass_cert_path" {
   type        = string
   description = "Path to Apple Wallet Pass certificate file"

@@ -92,6 +92,58 @@ resource "null_resource" "deploy_app" {
   }
 }
 
+# Upload SSL certificates for Nginx HTTPS
+resource "null_resource" "upload_ssl_certificates" {
+  depends_on = [null_resource.deploy_app]
+
+  # Upload server certificate
+  provisioner "file" {
+    source      = var.cert_details.server_path
+    destination = "/tmp/server.crt"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Upload server private key
+  provisioner "file" {
+    source      = var.cert_details.key_path
+    destination = "/tmp/server.key"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move SSL certificates to final location
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p /home/ec2-user/certs",
+      "mv /tmp/server.crt /home/ec2-user/certs/server.crt",
+      "mv /tmp/server.key /home/ec2-user/certs/server.key",
+      "chmod 644 /home/ec2-user/certs/server.crt",
+      "chmod 600 /home/ec2-user/certs/server.key"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
 # Upload Apple Wallet Pass certificate files
 resource "null_resource" "upload_pass_certificates" {
   depends_on = [null_resource.deploy_app]

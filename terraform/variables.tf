@@ -36,6 +36,18 @@ variable "ssh_key_path" {
   type = string
 }
 
+variable "cert_server_path" {
+  type        = string
+  description = "Path to server SSL certificate for Nginx"
+  default     = "../web_app/server.crt"
+}
+
+variable "cert_key_path" {
+  type        = string
+  description = "Path to server SSL private key for Nginx"
+  default     = "../web_app/server.key"
+}
+
 variable "pass_cert_path" {
   type = string
 }
