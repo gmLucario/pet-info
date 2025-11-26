@@ -594,7 +594,8 @@ pub fn build_qr_card_with_pic(
     // Create circular mask and overlay avatar on canvas
     // Avatar center (avatar_x, avatar_y) should align with card's horizontal center and top edge
     let radius = (AVATAR_SIZE / 2) as i32;
-    let radius_squared = radius * radius;
+    // Use slightly smaller radius (1px inset) to completely avoid edge artifacts
+    let safe_radius_squared = (radius - 1).pow(2);
 
     for y in 0..AVATAR_SIZE {
         for x in 0..AVATAR_SIZE {
@@ -603,20 +604,21 @@ pub fn build_qr_card_with_pic(
             let dy = y as i32 - radius;
             let distance_squared = dx * dx + dy * dy;
 
-            // Only draw pixels within the circular mask
-            if distance_squared < radius_squared { // Use < instead of <= to avoid edge artifacts
+            // Only draw pixels within the safe circular mask
+            if distance_squared < safe_radius_squared {
                 let pixel = pet_img.get_pixel(x, y);
 
-                // Skip transparent/semi-transparent pixels to avoid black edges
-                if pixel[3] > 10 {
+                // Only draw fully opaque pixels (>= 250) to eliminate all edge artifacts
+                if pixel[3] >= 250 {
                     // Position pixel relative to avatar center
                     let canvas_x = (avatar_x as i32 + dx) as u32;
                     let canvas_y = (avatar_y as i32 + dy) as u32;
 
                     if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
                         let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
+                        // Force full opacity (255) to prevent any premultiplication artifacts
                         pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
-                            pixel[0], pixel[1], pixel[2], pixel[3]
+                            pixel[0], pixel[1], pixel[2], 255
                         ).premultiply();
                     }
                 }
