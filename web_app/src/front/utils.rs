@@ -629,7 +629,7 @@ pub fn build_qr_card_with_pic(
     // Draw footer text "by pet-info.link"
     use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 
-    let font_data = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+    let font_data = include_bytes!("../../assets/fonts/DynaPuff.ttf");
     let font = FontRef::try_from_slice(font_data).context("Failed to load font")?;
 
     const FONT_SIZE: f32 = 24.0;
