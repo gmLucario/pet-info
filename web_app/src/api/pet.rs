@@ -844,10 +844,9 @@ pub async fn generate_pdf_report_bytes(
     } else {
         None
     };
-    let image_filename = pet_pic_option.as_ref().map(|pic| {
-        let actual_format = crate::utils::detect_image_format(&pic.body);
-        format!("pet.{}", actual_format)
-    });
+    let image_filename = pet_pic_option
+        .as_ref()
+        .map(|pic| format!("pet.{}", pic.extension));
 
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",

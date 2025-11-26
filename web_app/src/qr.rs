@@ -8,8 +8,6 @@ use anyhow::Context;
 use qrcode::{EcLevel, QrCode};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
-use crate::utils::detect_image_format;
-
 const SCALE: f32 = 20.0;
 const PADDING: usize = 4;
 
@@ -350,21 +348,14 @@ pub fn build_qr_card_with_pic(
     }
 
     // Load and overlay circular pet picture
-    // Detect actual format from magic bytes (more reliable than extension)
-    let actual_format = detect_image_format(&pet_pic.body);
-    let pic_format = match actual_format {
-        "png" => image::ImageFormat::Png,
-        "gif" => image::ImageFormat::Gif,
-        "webp" => image::ImageFormat::WebP,
-        "bmp" => image::ImageFormat::Bmp,
-        _ => image::ImageFormat::Jpeg, // jpg or default
-    };
+    // Use stored extension since we now guarantee it matches content at upload time
+    let pic_format =
+        image::ImageFormat::from_extension(&pet_pic.extension).unwrap_or(image::ImageFormat::Jpeg);
 
     let pet_img = image::load_from_memory_with_format(&pet_pic.body, pic_format)
         .with_context(|| {
             format!(
-                "Failed to load pet picture (detected: {}, stored ext: {}, size: {} bytes)",
-                actual_format,
+                "Failed to load pet picture (stored ext: {}, size: {} bytes)",
                 pet_pic.extension,
                 pet_pic.body.len()
             )

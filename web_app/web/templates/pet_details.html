@@ -38,19 +38,14 @@ datos de tu mascota
 {% block extra_js %}
 <script src="/static/js/cropper.min.js"></script>
 <script src="/static/js/quill.js"></script>
+<script src="/static/js/heic2any.min.js"></script>
 <script>
     let cropper;
-    const previewPhoto = () => {
+    let normalizedImageBlob = null;
 
-        const file = input.files;
-        if (!file) return;
-
-        const fileReader = new FileReader();
+    const initCropper = (imageSrc) => {
         const preview = document.getElementById('pet-pic-preview');
-
-        fileReader.onload = function (event) {
-            preview.setAttribute('src', event.target.result);
-        }
+        preview.src = imageSrc;
 
         preview.onload = function () {
             document.querySelector('.img-container').classList.add('image-loaded');
@@ -66,9 +61,58 @@ datos de tu mascota
                 responsive: true,
                 restore: false
             });
-        }        
+        }
+    };
 
-        fileReader.readAsDataURL(file[0]);
+    const normalizeImage = (file) => {
+        return new Promise((resolve, reject) => {
+            const isHeic = file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic';
+
+            if (isHeic) {
+                heic2any({
+                    blob: file,
+                    toType: "image/jpeg",
+                })
+                    .then(resolve)
+                    .catch(reject);
+            } else {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error("Canvas toBlob failed"));
+                    }, 'image/jpeg', 0.95);
+                };
+                img.onerror = (e) => {
+                    URL.revokeObjectURL(url);
+                    reject(e);
+                };
+                img.src = url;
+            }
+        });
+    };
+
+    const previewPhoto = () => {
+        normalizedImageBlob = null;
+        const file = input.files[0];
+        if (!file) return;
+
+        normalizeImage(file)
+            .then((blob) => {
+                normalizedImageBlob = blob;
+                const url = URL.createObjectURL(blob);
+                initCropper(url);
+            })
+            .catch((e) => {
+                console.error("Image normalization failed", e);
+            });
     }
 
     const input = document.getElementById('pet-pic-input');
@@ -91,6 +135,10 @@ datos de tu mascota
 
     form.addEventListener('formdata', (event) => {
         event.formData.append('about_pet', quill.root.innerHTML);
+
+        if (normalizedImageBlob) {
+            event.formData.set('pet_pic', normalizedImageBlob, 'image.jpg');
+        }
 
         if (cropper) {
             const cropData = cropper.getData();
