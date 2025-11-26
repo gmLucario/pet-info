@@ -12,6 +12,7 @@ pub mod front;
 pub mod logger;
 pub mod metric;
 pub mod models;
+pub mod qr;
 pub mod repo;
 pub mod services;
 pub mod utils;

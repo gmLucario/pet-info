@@ -452,9 +452,9 @@ async fn get_profile_qr_code(
 
     // Generate QR code card with picture if available, otherwise simple QR code
     let qr_code = if let Some(ref pic) = pet_pic {
-        super::utils::build_qr_card_with_pic(pic, &url)
+        crate::qr::build_qr_card_with_pic(pic, &url)
     } else {
-        super::utils::get_qr_code(&url)
+        crate::qr::get_qr_code(&url)
     }
     .map_err(|e| {
         errors::ServerError::InternalServerError(format!("qr_code could not be generated: {}", e))
