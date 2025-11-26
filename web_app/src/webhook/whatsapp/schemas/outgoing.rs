@@ -227,6 +227,45 @@ pub struct DocumentContent {
     pub filename: Option<String>,
 }
 
+/// Image message to send to WhatsApp
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutgoingImageMessage {
+    /// Messaging product, always "whatsapp"
+    pub messaging_product: String,
+    /// Recipient type
+    pub recipient_type: String,
+    /// Recipient's WhatsApp ID (phone number)
+    pub to: String,
+    /// Message type, "image"
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    /// Image content
+    pub image: ImageContent,
+}
+
+impl OutgoingImageMessage {
+    /// Creates a new image message with media ID
+    pub fn new_with_id(to: String, id: String, caption: Option<String>) -> Self {
+        Self {
+            messaging_product: "whatsapp".to_string(),
+            recipient_type: "individual".to_string(),
+            to,
+            msg_type: "image".to_string(),
+            image: ImageContent { id, caption },
+        }
+    }
+}
+
+/// Image content
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ImageContent {
+    /// Media ID of the image
+    pub id: String,
+    /// Optional caption
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+}
+
 /// Response from WhatsApp API when sending a message
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WhatsAppMessageResponse {
