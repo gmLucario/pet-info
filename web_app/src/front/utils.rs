@@ -14,6 +14,32 @@ use crate::front;
 const SCALE: f32 = 20.0;
 const PADDING: usize = 4;
 
+/// Detects image format from magic bytes.
+///
+/// Checks the first few bytes of the image data to determine the file format.
+/// This is more reliable than trusting file extensions.
+///
+/// # Arguments
+/// * `bytes` - The image file bytes
+///
+/// # Returns
+/// File extension string ("jpg", "png", "gif", "webp", etc.)
+fn detect_image_format(bytes: &[u8]) -> &'static str {
+    if bytes.len() < 4 {
+        return "jpg"; // Default fallback
+    }
+
+    // Check magic bytes for common image formats
+    match &bytes[0..4] {
+        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
+        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
+        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
+        [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
+        [0x42, 0x4D, ..] => "bmp",         // BMP
+        _ => "jpg",                        // Default fallback
+    }
+}
+
 /// Creates an HTTP redirect response to the specified URL.
 ///
 /// # Arguments
@@ -542,10 +568,20 @@ pub fn build_qr_card_with_pic(
     }
 
     // Load and overlay circular pet picture
-    // Try to guess format from image data first (more reliable than extension)
-    let pet_img = image::load_from_memory(&pet_pic.body)
+    // Detect actual format from magic bytes (more reliable than extension)
+    let actual_format = detect_image_format(&pet_pic.body);
+    let pic_format = match actual_format {
+        "png" => image::ImageFormat::Png,
+        "gif" => image::ImageFormat::Gif,
+        "webp" => image::ImageFormat::WebP,
+        "bmp" => image::ImageFormat::Bmp,
+        _ => image::ImageFormat::Jpeg, // jpg or default
+    };
+
+    let pet_img = image::load_from_memory_with_format(&pet_pic.body, pic_format)
         .with_context(|| format!(
-            "Failed to load pet picture (extension: {}, size: {} bytes)",
+            "Failed to load pet picture (detected: {}, stored ext: {}, size: {} bytes)",
+            actual_format,
             pet_pic.extension,
             pet_pic.body.len()
         ))?
