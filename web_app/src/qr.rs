@@ -8,7 +8,6 @@ use anyhow::Context;
 use qrcode::{EcLevel, QrCode};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
-use crate::front;
 use crate::utils::detect_image_format;
 
 const SCALE: f32 = 20.0;
