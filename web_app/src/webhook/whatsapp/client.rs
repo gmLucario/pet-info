@@ -4,8 +4,8 @@
 //! It handles authentication and message sending for text, interactive, and document messages.
 
 use super::schemas::{
-    OutgoingDocumentMessage, OutgoingImageMessage, OutgoingInteractiveMessage,
-    OutgoingTextMessage, WhatsAppMessageResponse,
+    OutgoingDocumentMessage, OutgoingImageMessage, OutgoingInteractiveMessage, OutgoingTextMessage,
+    WhatsAppMessageResponse,
 };
 use crate::config;
 use anyhow::{Context, Result};

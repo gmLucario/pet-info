@@ -57,10 +57,7 @@ fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> b
 }
 
 /// Processes an image field, validating size and extracting file data
-async fn process_image_field(
-    field: ntex_multipart::Field,
-    _content_disposition: &str,
-) -> anyhow::Result<forms::pet::Pic> {
+async fn process_image_field(field: ntex_multipart::Field) -> anyhow::Result<forms::pet::Pic> {
     let body = utils::get_bytes_value(field).await;
 
     // Validate image size
@@ -110,7 +107,7 @@ async fn deserialize_pet_form(
         let content_disposition = get_header_str_value(headers, "content-disposition");
 
         if is_image_field(&field, &content_disposition) {
-            pet_pic = Some(process_image_field(field, &content_disposition).await?);
+            pet_pic = Some(process_image_field(field).await?);
             continue;
         }
 

@@ -209,14 +209,10 @@ async fn handle_interactive_response(
             );
 
             // Try to get pet picture
-            let pet_pic = crate::api::pet::get_public_pic(
-                external_id,
-                repo,
-                storage_service,
-            )
-            .await
-            .ok()
-            .flatten();
+            let pet_pic = crate::api::pet::get_public_pic(external_id, repo, storage_service)
+                .await
+                .ok()
+                .flatten();
 
             // Generate QR code card with picture if available, otherwise simple QR code
             let qr_code = if let Some(ref pic) = pet_pic {
