@@ -507,9 +507,9 @@ pub fn build_qr_card_with_pic(
     let card_x = 50.0;
     let card_y = (AVATAR_RADIUS + 50) as f32; // Card top edge = 130px from canvas top
 
-    // Avatar center should align with card top edge
-    let avatar_x = (CANVAS_WIDTH / 2) as f32; // Centered horizontally
-    let avatar_y = card_y; // Avatar center = card top edge = 130px
+    // Avatar center should align with card center horizontally and card top edge vertically
+    let avatar_x = card_x + (CARD_WIDTH as f32 / 2.0); // Centered on card horizontally
+    let avatar_y = card_y; // Avatar center = card top edge (50% outside, 50% inside)
 
     // Create canvas with gradient background
     let mut pixmap = Pixmap::new(CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -591,20 +591,24 @@ pub fn build_qr_card_with_pic(
         .resize_to_fill(AVATAR_SIZE, AVATAR_SIZE, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
 
-    // Create circular mask and overlay
+    // Create circular mask and overlay avatar on canvas
+    // Avatar center (avatar_x, avatar_y) should align with card's horizontal center and top edge
     let radius = (AVATAR_SIZE / 2) as i32;
     let radius_squared = radius * radius;
 
     for y in 0..AVATAR_SIZE {
         for x in 0..AVATAR_SIZE {
+            // Calculate offset from avatar center
             let dx = x as i32 - radius;
             let dy = y as i32 - radius;
             let distance_squared = dx * dx + dy * dy;
 
+            // Only draw pixels within the circular mask
             if distance_squared <= radius_squared {
                 let pixel = pet_img.get_pixel(x, y);
-                let canvas_x = (avatar_x as i32 - radius + dx) as u32;
-                let canvas_y = (avatar_y as i32 - radius + dy) as u32;
+                // Position pixel relative to avatar center (don't double-subtract radius)
+                let canvas_x = (avatar_x as i32 + dx) as u32;
+                let canvas_y = (avatar_y as i32 + dy) as u32;
 
                 if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
                     let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
