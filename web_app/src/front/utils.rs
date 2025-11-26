@@ -494,19 +494,22 @@ pub fn build_qr_card_with_pic(
 ) -> anyhow::Result<Vec<u8>> {
     // Card dimensions
     const CARD_WIDTH: u32 = 600;
-    const CARD_HEIGHT: u32 = 900;
+    const CARD_HEIGHT: u32 = 720; // Reduced by 20%
     const AVATAR_SIZE: u32 = 160;
     const CARD_RADIUS: f32 = 40.0;
-    const AVATAR_OVERLAP: u32 = AVATAR_SIZE / 2; // 50% inside, 50% outside
+    const AVATAR_RADIUS: u32 = AVATAR_SIZE / 2; // Avatar radius (80px)
 
     const CANVAS_WIDTH: u32 = CARD_WIDTH + 100; // Extra margin for shadow/spacing
-    const CANVAS_HEIGHT: u32 = CARD_HEIGHT + AVATAR_OVERLAP + 100;
+    const CANVAS_HEIGHT: u32 = CARD_HEIGHT + AVATAR_RADIUS + 100; // Reduced proportionally
 
     // Calculate positions
+    // Card starts after top margin
     let card_x = 50.0;
-    let card_y = (AVATAR_OVERLAP + 50) as f32;
-    let avatar_x = (CANVAS_WIDTH / 2) as f32;
-    let avatar_y = 50.0 + (AVATAR_SIZE / 2) as f32;
+    let card_y = (AVATAR_RADIUS + 50) as f32; // Card top edge = 130px from canvas top
+
+    // Avatar center should align with card top edge
+    let avatar_x = (CANVAS_WIDTH / 2) as f32; // Centered horizontally
+    let avatar_y = card_y; // Avatar center = card top edge = 130px
 
     // Create canvas with gradient background
     let mut pixmap = Pixmap::new(CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -548,10 +551,10 @@ pub fn build_qr_card_with_pic(
         qr_img
     };
 
-    // Position QR code in center of card
+    // Position QR code in center of card, below avatar
     let qr_size = qr_img.width().min(qr_img.height());
     let qr_x = (CANVAS_WIDTH.saturating_sub(qr_size)) / 2;
-    let qr_y = card_y as u32 + AVATAR_OVERLAP + 60; // Below avatar with spacing
+    let qr_y = card_y as u32 + AVATAR_RADIUS + 60; // Below avatar with spacing
 
     // Overlay QR code
     for (x, y, pixel) in qr_img.enumerate_pixels() {
