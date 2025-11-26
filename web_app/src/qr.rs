@@ -8,8 +8,6 @@ use anyhow::Context;
 use qrcode::{EcLevel, QrCode};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
-use crate::front;
-
 const SCALE: f32 = 20.0;
 const PADDING: usize = 4;
 

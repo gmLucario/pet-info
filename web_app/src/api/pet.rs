@@ -794,7 +794,6 @@ fn convert_html_to_text(note: &models::pet::PetNote) -> models::pet::PetNote {
     }
 }
 
-
 /// Generates PDF report bytes for a pet by external ID
 ///
 /// Creates a comprehensive PDF report containing all pet information including
