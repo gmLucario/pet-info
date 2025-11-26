@@ -794,29 +794,6 @@ fn convert_html_to_text(note: &models::pet::PetNote) -> models::pet::PetNote {
     }
 }
 
-/// Detects image format from magic bytes
-///
-/// # Arguments
-/// * `bytes` - The image file bytes
-///
-/// # Returns
-/// File extension string ("jpg", "png", "gif", "webp", etc.)
-fn detect_image_format(bytes: &[u8]) -> &'static str {
-    if bytes.len() < 4 {
-        return "jpg"; // Default fallback
-    }
-
-    // Check magic bytes for common image formats
-    match &bytes[0..4] {
-        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
-        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
-        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
-        [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
-        [0x42, 0x4D, ..] => "bmp",         // BMP
-        _ => "jpg",                        // Default fallback
-    }
-}
-
 /// Generates PDF report bytes for a pet by external ID
 ///
 /// Creates a comprehensive PDF report containing all pet information including
@@ -860,7 +837,7 @@ pub async fn generate_pdf_report_bytes(
         "https://pet-info.link/info/{external_id}",
         external_id = pet_full_info.pet.external_id
     );
-    let qr_code_data = front::utils::get_qr_code(&pet_link)?;
+    let qr_code_data = crate::qr::get_qr_code(&pet_link)?;
 
     let pet_pic_option = if pet_full_info.pet.pic.is_some() {
         get_public_pic(pet_full_info.pet.external_id, repo, storage_service).await?
@@ -868,7 +845,7 @@ pub async fn generate_pdf_report_bytes(
         None
     };
     let image_filename = pet_pic_option.as_ref().map(|pic| {
-        let actual_format = detect_image_format(&pic.body);
+        let actual_format = crate::utils::detect_image_format(&pic.body);
         format!("pet.{}", actual_format)
     });
 

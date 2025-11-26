@@ -17,6 +17,32 @@ use std::{str::FromStr, sync::LazyLock};
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
+/// Detects image format from magic bytes.
+///
+/// Checks the first few bytes of the image data to determine the file format.
+/// This is more reliable than trusting file extensions.
+///
+/// # Arguments
+/// * `bytes` - The image file bytes
+///
+/// # Returns
+/// File extension string ("jpg", "png", "gif", "webp", etc.)
+pub fn detect_image_format(bytes: &[u8]) -> &'static str {
+    if bytes.len() < 4 {
+        return "jpg"; // Default fallback
+    }
+
+    // Check magic bytes for common image formats
+    match &bytes[0..4] {
+        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
+        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
+        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
+        [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
+        [0x42, 0x4D, ..] => "bmp",         // BMP
+        _ => "jpg",                        // Default fallback
+    }
+}
+
 /// Creates and configures a SQLite connection pool with optional encryption.
 ///
 /// This function establishes a database connection pool that can be configured for
