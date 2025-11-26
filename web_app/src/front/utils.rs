@@ -542,10 +542,13 @@ pub fn build_qr_card_with_pic(
     }
 
     // Load and overlay circular pet picture
-    let pic_format = image::ImageFormat::from_extension(&pet_pic.extension)
-        .context("Invalid pet picture extension")?;
-    let pet_img = image::load_from_memory_with_format(&pet_pic.body, pic_format)
-        .context("Failed to load pet picture")?
+    // Try to guess format from image data first (more reliable than extension)
+    let pet_img = image::load_from_memory(&pet_pic.body)
+        .with_context(|| format!(
+            "Failed to load pet picture (extension: {}, size: {} bytes)",
+            pet_pic.extension,
+            pet_pic.body.len()
+        ))?
         .resize_to_fill(AVATAR_SIZE, AVATAR_SIZE, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
 
