@@ -448,7 +448,7 @@ async fn get_profile_qr_code(
     let body = once(ok::<_, web::Error>(Bytes::from_iter(&qr_code)));
 
     Ok(web::HttpResponse::Ok()
-        .content_type("image/jpeg")
+        .content_type("image/png")
         .streaming(body))
 }
 

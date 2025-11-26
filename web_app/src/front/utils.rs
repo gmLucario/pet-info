@@ -5,14 +5,14 @@
 use anyhow::Context;
 use chrono::NaiveDate;
 use chrono_tz::Tz;
-use fast_qr::{
-    ECL,
-    convert::{Builder, Shape, image::ImageBuilder},
-    qr::QRBuilder,
-};
 use futures::StreamExt;
+use qrcode::{EcLevel, QrCode};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
 use crate::front;
+
+const SCALE: f32 = 20.0;
+const PADDING: usize = 4;
 
 /// Creates an HTTP redirect response to the specified URL.
 ///
@@ -222,9 +222,8 @@ pub fn get_utc_now_with_default_time() -> chrono::DateTime<chrono::Utc> {
 
 /// Generates a QR code image from a URL string.
 ///
-/// Creates a high-quality QR code image with custom styling suitable for
-/// pet information sharing. The QR code uses high error correction level
-/// for better reliability. Optimized to accept string slice instead of owned String.
+/// Creates a high-quality QR code image with custom styling (liquid effect)
+/// suitable for pet information sharing. The QR code uses high error correction level.
 ///
 /// # Arguments
 /// * `info_url` - The URL or text to encode in the QR code
@@ -243,18 +242,203 @@ pub fn get_utc_now_with_default_time() -> chrono::DateTime<chrono::Utc> {
 /// std::fs::write("qr.png", qr_data)?;
 /// ```
 pub fn get_qr_code(info_url: &str) -> anyhow::Result<Vec<u8>> {
-    const QR_WIDTH: u32 = 600;
-    const BACKGROUND_COLOR: &str = "#ffffff";
-    const MODULE_COLOR: &str = "#000000";
+    // Generate the QR code matrix
+    let code = QrCode::with_error_correction_level(info_url, EcLevel::L)?;
+    let width = code.width();
 
-    let qr_code = QRBuilder::new(info_url.as_bytes()).ecl(ECL::H).build()?;
+    // Calculate canvas size
+    let canvas_modules = width + (PADDING * 2);
+    let canvas_size = (canvas_modules as f32 * SCALE) as u32;
 
-    Ok(ImageBuilder::default()
-        .shape(Shape::Square)
-        .background_color(BACKGROUND_COLOR)
-        .module_color(MODULE_COLOR)
-        .fit_width(QR_WIDTH)
-        .to_bytes(&qr_code)?)
+    let mut pixmap = Pixmap::new(canvas_size, canvas_size).context("Failed to create pixmap")?;
+    pixmap.fill(Color::WHITE);
+
+    // Builders for different layers
+    let mut black_outer_pb = PathBuilder::new(); // Body + Outer Finder
+    let mut white_gap_pb = PathBuilder::new(); // Finder Gap
+    let mut black_inner_pb = PathBuilder::new(); // Finder Inner Dot
+
+    // Paint for the liquid blobs (Dark Blue/Black)
+    let mut black_paint = Paint::default();
+    black_paint.set_color_rgba8(15, 23, 42, 255); // #0f172a
+    black_paint.anti_alias = true;
+
+    // Paint for the gaps (White)
+    let mut white_paint = Paint::default();
+    white_paint.set_color(Color::WHITE);
+    white_paint.anti_alias = true;
+
+    // 4. HELPER: CHECK IF MODULE IS PART OF A FINDER PATTERN (THE 3 EYES)
+    let is_finder = |x: usize, y: usize| -> bool {
+        (x >= width - 7 || x < 7) && y < 7 || (x < 7 && y >= width - 7) // Bottom-Left
+    };
+
+    // 5. DRAW THE LIQUID BODY
+    draw_liquid_body(&code, width, SCALE, PADDING, &mut black_outer_pb, is_finder);
+
+    // 6. DRAW CUSTOM "SQUIRCLE" FINDER PATTERNS
+    draw_finder_patterns(
+        width,
+        SCALE,
+        PADDING,
+        &mut black_outer_pb,
+        &mut white_gap_pb,
+        &mut black_inner_pb,
+        draw_rounded_rect,
+    );
+
+    // Fill the paths
+    // 1. Draw Body + Outer Finders (Black)
+    if let Some(path) = black_outer_pb.finish() {
+        pixmap.fill_path(
+            &path,
+            &black_paint,
+            FillRule::Winding,
+            Transform::default(),
+            None,
+        );
+    }
+
+    // 2. Draw Gaps (White)
+    if let Some(path) = white_gap_pb.finish() {
+        pixmap.fill_path(
+            &path,
+            &white_paint,
+            FillRule::Winding,
+            Transform::default(),
+            None,
+        );
+    }
+
+    // 3. Draw Inner Finders (Black)
+    if let Some(path) = black_inner_pb.finish() {
+        pixmap.fill_path(
+            &path,
+            &black_paint,
+            FillRule::Winding,
+            Transform::default(),
+            None,
+        );
+    }
+
+    Ok(pixmap.encode_png()?)
+}
+
+fn draw_rounded_rect(pb: &mut PathBuilder, x: f32, y: f32, w: f32, h: f32, r: f32) {
+    pb.move_to(x + r, y);
+    pb.line_to(x + w - r, y);
+    pb.quad_to(x + w, y, x + w, y + r);
+    pb.line_to(x + w, y + h - r);
+    pb.quad_to(x + w, y + h, x + w - r, y + h);
+    pb.line_to(x + r, y + h);
+    pb.quad_to(x, y + h, x, y + h - r);
+    pb.line_to(x, y + r);
+    pb.quad_to(x, y, x + r, y);
+    pb.close();
+}
+
+fn draw_liquid_body<F>(
+    code: &qrcode::QrCode,
+    width: usize,
+    scale: f32,
+    padding: usize,
+    pb: &mut tiny_skia::PathBuilder,
+    is_finder: F,
+) where
+    F: Fn(usize, usize) -> bool,
+{
+    use tiny_skia::Rect;
+
+    for y in 0..width {
+        for x in 0..width {
+            if let qrcode::Color::Dark = code[(x, y)] {
+                if is_finder(x, y) {
+                    continue;
+                }
+
+                let cx = (x + padding) as f32 * scale;
+                let cy = (y + padding) as f32 * scale;
+                let radius = scale / 2.0;
+
+                // A. Draw the MAIN CIRCLE for this module
+                let circle_rect = Rect::from_xywh(cx, cy, scale, scale).unwrap();
+                pb.push_oval(circle_rect);
+
+                // B. DRAW BRIDGES (The "Liquid" Logic)
+                // Right neighbor
+                if x + 1 < width
+                    && let qrcode::Color::Dark = code[(x + 1, y)]
+                    && !is_finder(x + 1, y)
+                {
+                    let rect = Rect::from_xywh(cx + radius, cy, scale, scale).unwrap();
+                    pb.push_rect(rect);
+                }
+
+                // Bottom neighbor
+                if y + 1 < width
+                    && let qrcode::Color::Dark = code[(x, y + 1)]
+                    && !is_finder(x, y + 1)
+                {
+                    let rect = Rect::from_xywh(cx, cy + radius, scale, scale).unwrap();
+                    pb.push_rect(rect);
+                }
+            }
+        }
+    }
+}
+
+fn draw_finder_patterns<F>(
+    width: usize,
+    scale: f32,
+    padding: usize,
+    black_outer_pb: &mut tiny_skia::PathBuilder,
+    white_gap_pb: &mut tiny_skia::PathBuilder,
+    black_inner_pb: &mut tiny_skia::PathBuilder,
+    push_rounded_rect: F,
+) where
+    F: Fn(&mut tiny_skia::PathBuilder, f32, f32, f32, f32, f32),
+{
+    let mut draw_eye = |tx: usize, ty: usize| {
+        let x = (tx + padding) as f32 * scale;
+        let y = (ty + padding) as f32 * scale;
+
+        // Outer Box (7x7) - Black
+        let outer_size = 7.0 * scale;
+        let outer_radius = 2.5 * scale;
+        push_rounded_rect(black_outer_pb, x, y, outer_size, outer_size, outer_radius);
+
+        // White Mask (The gap) - White
+        // Gap is 5x5, offset by 1
+        let gap_offset = 1.0 * scale;
+        let gap_size = 5.0 * scale;
+        let gap_radius = 2.0 * scale;
+        push_rounded_rect(
+            white_gap_pb,
+            x + gap_offset,
+            y + gap_offset,
+            gap_size,
+            gap_size,
+            gap_radius,
+        );
+
+        // Inner Dot (3x3) - Black
+        // Inner is 3x3, offset by 2
+        let inner_offset = 2.0 * scale;
+        let inner_size = 3.0 * scale;
+        let inner_radius = 1.2 * scale;
+        push_rounded_rect(
+            black_inner_pb,
+            x + inner_offset,
+            y + inner_offset,
+            inner_size,
+            inner_size,
+            inner_radius,
+        );
+    };
+
+    draw_eye(0, 0); // Top-Left
+    draw_eye(width - 7, 0); // Top-Right
+    draw_eye(0, width - 7); // Bottom-Left
 }
 
 /// Filters a string to contain only alphanumeric characters.

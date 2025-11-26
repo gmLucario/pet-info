@@ -16,7 +16,8 @@ ntex-identity = "2.0.0"
 ntex-session = { version = "2.0.0", features = [] }
 tera = { version = "1.20.1", default-features = false, features = [ "builtins", "date-locale" ]}
 oauth2 = { version = "5.0.0", features = ["reqwest-blocking"]}
-fast_qr = { version = "0.12.7", features = ["image"]}
+qrcode = "0.12"
+tiny-skia = "0.11.4"
 # pinning image cause fast_qr is using a specific version
 image = { version = "=0.25.5"}
 pulldown-cmark = "0.12.2"
