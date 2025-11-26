@@ -845,7 +845,7 @@ pub async fn generate_pdf_report_bytes(
         None
     };
     let image_filename = pet_pic_option.as_ref().map(|pic| {
-        let actual_format = crate::qr::detect_image_format(&pic.body);
+        let actual_format = crate::utils::detect_image_format(&pic.body);
         format!("pet.{}", actual_format)
     });
 

@@ -8,34 +8,11 @@ use anyhow::Context;
 use qrcode::{EcLevel, QrCode};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
+use crate::front;
+use crate::utils::detect_image_format;
+
 const SCALE: f32 = 20.0;
 const PADDING: usize = 4;
-
-/// Detects image format from magic bytes.
-///
-/// Checks the first few bytes of the image data to determine the file format.
-/// This is more reliable than trusting file extensions.
-///
-/// # Arguments
-/// * `bytes` - The image file bytes
-///
-/// # Returns
-/// File extension string ("jpg", "png", "gif", "webp", etc.)
-pub fn detect_image_format(bytes: &[u8]) -> &'static str {
-    if bytes.len() < 4 {
-        return "jpg"; // Default fallback
-    }
-
-    // Check magic bytes for common image formats
-    match &bytes[0..4] {
-        [0x89, 0x50, 0x4E, 0x47] => "png", // PNG
-        [0xFF, 0xD8, 0xFF, ..] => "jpg",   // JPEG
-        [0x47, 0x49, 0x46, ..] => "gif",   // GIF
-        [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
-        [0x42, 0x4D, ..] => "bmp",         // BMP
-        _ => "jpg",                        // Default fallback
-    }
-}
 
 /// Generates a QR code image from a URL string.
 ///
