@@ -24,7 +24,7 @@ use anyhow::{Context, bail};
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
 use serde_json::json;
-use std::{path::Path, str::FromStr};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
@@ -51,44 +51,6 @@ fn get_header_str_value(headers: &ntex::http::HeaderMap, key: &str) -> String {
         .to_string()
 }
 
-/// Extracts file extension from Content-Disposition header
-///
-/// # Arguments
-/// * `content_disposition` - Content-Disposition header value
-///
-/// # Returns
-/// * `Ok(String)` - File extension in lowercase
-/// * `Err(anyhow::Error)` - If extension cannot be parsed
-///
-/// # Example
-/// ```
-/// let header = "form-data; name=\"file\"; filename=\"image.jpg\"";
-/// assert_eq!(get_filename_extension(header)?, "jpg");
-/// ```
-fn get_filename_extension(content_disposition: &str) -> anyhow::Result<String> {
-    let sections = content_disposition.split(";").collect::<Vec<&str>>();
-    let mut sections = sections
-        .iter()
-        .filter(|s| s.trim().starts_with("filename="))
-        .map(|w| {
-            let name = &w.trim()["filename=".len()..];
-            name.trim_matches('"')
-        });
-
-    if let Some(Some(filename)) = Path::new(sections.next().unwrap_or_default())
-        .extension()
-        .map(|filename| {
-            filename
-                .to_str()
-                .map(|f| f.to_string().trim().to_lowercase())
-        })
-    {
-        return Ok(filename);
-    }
-
-    bail!("filename extension couldnt be found in the request content_disposition form")
-}
-
 /// Checks if the field contains an image for pet picture upload
 fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> bool {
     field.content_type().essence_str().contains("image") && content_disposition.contains("pet_pic")
@@ -97,7 +59,7 @@ fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> b
 /// Processes an image field, validating size and extracting file data
 async fn process_image_field(
     field: ntex_multipart::Field,
-    content_disposition: &str,
+    _content_disposition: &str,
 ) -> anyhow::Result<forms::pet::Pic> {
     let body = utils::get_bytes_value(field).await;
 
@@ -109,8 +71,10 @@ async fn process_image_field(
         );
     }
 
+    let extension = crate::utils::detect_image_format(&body);
+
     Ok(forms::pet::Pic {
-        filename_extension: get_filename_extension(content_disposition)?,
+        filename_extension: extension.to_string(),
         body,
     })
 }

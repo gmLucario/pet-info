@@ -39,7 +39,13 @@ pub fn detect_image_format(bytes: &[u8]) -> &'static str {
         [0x47, 0x49, 0x46, ..] => "gif",   // GIF
         [0x52, 0x49, 0x46, 0x46] if bytes.len() >= 12 && &bytes[8..12] == b"WEBP" => "webp", // WebP
         [0x42, 0x4D, ..] => "bmp",         // BMP
-        _ => "jpg",                        // Default fallback
+        // HEIC signatures (ftypheic, ftypheix, ftypheim, ftypmsf1)
+        // usually start at offset 4, bytes 4-12 are "ftypheic" etc
+        _ if bytes.len() >= 12 => match &bytes[4..12] {
+            b"ftypheic" | b"ftypheix" | b"ftypheim" | b"ftypmsf1" => "heic",
+            _ => "jpg",
+        },
+        _ => "jpg", // Default fallback
     }
 }
 
@@ -242,3 +248,55 @@ pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
     )
     .unwrap()
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_image_format() {
+        // PNG
+        assert_eq!(
+            detect_image_format(&[0x89, 0x50, 0x4E, 0x47, 0x00, 0x00]),
+            "png"
+        );
+
+        // JPEG
+        assert_eq!(detect_image_format(&[0xFF, 0xD8, 0xFF, 0xE0]), "jpg");
+
+        // GIF
+        assert_eq!(detect_image_format(&[0x47, 0x49, 0x46, 0x38]), "gif");
+
+        // WebP
+        let mut webp_data = vec![0u8; 12];
+        webp_data[0] = 0x52; // R
+        webp_data[1] = 0x49; // I
+        webp_data[2] = 0x46; // F
+        webp_data[3] = 0x46; // F
+        webp_data[8] = 0x57; // W
+        webp_data[9] = 0x45; // E
+        webp_data[10] = 0x42; // B
+        webp_data[11] = 0x50; // P
+        assert_eq!(detect_image_format(&webp_data), "webp");
+
+        // BMP
+        assert_eq!(detect_image_format(&[0x42, 0x4D, 0x00, 0x00]), "bmp");
+
+        // HEIC
+        // ftypheic
+        let mut heic_data = vec![0u8; 12];
+        heic_data[4] = b'f';
+        heic_data[5] = b't';
+        heic_data[6] = b'y';
+        heic_data[7] = b'p';
+        heic_data[8] = b'h';
+        heic_data[9] = b'e';
+        heic_data[10] = b'i';
+        heic_data[11] = b'c';
+        assert_eq!(detect_image_format(&heic_data), "heic");
+
+        // Fallback
+        assert_eq!(detect_image_format(&[0x00, 0x00, 0x00, 0x00]), "jpg");
+        assert_eq!(detect_image_format(&[]), "jpg");
+    }
+}
