@@ -441,6 +441,189 @@ fn draw_finder_patterns<F>(
     draw_eye(0, width - 7); // Bottom-Left
 }
 
+/// Builds a styled QR card with pet picture.
+///
+/// Creates a beautiful card design with:
+/// - Gradient background
+/// - White rounded card container
+/// - Floating circular pet avatar (50% inside card, 50% outside)
+/// - Centered QR code
+/// - Footer text "by pet-info.link"
+///
+/// # Arguments
+/// * `pet_pic` - The pet's picture data (body and extension)
+/// * `info_url` - The URL to encode in the QR code
+///
+/// # Returns
+/// * `anyhow::Result<Vec<u8>>` - PNG image data of the complete card
+///
+/// # Errors
+/// Returns an error if:
+/// - QR code generation fails
+/// - Pet picture loading fails
+/// - Image composition fails
+pub fn build_qr_card_with_pic(
+    pet_pic: &crate::api::pet::PetPublicPic,
+    info_url: &str,
+) -> anyhow::Result<Vec<u8>> {
+    // Card dimensions
+    const CARD_WIDTH: u32 = 600;
+    const CARD_HEIGHT: u32 = 900;
+    const AVATAR_SIZE: u32 = 160;
+    const CARD_RADIUS: f32 = 40.0;
+    const AVATAR_OVERLAP: u32 = AVATAR_SIZE / 2; // 50% inside, 50% outside
+
+    const CANVAS_WIDTH: u32 = CARD_WIDTH + 100; // Extra margin for shadow/spacing
+    const CANVAS_HEIGHT: u32 = CARD_HEIGHT + AVATAR_OVERLAP + 100;
+
+    // Calculate positions
+    let card_x = 50.0;
+    let card_y = (AVATAR_OVERLAP + 50) as f32;
+    let avatar_x = (CANVAS_WIDTH / 2) as f32;
+    let avatar_y = 50.0 + (AVATAR_SIZE / 2) as f32;
+
+    // Create canvas with gradient background
+    let mut pixmap = Pixmap::new(CANVAS_WIDTH, CANVAS_HEIGHT)
+        .context("Failed to create pixmap")?;
+
+    // Fill with gradient background (#f0f4f8 to #e2e8f0)
+    for y in 0..CANVAS_HEIGHT {
+        for x in 0..CANVAS_WIDTH {
+            let t = y as f32 / CANVAS_HEIGHT as f32;
+            let r = (240.0 + (226.0 - 240.0) * t) as u8;
+            let g = (244.0 + (232.0 - 244.0) * t) as u8;
+            let b = (248.0 + (240.0 - 248.0) * t) as u8;
+            pixmap.pixels_mut()[(y * CANVAS_WIDTH + x) as usize] =
+                tiny_skia::ColorU8::from_rgba(r, g, b, 255).premultiply();
+        }
+    }
+
+    // Draw white rounded card
+    let mut card_pb = PathBuilder::new();
+    draw_rounded_rect(&mut card_pb, card_x, card_y, CARD_WIDTH as f32, CARD_HEIGHT as f32, CARD_RADIUS);
+    if let Some(path) = card_pb.finish() {
+        let mut paint = Paint::default();
+        paint.set_color(Color::WHITE);
+        paint.anti_alias = true;
+        pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::default(), None);
+    }
+
+    // Generate and overlay QR code
+    let qr_bytes = get_qr_code(info_url)?;
+    let qr_img = image::load_from_memory(&qr_bytes)
+        .context("Failed to load QR code")?
+        .to_rgba8();
+
+    // Position QR code in center of card
+    let qr_size = qr_img.width().min(qr_img.height());
+    let qr_x = (CANVAS_WIDTH - qr_size) / 2;
+    let qr_y = card_y as u32 + AVATAR_OVERLAP + 60; // Below avatar with spacing
+
+    // Overlay QR code
+    for (x, y, pixel) in qr_img.enumerate_pixels() {
+        let px = qr_x + x;
+        let py = qr_y + y;
+        if px < CANVAS_WIDTH && py < CANVAS_HEIGHT {
+            let idx = (py * CANVAS_WIDTH + px) as usize;
+            if pixel[3] > 128 { // Alpha threshold
+                pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
+                    pixel[0], pixel[1], pixel[2], pixel[3]
+                ).premultiply();
+            }
+        }
+    }
+
+    // Load and overlay circular pet picture
+    let pic_format = image::ImageFormat::from_extension(&pet_pic.extension)
+        .context("Invalid pet picture extension")?;
+    let pet_img = image::load_from_memory_with_format(&pet_pic.body, pic_format)
+        .context("Failed to load pet picture")?
+        .resize_to_fill(AVATAR_SIZE, AVATAR_SIZE, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
+
+    // Create circular mask and overlay
+    let radius = (AVATAR_SIZE / 2) as i32;
+    let radius_squared = radius * radius;
+
+    for y in 0..AVATAR_SIZE {
+        for x in 0..AVATAR_SIZE {
+            let dx = x as i32 - radius;
+            let dy = y as i32 - radius;
+            let distance_squared = dx * dx + dy * dy;
+
+            if distance_squared <= radius_squared {
+                let pixel = pet_img.get_pixel(x, y);
+                let canvas_x = (avatar_x as i32 - radius + dx) as u32;
+                let canvas_y = (avatar_y as i32 - radius + dy) as u32;
+
+                if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
+                    let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
+                    pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
+                        pixel[0], pixel[1], pixel[2], pixel[3]
+                    ).premultiply();
+                }
+            }
+        }
+    }
+
+    // Draw footer text "by pet-info.link"
+    use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
+
+    let font_data = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+    let font = FontRef::try_from_slice(font_data).context("Failed to load font")?;
+
+    const FONT_SIZE: f32 = 24.0;
+    let text = "by pet-info.link";
+    let scale = PxScale::from(FONT_SIZE);
+    let scaled_font = font.as_scaled(scale);
+
+    // Calculate text width for centering
+    let text_width: f32 = text
+        .chars()
+        .map(|c| scaled_font.h_advance(scaled_font.glyph_id(c)))
+        .sum();
+
+    let text_x = ((CANVAS_WIDTH as f32 - text_width) / 2.0).max(0.0);
+    let text_y = qr_y + qr_size + 60;
+    let text_color = tiny_skia::ColorU8::from_rgba(15, 23, 42, 255); // Matching QR color
+
+    // Render text
+    let mut x_offset = text_x;
+    for ch in text.chars() {
+        let glyph_id = scaled_font.glyph_id(ch);
+        let glyph = glyph_id.with_scale_and_position(scale, ab_glyph::point(x_offset, text_y as f32));
+
+        if let Some(outlined) = scaled_font.outline_glyph(glyph) {
+            let bounds = outlined.px_bounds();
+            outlined.draw(|gx, gy, coverage| {
+                if coverage > 0.0 {
+                    let px = (bounds.min.x as i32 + gx as i32) as u32;
+                    let py = (bounds.min.y as i32 + gy as i32) as u32;
+
+                    if px < CANVAS_WIDTH && py < CANVAS_HEIGHT {
+                        let idx = (py * CANVAS_WIDTH + px) as usize;
+                        let alpha = (coverage * 255.0) as u8;
+
+                        // Alpha blend text with background
+                        let bg = pixmap.pixels()[idx].demultiply();
+                        let blended = tiny_skia::ColorU8::from_rgba(
+                            ((text_color.red() as u16 * alpha as u16 + bg.red() as u16 * (255 - alpha) as u16) / 255) as u8,
+                            ((text_color.green() as u16 * alpha as u16 + bg.green() as u16 * (255 - alpha) as u16) / 255) as u8,
+                            ((text_color.blue() as u16 * alpha as u16 + bg.blue() as u16 * (255 - alpha) as u16) / 255) as u8,
+                            255,
+                        );
+                        pixmap.pixels_mut()[idx] = blended.premultiply();
+                    }
+                }
+            });
+        }
+
+        x_offset += scaled_font.h_advance(glyph_id);
+    }
+
+    Ok(pixmap.encode_png()?)
+}
+
 /// Filters a string to contain only alphanumeric characters.
 ///
 /// Removes all non-alphanumeric characters from the input string,
