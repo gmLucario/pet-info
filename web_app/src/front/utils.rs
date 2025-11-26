@@ -514,9 +514,17 @@ pub fn build_qr_card_with_pic(
         .context("Failed to load QR code")?
         .to_rgba8();
 
+    // Resize QR code if it's too large for the card
+    let max_qr_size = (CARD_WIDTH as f32 * 0.7) as u32; // 70% of card width
+    let qr_img = if qr_img.width() > max_qr_size || qr_img.height() > max_qr_size {
+        image::imageops::resize(&qr_img, max_qr_size, max_qr_size, image::imageops::FilterType::Lanczos3)
+    } else {
+        qr_img
+    };
+
     // Position QR code in center of card
     let qr_size = qr_img.width().min(qr_img.height());
-    let qr_x = (CANVAS_WIDTH - qr_size) / 2;
+    let qr_x = (CANVAS_WIDTH.saturating_sub(qr_size)) / 2;
     let qr_y = card_y as u32 + AVATAR_OVERLAP + 60; // Below avatar with spacing
 
     // Overlay QR code
