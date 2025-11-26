@@ -139,7 +139,7 @@ async fn deserialize_pet_form(
 
     if let (Some(cropper_box), Some(pet_pic)) = (cropper_box, pet_pic) {
         form.pet_pic = Some(forms::pet::PetPic {
-            filename_extension: pet_pic.filename_extension.to_string(),
+            filename_extension: "png".to_string(),
             body: utils::crop_circle(&pet_pic, cropper_box.x, cropper_box.y, cropper_box.diameter)?,
         })
     }
