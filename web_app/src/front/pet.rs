@@ -409,10 +409,10 @@ async fn delete_pet(
         .finish())
 }
 
-/// Generates and streams QR code for pet's public profile
+/// Generates and streams QR code card for pet's public profile
 ///
-/// Creates a QR code containing the URL to the pet's public information page.
-/// The QR code can be printed on physical pet tags for easy scanning.
+/// Creates a beautiful QR code card with the pet's picture, QR code, and branding.
+/// Falls back to simple QR code if pet picture is not available.
 ///
 /// # Path Parameters
 /// * `pet_external_id` - UUID of the pet's external identifier
@@ -421,7 +421,7 @@ async fn delete_pet(
 /// Requires service access (subscription)
 ///
 /// # Returns
-/// * `Ok(HttpResponse)` - JPEG image stream of the QR code
+/// * `Ok(HttpResponse)` - PNG image stream of the QR code card
 /// * `Err(web::Error)` - Server error if QR generation fails
 ///
 /// # Generated URL Format
@@ -430,6 +430,7 @@ async fn delete_pet(
 async fn get_profile_qr_code(
     _: middleware::logged_user::CheckUserCanAccessService,
     path: web::types::Path<(Uuid,)>,
+    app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_external_id = path.0;
     let app_config = config::APP_CONFIG
@@ -441,7 +442,21 @@ async fn get_profile_qr_code(
         base_url = app_config.base_url(),
         external_id = pet_external_id
     );
-    let qr_code = super::utils::get_qr_code(&url).map_err(|e| {
+
+    // Try to get pet picture
+    let pet_pic =
+        api::pet::get_public_pic(pet_external_id, &app_state.repo, &app_state.storage_service)
+            .await
+            .ok()
+            .flatten();
+
+    // Generate QR code card with picture if available, otherwise simple QR code
+    let qr_code = if let Some(ref pic) = pet_pic {
+        super::utils::build_qr_card_with_pic(pic, &url)
+    } else {
+        super::utils::get_qr_code(&url)
+    }
+    .map_err(|e| {
         errors::ServerError::InternalServerError(format!("qr_code could not be generated: {}", e))
     })?;
 

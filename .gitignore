@@ -28,6 +28,7 @@ scripts/**/*.rs.bk
 # SSL/TLS certificates (auto-downloaded in production)
 **/*.pem
 **/*.crt
+**/*.key
 
 # .tfstate files
 *.tfstate
