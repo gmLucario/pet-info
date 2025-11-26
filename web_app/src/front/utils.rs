@@ -604,17 +604,21 @@ pub fn build_qr_card_with_pic(
             let distance_squared = dx * dx + dy * dy;
 
             // Only draw pixels within the circular mask
-            if distance_squared <= radius_squared {
+            if distance_squared < radius_squared { // Use < instead of <= to avoid edge artifacts
                 let pixel = pet_img.get_pixel(x, y);
-                // Position pixel relative to avatar center (don't double-subtract radius)
-                let canvas_x = (avatar_x as i32 + dx) as u32;
-                let canvas_y = (avatar_y as i32 + dy) as u32;
 
-                if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
-                    let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
-                    pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
-                        pixel[0], pixel[1], pixel[2], pixel[3]
-                    ).premultiply();
+                // Skip transparent/semi-transparent pixels to avoid black edges
+                if pixel[3] > 10 {
+                    // Position pixel relative to avatar center
+                    let canvas_x = (avatar_x as i32 + dx) as u32;
+                    let canvas_y = (avatar_y as i32 + dy) as u32;
+
+                    if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
+                        let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
+                        pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
+                            pixel[0], pixel[1], pixel[2], pixel[3]
+                        ).premultiply();
+                    }
                 }
             }
         }
