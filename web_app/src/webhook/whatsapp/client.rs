@@ -4,8 +4,8 @@
 //! It handles authentication and message sending for text, interactive, and document messages.
 
 use super::schemas::{
-    OutgoingDocumentMessage, OutgoingInteractiveMessage, OutgoingTextMessage,
-    WhatsAppMessageResponse,
+    OutgoingDocumentMessage, OutgoingImageMessage, OutgoingInteractiveMessage,
+    OutgoingTextMessage, WhatsAppMessageResponse,
 };
 use crate::config;
 use anyhow::{Context, Result};
@@ -102,6 +102,20 @@ impl WhatsAppClient {
     pub async fn send_document_message(
         &self,
         message: &OutgoingDocumentMessage,
+    ) -> Result<WhatsAppMessageResponse> {
+        self.send_message(message).await
+    }
+
+    /// Sends an image message
+    ///
+    /// # Arguments
+    /// * `message` - Image message to send
+    ///
+    /// # Returns
+    /// * `Result<WhatsAppMessageResponse>` - Response from WhatsApp API
+    pub async fn send_image_message(
+        &self,
+        message: &OutgoingImageMessage,
     ) -> Result<WhatsAppMessageResponse> {
         self.send_message(message).await
     }

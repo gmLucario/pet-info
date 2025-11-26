@@ -61,7 +61,7 @@ pub fn process_webhook_statuses(payload: &WebhookPayload) -> Vec<&Status> {
 /// Sends pet information to a WhatsApp user
 ///
 /// Sends a text message listing all registered pets, followed by an interactive
-/// list message for each pet with options for report, and card.
+/// list message for each pet with options for report and QR code.
 ///
 /// # Arguments
 ///
@@ -107,9 +107,9 @@ async fn send_pet_info_to_user(
         let rows = vec![
             InteractiveRow::new(format!("reporte:{}", external_id), "reporte".into()),
             InteractiveRow {
-                id: format!("tarjeta:{}", external_id),
-                title: "tarjeta".into(),
-                description: Some("tarjeta digital (wallet)".into()),
+                id: format!("qr:{}", external_id),
+                title: "qr".into(),
+                description: Some("código QR con foto de perfil".into()),
             },
         ];
 
@@ -197,17 +197,48 @@ async fn handle_interactive_response(
 
             client.send_document_message(&document_message).await?;
         }
-        "tarjeta" => {
-            // Send Apple Wallet pass link (WhatsApp doesn't support .pkpass files)
-            client
-                .send_text_message(
-                    message.from.clone(),
-                    format!(
-                        "Tarjeta digital: https://pet-info.link/pet/pass/{}",
-                        external_id
-                    ),
-                )
+        "qr" => {
+            // Get app config for base URL
+            let app_config = crate::config::APP_CONFIG
+                .get()
+                .context("failed to get app config")?;
+            let url = format!(
+                "{base_url}/info/{external_id}",
+                base_url = app_config.base_url(),
+                external_id = external_id
+            );
+
+            // Try to get pet picture
+            let pet_pic = crate::api::pet::get_public_pic(
+                external_id,
+                repo,
+                storage_service,
+            )
+            .await
+            .ok()
+            .flatten();
+
+            // Generate QR code card with picture if available, otherwise simple QR code
+            let qr_code = if let Some(ref pic) = pet_pic {
+                crate::qr::build_qr_card_with_pic(pic, &url)
+            } else {
+                crate::qr::get_qr_code(&url)
+            }
+            .with_context(|| format!("qr_code could not be generated for pet {}", external_id))?;
+
+            // Upload QR code image to WhatsApp
+            let media_id = client
+                .upload_media(qr_code, "image/png", "qr_code.png")
                 .await?;
+
+            // Send image message with media ID
+            let image_message = super::schemas::OutgoingImageMessage::new_with_id(
+                message.from.clone(),
+                media_id,
+                Some(format!("Código QR de tu mascota - {}", url)),
+            );
+
+            client.send_image_message(&image_message).await?;
         }
         _ => {
             logfire::warn!(
