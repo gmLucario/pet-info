@@ -512,8 +512,7 @@ pub fn build_qr_card_with_pic(
     let avatar_y = card_y; // Avatar center = card top edge (50% outside, 50% inside)
 
     // Create canvas with gradient background
-    let mut pixmap = Pixmap::new(CANVAS_WIDTH, CANVAS_HEIGHT)
-        .context("Failed to create pixmap")?;
+    let mut pixmap = Pixmap::new(CANVAS_WIDTH, CANVAS_HEIGHT).context("Failed to create pixmap")?;
 
     // Fill with gradient background (#f0f4f8 to #e2e8f0)
     for y in 0..CANVAS_HEIGHT {
@@ -529,7 +528,14 @@ pub fn build_qr_card_with_pic(
 
     // Draw white rounded card
     let mut card_pb = PathBuilder::new();
-    draw_rounded_rect(&mut card_pb, card_x, card_y, CARD_WIDTH as f32, CARD_HEIGHT as f32, CARD_RADIUS);
+    draw_rounded_rect(
+        &mut card_pb,
+        card_x,
+        card_y,
+        CARD_WIDTH as f32,
+        CARD_HEIGHT as f32,
+        CARD_RADIUS,
+    );
     if let Some(path) = card_pb.finish() {
         let mut paint = Paint::default();
         paint.set_color(Color::WHITE);
@@ -546,7 +552,12 @@ pub fn build_qr_card_with_pic(
     // Resize QR code if it's too large for the card
     let max_qr_size = (CARD_WIDTH as f32 * 0.7) as u32; // 70% of card width
     let qr_img = if qr_img.width() > max_qr_size || qr_img.height() > max_qr_size {
-        image::imageops::resize(&qr_img, max_qr_size, max_qr_size, image::imageops::FilterType::Lanczos3)
+        image::imageops::resize(
+            &qr_img,
+            max_qr_size,
+            max_qr_size,
+            image::imageops::FilterType::Lanczos3,
+        )
     } else {
         qr_img
     };
@@ -562,10 +573,11 @@ pub fn build_qr_card_with_pic(
         let py = qr_y + y;
         if px < CANVAS_WIDTH && py < CANVAS_HEIGHT {
             let idx = (py * CANVAS_WIDTH + px) as usize;
-            if pixel[3] > 128 { // Alpha threshold
-                pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
-                    pixel[0], pixel[1], pixel[2], pixel[3]
-                ).premultiply();
+            if pixel[3] > 128 {
+                // Alpha threshold
+                pixmap.pixels_mut()[idx] =
+                    tiny_skia::ColorU8::from_rgba(pixel[0], pixel[1], pixel[2], pixel[3])
+                        .premultiply();
             }
         }
     }
@@ -582,13 +594,19 @@ pub fn build_qr_card_with_pic(
     };
 
     let pet_img = image::load_from_memory_with_format(&pet_pic.body, pic_format)
-        .with_context(|| format!(
-            "Failed to load pet picture (detected: {}, stored ext: {}, size: {} bytes)",
-            actual_format,
-            pet_pic.extension,
-            pet_pic.body.len()
-        ))?
-        .resize_to_fill(AVATAR_SIZE, AVATAR_SIZE, image::imageops::FilterType::Lanczos3)
+        .with_context(|| {
+            format!(
+                "Failed to load pet picture (detected: {}, stored ext: {}, size: {} bytes)",
+                actual_format,
+                pet_pic.extension,
+                pet_pic.body.len()
+            )
+        })?
+        .resize_to_fill(
+            AVATAR_SIZE,
+            AVATAR_SIZE,
+            image::imageops::FilterType::Lanczos3,
+        )
         .to_rgba8();
 
     // Create circular mask and overlay avatar on canvas
@@ -617,9 +635,9 @@ pub fn build_qr_card_with_pic(
                     if canvas_x < CANVAS_WIDTH && canvas_y < CANVAS_HEIGHT {
                         let idx = (canvas_y * CANVAS_WIDTH + canvas_x) as usize;
                         // Force full opacity (255) to prevent any premultiplication artifacts
-                        pixmap.pixels_mut()[idx] = tiny_skia::ColorU8::from_rgba(
-                            pixel[0], pixel[1], pixel[2], 255
-                        ).premultiply();
+                        pixmap.pixels_mut()[idx] =
+                            tiny_skia::ColorU8::from_rgba(pixel[0], pixel[1], pixel[2], 255)
+                                .premultiply();
                     }
                 }
             }
@@ -651,7 +669,8 @@ pub fn build_qr_card_with_pic(
     let mut x_offset = text_x;
     for ch in text.chars() {
         let glyph_id = scaled_font.glyph_id(ch);
-        let glyph = glyph_id.with_scale_and_position(scale, ab_glyph::point(x_offset, text_y as f32));
+        let glyph =
+            glyph_id.with_scale_and_position(scale, ab_glyph::point(x_offset, text_y as f32));
 
         if let Some(outlined) = scaled_font.outline_glyph(glyph) {
             let bounds = outlined.px_bounds();
@@ -667,9 +686,15 @@ pub fn build_qr_card_with_pic(
                         // Alpha blend text with background
                         let bg = pixmap.pixels()[idx].demultiply();
                         let blended = tiny_skia::ColorU8::from_rgba(
-                            ((text_color.red() as u16 * alpha as u16 + bg.red() as u16 * (255 - alpha) as u16) / 255) as u8,
-                            ((text_color.green() as u16 * alpha as u16 + bg.green() as u16 * (255 - alpha) as u16) / 255) as u8,
-                            ((text_color.blue() as u16 * alpha as u16 + bg.blue() as u16 * (255 - alpha) as u16) / 255) as u8,
+                            ((text_color.red() as u16 * alpha as u16
+                                + bg.red() as u16 * (255 - alpha) as u16)
+                                / 255) as u8,
+                            ((text_color.green() as u16 * alpha as u16
+                                + bg.green() as u16 * (255 - alpha) as u16)
+                                / 255) as u8,
+                            ((text_color.blue() as u16 * alpha as u16
+                                + bg.blue() as u16 * (255 - alpha) as u16)
+                                / 255) as u8,
                             255,
                         );
                         pixmap.pixels_mut()[idx] = blended.premultiply();

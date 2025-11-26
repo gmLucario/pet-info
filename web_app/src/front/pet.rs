@@ -444,10 +444,11 @@ async fn get_profile_qr_code(
     );
 
     // Try to get pet picture
-    let pet_pic = api::pet::get_public_pic(pet_external_id, &app_state.repo, &app_state.storage_service)
-        .await
-        .ok()
-        .flatten();
+    let pet_pic =
+        api::pet::get_public_pic(pet_external_id, &app_state.repo, &app_state.storage_service)
+            .await
+            .ok()
+            .flatten();
 
     // Generate QR code card with picture if available, otherwise simple QR code
     let qr_code = if let Some(ref pic) = pet_pic {
