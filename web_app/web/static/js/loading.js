@@ -120,4 +120,24 @@ document.addEventListener('DOMContentLoaded', () => {
         link.setAttribute('aria-busy', 'true');
         link.style.pointerEvents = 'none';
     });
+
+    // --- Handle Browser Back/Forward Cache (bfcache) ---
+    window.addEventListener('pageshow', (event) => {
+        // If the page is being restored from the bfcache, reset loading states
+        if (event.persisted) {
+            document.querySelectorAll('[aria-busy="true"]').forEach(el => {
+                el.removeAttribute('aria-busy');
+                if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
+                    el.disabled = false;
+                } else {
+                    el.style.pointerEvents = 'auto';
+                }
+            });
+
+            // Close any open dropdowns
+            document.querySelectorAll('details.dropdown[open]').forEach(el => {
+                el.removeAttribute('open');
+            });
+        }
+    });
 });
