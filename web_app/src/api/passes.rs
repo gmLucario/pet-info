@@ -42,7 +42,7 @@ use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
 use image::ImageEncoder;
 use passes::{Package, resource, sign};
-use std::{io::Cursor, path::Path};
+use std::io::Cursor;
 
 /// Configuration constants for Apple Wallet passes
 ///
@@ -105,7 +105,7 @@ pub async fn generate_pet_pass(
 
     let mut package = create_signed_package(pass)?;
 
-    add_pass_resources(&mut package, storage_service, &pet_info.pic).await?;
+    add_pass_resources(&mut package, storage_service, &pet_info.pic_path).await?;
 
     generate_pkpass_bytes(package)
 }
@@ -384,7 +384,7 @@ fn build_thumbnail(image_bytes: Vec<u8>) -> Result<Vec<u8>> {
 async fn add_pass_resources(
     package: &mut Package,
     storage_service: &services::ImplStorageService,
-    pic_path: &Option<String>,
+    pic_path: &str,
 ) -> Result<()> {
     let icon_data = include_bytes!("../../web/static/images/maskable-512.png");
     package
@@ -394,21 +394,15 @@ async fn add_pass_resources(
         )
         .map_err(|e| anyhow::anyhow!("Failed to add icon resource: {}", e))?;
 
-    if let Some(pic_path) = pic_path {
-        let pic_path = Path::new(&pic_path);
-        let image_bytes = storage_service
-            .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
-            .await?;
+    let image_bytes = storage_service.get_pic_as_bytes(pic_path).await?;
+    let image_bytes = build_thumbnail(image_bytes)?;
 
-        let png_bytes = build_thumbnail(image_bytes)?;
-
-        package
-            .add_resource(
-                resource::Type::Thumbnail(resource::Version::Standard),
-                &png_bytes[..],
-            )
-            .map_err(|e| anyhow::anyhow!("Failed to add Thumbnail: {}", e))?;
-    }
+    package
+        .add_resource(
+            resource::Type::Thumbnail(resource::Version::Standard),
+            &image_bytes[..],
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to add Thumbnail: {}", e))?;
 
     Ok(())
 }

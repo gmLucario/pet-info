@@ -67,7 +67,10 @@ async fn get_pet_info_view(
                 "function get_owner_contacts raised an error: {e}"
             ))
         })?,
-        "pet_pic_url": format!("{}.png",app_config.cloudfront_url),
+        "pet_pic_url": format!("{}/{}",
+            app_config.cloudfront_url,
+            pet.pic_path,
+        ),
     }))
     .unwrap_or_default();
 

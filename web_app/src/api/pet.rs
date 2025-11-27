@@ -315,8 +315,8 @@ pub struct PetPublicInfoSchema {
     pub is_lost: bool,
     /// Description and additional information about the pet
     pub about_pet: String,
-    /// Whether the pet has a picture available
-    pub pic: Option<String>,
+    /// Whether the pet has a picture available or default one
+    pub pic_path: String,
 }
 
 /// Converts a Pet model to PetPublicInfoSchema for public display.
@@ -325,6 +325,16 @@ pub struct PetPublicInfoSchema {
 /// viewing, including all relevant information for found pet scenarios.
 impl From<models::pet::Pet> for PetPublicInfoSchema {
     fn from(val: models::pet::Pet) -> Self {
+        let mut pic_path = "pics/default".to_string();
+        if let Some(path) = val.pic {
+            let path = Path::new(&path)
+                .with_extension("")
+                .to_str()
+                .unwrap_or("pics/default")
+                .to_string();
+            pic_path = path;
+        }
+
         PetPublicInfoSchema {
             external_id: val.external_id.to_string(),
             name: val.pet_name,
@@ -332,7 +342,7 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
-            pic: val.pic,
+            pic_path,
             pet_breed: val.breed,
             last_weight: val.last_weight,
             fmt_age: front::utils::fmt_dates_difference(
