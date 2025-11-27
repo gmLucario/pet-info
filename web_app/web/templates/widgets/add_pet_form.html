@@ -6,7 +6,7 @@
             <div class="grid">
                 <section class="img-container">
                     <img src="" id="pet-pic-preview">
-                </section>                
+                </section>
                 <label>
                     <input 
                         type="file"
@@ -34,13 +34,13 @@
                 Perdida
             </label>
         </fieldset>
-        {% endif %}        
+        {% endif %}
         <label>
             Nombre
-            <input 
+            <input
                 type="text"
-                name="pet_full_name" 
-                placeholder="Cooki3-l4_Ga113ta" 
+                name="pet_full_name"
+                placeholder="Cooki3-l4_Ga113ta"
                 {% if pet %} value="{{pet.pet_full_name}}" {%endif %}
                 required
                 aria-describedby="pet-name-helper">
@@ -48,7 +48,7 @@
                 <ul>
                     <li>utilice letras, numeros y/o <i>-,_</i></li>
                 </ul>
-            </small>                
+            </small>
         </label>
         <label>
             Fecha Nacimiento
@@ -80,6 +80,6 @@
         {% if pet_external_id %} <input type="hidden" name="pet_external_id" value="{{pet_external_id}}"> {% endif %}
     </fieldset>
     <footer style="text-align: center;">
-        <button>Guardar</button>
+        <button type="submit">Guardar</button>
     </footer>
 </form>
