@@ -1,0 +1,1048 @@
+# Wallet Pass Notifications Implementation Plan
+
+## Current State Summary
+
+Your Pet Info app is a Rust-based web application that:
+- **Generates Apple Wallet passes** for pets with QR codes, pet info, and photos
+- **Uses SQLite database** (encrypted with SQLCipher) for data storage
+- **Has AWS infrastructure** with S3, Lambda, Step Functions for WhatsApp reminders
+- **Stack**: Ntex web framework, OAuth2 authentication, MercadoPago payments
+- **Current pass limitation**: Passes are **static** - once downloaded, they never update
+
+## Apple Wallet Pass Notifications: What's Required
+
+Based on research, here's what Apple requires for pass updates:
+
+### Technical Requirements:
+1. **Web Service URL** in the pass that Apple Wallet can call
+2. **5 specific REST endpoints** that follow Apple's PassKit Web Service protocol
+3. **Database to track device registrations** and push tokens
+4. **APNS connection** using your Pass Type ID Certificate to send push notifications
+5. **Authentication tokens** unique to each pass instance
+
+---
+
+## Implementation Plan
+
+### Phase 1: Database Schema Changes
+
+**New tables needed:**
+
+```sql
+-- Track which devices have registered for pass updates
+pass_registration
+├── id (PK)
+├── device_library_identifier (Apple device ID)
+├── pass_type_identifier (pass.com.petinfo.link)
+├── serial_number (pet.external_id)
+├── push_token (APNS token)
+├── created_at
+├── updated_at
+└── UNIQUE(device_library_identifier, pass_type_identifier, serial_number)
+
+-- Track authentication tokens for each pass instance
+pass_authentication_token
+├── id (PK)
+├── serial_number (pet.external_id - FK to pet)
+├── authentication_token (UUID, unique per pass)
+├── created_at
+└── UNIQUE(serial_number)
+
+-- Track when passes were last updated (for change detection)
+pass_update_tag
+├── id (PK)
+├── serial_number (pet.external_id)
+├── update_tag (timestamp or version number)
+├── updated_at
+└── UNIQUE(serial_number)
+
+-- Optional: Log errors from Apple Wallet for debugging
+pass_error_log
+├── id (PK)
+├── serial_number
+├── error_message (TEXT)
+├── created_at
+```
+
+**SQL Migration File: `migrations/add_pass_registrations.sql`**
+
+```sql
+-- Track device registrations for pass updates
+CREATE TABLE IF NOT EXISTS pass_registration (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_library_identifier TEXT NOT NULL,
+    pass_type_identifier TEXT NOT NULL,
+    serial_number TEXT NOT NULL,
+    push_token TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_library_identifier, pass_type_identifier, serial_number)
+);
+
+CREATE INDEX idx_pass_registration_device ON pass_registration(device_library_identifier);
+CREATE INDEX idx_pass_registration_serial ON pass_registration(serial_number);
+
+-- Track authentication tokens for each pass
+CREATE TABLE IF NOT EXISTS pass_authentication_token (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    serial_number TEXT NOT NULL UNIQUE,
+    authentication_token TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (serial_number) REFERENCES pet(external_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_pass_auth_token ON pass_authentication_token(authentication_token);
+
+-- Track pass update tags (versioning)
+CREATE TABLE IF NOT EXISTS pass_update_tag (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    serial_number TEXT NOT NULL UNIQUE,
+    update_tag TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (serial_number) REFERENCES pet(external_id) ON DELETE CASCADE
+);
+
+-- Optional: Log errors from Apple Wallet
+CREATE TABLE IF NOT EXISTS pass_error_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    serial_number TEXT,
+    error_message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pass_error_serial ON pass_error_log(serial_number);
+```
+
+---
+
+### Phase 2: Pass Generation Updates
+
+**Modify `web_app/src/api/passes.rs`** to include:
+
+```rust
+// Add to pass.json structure:
+{
+  "webServiceURL": "https://pet-info.link/api/v1",
+  "authenticationToken": "{unique_uuid_per_pass}",
+  // ... existing fields
+}
+```
+
+**Implementation steps:**
+
+1. Generate unique `authenticationToken` (UUID) when creating pass
+2. Store it in `pass_authentication_token` table
+3. Initialize `pass_update_tag` with current timestamp
+4. Include both `webServiceURL` and `authenticationToken` in the .pkpass file
+
+**Code changes in `generate_pet_pass()` function:**
+
+```rust
+// Generate or retrieve authentication token
+let auth_token = get_or_create_auth_token(&pet.external_id, &repo).await?;
+
+// Add to pass JSON
+pass_json["webServiceURL"] = json!("https://pet-info.link/api/v1");
+pass_json["authenticationToken"] = json!(auth_token);
+
+// Initialize update tag if not exists
+initialize_pass_update_tag(&pet.external_id, &repo).await?;
+```
+
+---
+
+### Phase 3: Apple PassKit Web Service Endpoints
+
+**Create new module: `web_app/src/api/passkit_webservice.rs`**
+
+Required endpoints per Apple specification:
+
+#### 1. Register Device for Pass Updates
+```rust
+POST /api/v1/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}
+Headers: Authorization: ApplePass {authenticationToken}
+Body: { "pushToken": "..." }
+Response: 201 Created (new) or 200 OK (existing)
+```
+
+#### 2. Get Serial Numbers for Passes
+```rust
+GET /api/v1/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}
+Query: ?passesUpdatedSince={timestamp}
+Response: {
+  "lastUpdated": "{timestamp}",
+  "serialNumbers": ["pet-uuid-1", "pet-uuid-2"]
+}
+```
+
+#### 3. Unregister Device
+```rust
+DELETE /api/v1/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}
+Headers: Authorization: ApplePass {authenticationToken}
+Response: 200 OK
+```
+
+#### 4. Get Latest Version of Pass
+```rust
+GET /api/v1/passes/{passTypeIdentifier}/{serialNumber}
+Headers: Authorization: ApplePass {authenticationToken}
+If-Modified-Since: {last_known_update}
+Response: 200 OK with .pkpass binary or 304 Not Modified
+```
+
+#### 5. Log Errors from Devices
+```rust
+POST /api/v1/log
+Body: { "logs": ["error message 1", "error message 2"] }
+Response: 200 OK
+```
+
+**Module structure:**
+
+```rust
+// web_app/src/api/passkit_webservice.rs
+
+use ntex::web::{self, HttpRequest, HttpResponse, Error};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+pub struct RegisterRequest {
+    #[serde(rename = "pushToken")]
+    pub push_token: String,
+}
+
+#[derive(Serialize)]
+pub struct PassesResponse {
+    #[serde(rename = "lastUpdated")]
+    pub last_updated: String,
+    #[serde(rename = "serialNumbers")]
+    pub serial_numbers: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct LogRequest {
+    pub logs: Vec<String>,
+}
+
+// Endpoint implementations
+pub async fn register_device(...) -> Result<HttpResponse, Error> { ... }
+pub async fn get_serial_numbers(...) -> Result<HttpResponse, Error> { ... }
+pub async fn unregister_device(...) -> Result<HttpResponse, Error> { ... }
+pub async fn get_latest_pass(...) -> Result<HttpResponse, Error> { ... }
+pub async fn log_errors(...) -> Result<HttpResponse, Error> { ... }
+
+// Helper: Validate authentication token
+async fn validate_auth_token(serial_number: &str, token: &str, repo: &Repo) -> Result<bool> { ... }
+```
+
+---
+
+### Phase 4: APNS Push Notification Service
+
+**Create new module: `web_app/src/services/apns.rs`**
+
+```rust
+use a2::{Client, Endpoint, NotificationBuilder, NotificationOptions};
+use std::fs::File;
+use std::io::Read;
+
+pub struct ApnsPassNotificationService {
+    client: Client,
+    pass_type_id: String, // "pass.com.petinfo.link"
+}
+
+impl ApnsPassNotificationService {
+    pub async fn new(
+        cert_path: &str,
+        key_path: &str,
+        environment: &str,
+    ) -> Result<Self> {
+        // Load certificate and key
+        let mut cert_file = File::open(cert_path)?;
+        let mut cert_data = Vec::new();
+        cert_file.read_to_end(&mut cert_data)?;
+
+        let mut key_file = File::open(key_path)?;
+        let mut key_data = Vec::new();
+        key_file.read_to_end(&mut key_data)?;
+
+        // Create APNS client
+        let endpoint = match environment {
+            "production" => Endpoint::Production,
+            _ => Endpoint::Sandbox,
+        };
+
+        let client = Client::certificate(
+            &cert_data,
+            &key_data,
+            endpoint,
+        )?;
+
+        Ok(Self {
+            client,
+            pass_type_id: "pass.com.petinfo.link".to_string(),
+        })
+    }
+
+    /// Send push notification to a single device
+    pub async fn send_pass_update_notification(&self, push_token: &str) -> Result<()> {
+        // Empty payload triggers pass update
+        let payload = json!({});
+
+        let options = NotificationOptions {
+            apns_topic: Some(&self.pass_type_id),
+            ..Default::default()
+        };
+
+        let builder = NotificationBuilder::new()
+            .set_content_available()
+            .set_payload(payload);
+
+        let notification = builder.build(push_token, options);
+        let response = self.client.send(notification).await?;
+
+        if response.error.is_some() {
+            return Err(anyhow!("APNS error: {:?}", response.error));
+        }
+
+        Ok(())
+    }
+
+    /// Send push to all devices registered for a pass
+    pub async fn notify_all_devices_for_pass(
+        &self,
+        serial_number: &str,
+        repo: &Repo,
+    ) -> Result<u32> {
+        // Get all registrations for this pass
+        let registrations = repo.get_pass_registrations_by_serial(serial_number).await?;
+
+        let mut success_count = 0;
+        for registration in registrations {
+            match self.send_pass_update_notification(&registration.push_token).await {
+                Ok(_) => {
+                    success_count += 1;
+                    log::info!(
+                        "Sent pass update notification for {} to device {}",
+                        serial_number,
+                        registration.device_library_identifier
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "Failed to send pass update for {}: {}",
+                        serial_number,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(success_count)
+    }
+}
+```
+
+**Dependencies to add to `Cargo.toml`:**
+
+```toml
+[dependencies]
+# Apple Push Notification Service
+a2 = "0.10"
+
+# Existing dependencies already support this:
+# - uuid (for auth tokens) ✅
+# - serde_json (for JSON) ✅
+# - sqlx (for DB) ✅
+```
+
+---
+
+### Phase 5: Update Triggers
+
+**Modify existing pet update endpoints** to trigger pass updates.
+
+**Create helper module: `web_app/src/api/pass_update_helper.rs`**
+
+```rust
+use crate::repo::Repo;
+use crate::services::apns::ApnsPassNotificationService;
+use chrono::Utc;
+
+/// Update the pass update tag and notify all registered devices
+pub async fn trigger_pass_update(
+    serial_number: &str,
+    repo: &Repo,
+    apns_service: &ApnsPassNotificationService,
+) -> Result<()> {
+    // Update the pass update tag
+    let new_tag = Utc::now().timestamp().to_string();
+    repo.update_pass_tag(serial_number, &new_tag).await?;
+
+    // Send push notifications to all registered devices
+    let notification_count = apns_service
+        .notify_all_devices_for_pass(serial_number, repo)
+        .await?;
+
+    log::info!(
+        "Pass update triggered for {}: {} notifications sent",
+        serial_number,
+        notification_count
+    );
+
+    Ok(())
+}
+```
+
+**Update these endpoints in `web_app/src/api/pet.rs`:**
+
+```rust
+// After successful pet update
+pub async fn update_pet_info(
+    pet_id: i64,
+    data: UpdatePetRequest,
+    repo: &Repo,
+    apns_service: &ApnsPassNotificationService,
+) -> Result<()> {
+    // ... existing update logic
+    let pet = repo.update_pet(pet_id, data).await?;
+
+    // NEW: Trigger pass update
+    trigger_pass_update(&pet.external_id.to_string(), repo, apns_service).await?;
+
+    Ok(())
+}
+```
+
+**Triggers needed for:**
+- ✅ Pet info edit (`PUT /pet/edit/{pet_id}`)
+- ✅ Pet photo update
+- ✅ Health record added (`POST /pet/health`)
+- ✅ Weight update (`POST /pet/weight`)
+- ✅ Lost status change (`PUT /pet/lost`)
+- ✅ Sterilization status change
+
+---
+
+### Phase 6: Configuration Updates
+
+**Add to environment variables / SSM Parameters:**
+
+```bash
+# Apple Push Notification Service
+APNS_PASS_CERT_PATH=/path/to/pass_cert.pem
+APNS_PASS_KEY_PATH=/path/to/pass_key.pem
+APNS_ENVIRONMENT=production  # or sandbox for testing
+
+# PassKit Web Service
+PASSKIT_WEB_SERVICE_URL=https://pet-info.link/api/v1
+```
+
+**Update `web_app/src/config.rs`:**
+
+```rust
+pub struct Config {
+    // ... existing fields
+
+    // APNS Configuration
+    pub apns_pass_cert_path: String,
+    pub apns_pass_key_path: String,
+    pub apns_environment: String,
+
+    // PassKit Web Service
+    pub passkit_web_service_url: String,
+}
+```
+
+---
+
+### Phase 7: Route Registration
+
+**Update `web_app/src/front/routes.rs`:**
+
+```rust
+use crate::api::passkit_webservice;
+
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg
+        // ... existing routes
+
+        // PassKit Web Service endpoints
+        .service(
+            web::scope("/api/v1")
+                // Register device
+                .route(
+                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}",
+                    web::post().to(passkit_webservice::register_device)
+                )
+                // Get serial numbers
+                .route(
+                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}",
+                    web::get().to(passkit_webservice::get_serial_numbers)
+                )
+                // Unregister device
+                .route(
+                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}",
+                    web::delete().to(passkit_webservice::unregister_device)
+                )
+                // Get latest pass
+                .route(
+                    "/passes/{passTypeIdentifier}/{serialNumber}",
+                    web::get().to(passkit_webservice::get_latest_pass)
+                )
+                // Log errors
+                .route(
+                    "/log",
+                    web::post().to(passkit_webservice::log_errors)
+                )
+        );
+}
+```
+
+---
+
+### Phase 8: Database Queries
+
+**Add to `web_app/src/repo/sqlite_queries.rs`:**
+
+```rust
+// Get or create authentication token for a pass
+pub async fn get_or_create_auth_token(&self, serial_number: &str) -> Result<String> {
+    // Check if token exists
+    let existing = sqlx::query!(
+        "SELECT authentication_token FROM pass_authentication_token WHERE serial_number = ?",
+        serial_number
+    )
+    .fetch_optional(&self.pool)
+    .await?;
+
+    if let Some(record) = existing {
+        return Ok(record.authentication_token);
+    }
+
+    // Create new token
+    let new_token = uuid::Uuid::new_v4().to_string();
+    sqlx::query!(
+        "INSERT INTO pass_authentication_token (serial_number, authentication_token) VALUES (?, ?)",
+        serial_number,
+        new_token
+    )
+    .execute(&self.pool)
+    .await?;
+
+    Ok(new_token)
+}
+
+// Register or update device for pass updates
+pub async fn register_device(
+    &self,
+    device_id: &str,
+    pass_type_id: &str,
+    serial_number: &str,
+    push_token: &str,
+) -> Result<bool> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO pass_registration
+        (device_library_identifier, pass_type_identifier, serial_number, push_token, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(device_library_identifier, pass_type_identifier, serial_number)
+        DO UPDATE SET push_token = ?, updated_at = CURRENT_TIMESTAMP
+        "#,
+        device_id,
+        pass_type_id,
+        serial_number,
+        push_token,
+        push_token
+    )
+    .execute(&self.pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+// Get all registrations for a serial number
+pub async fn get_pass_registrations_by_serial(&self, serial_number: &str) -> Result<Vec<PassRegistration>> {
+    let records = sqlx::query_as!(
+        PassRegistration,
+        "SELECT * FROM pass_registration WHERE serial_number = ?",
+        serial_number
+    )
+    .fetch_all(&self.pool)
+    .await?;
+
+    Ok(records)
+}
+
+// Update pass update tag
+pub async fn update_pass_tag(&self, serial_number: &str, update_tag: &str) -> Result<()> {
+    sqlx::query!(
+        r#"
+        INSERT INTO pass_update_tag (serial_number, update_tag, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(serial_number)
+        DO UPDATE SET update_tag = ?, updated_at = CURRENT_TIMESTAMP
+        "#,
+        serial_number,
+        update_tag,
+        update_tag
+    )
+    .execute(&self.pool)
+    .await?;
+
+    Ok(())
+}
+
+// Validate authentication token
+pub async fn validate_auth_token(&self, serial_number: &str, token: &str) -> Result<bool> {
+    let result = sqlx::query!(
+        "SELECT 1 as valid FROM pass_authentication_token WHERE serial_number = ? AND authentication_token = ?",
+        serial_number,
+        token
+    )
+    .fetch_optional(&self.pool)
+    .await?;
+
+    Ok(result.is_some())
+}
+```
+
+---
+
+### Phase 9: Testing Strategy
+
+**Test scenarios:**
+
+1. ✅ **Initial Pass Download**
+   - Download pass to iPhone
+   - Verify device registration in database
+   - Check push_token is stored
+
+2. ✅ **Pass Update Flow**
+   - Update pet info via web app
+   - Verify `pass_update_tag` is updated
+   - Confirm APNS push notification sent
+   - Check pass updates on device
+
+3. ✅ **Change Messages**
+   - Test visible updates (with changeMessage)
+   - Test silent updates (without changeMessage)
+   - Verify notification display behavior
+
+4. ✅ **Edge Cases**
+   - Invalid authentication token
+   - Device unregistration
+   - Multiple devices for same pass
+   - Pass deleted while registered
+
+5. ✅ **Error Handling**
+   - APNS connection failures
+   - Invalid push tokens
+   - Network timeouts
+   - Check error logs
+
+**Testing commands:**
+
+```bash
+# Register device (simulated)
+curl -X POST https://pet-info.link/api/v1/devices/DEVICE123/registrations/pass.com.petinfo.link/PET-UUID \
+  -H "Authorization: ApplePass TOKEN123" \
+  -H "Content-Type: application/json" \
+  -d '{"pushToken":"APNS-TOKEN-XYZ"}'
+
+# Get serial numbers
+curl https://pet-info.link/api/v1/devices/DEVICE123/registrations/pass.com.petinfo.link
+
+# Get latest pass
+curl https://pet-info.link/api/v1/passes/pass.com.petinfo.link/PET-UUID \
+  -H "Authorization: ApplePass TOKEN123"
+```
+
+---
+
+## Architecture Diagram: Pass Update Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ User's iPhone (Apple Wallet)                            │
+│                                                         │
+│ 1. User adds .pkpass to Wallet                         │
+│    ├─ Reads: webServiceURL from pass                   │
+│    └─ Reads: authenticationToken                       │
+│         ┌───────────────────────────────┐              │
+│         │ POST /api/v1/devices/.../registrations/... │ │
+│         │ Auth: ApplePass {token}                    │ │
+│         │ Body: { "pushToken": "apns-token-xyz" }    │ │
+│         └───────────────┬───────────────────────────┘  │
+└─────────────────────────┼──────────────────────────────┘
+                          │
+        ┌─────────────────▼──────────────────┐
+        │ Pet Info Web Service (Rust)        │
+        │                                    │
+        │ 2. Store registration in DB        │
+        │    ├─ device_id                    │
+        │    ├─ serial_number (pet UUID)     │
+        │    └─ push_token                   │
+        │                                    │
+        │ 3. User updates pet via web        │
+        │    └─ PUT /pet/edit/123            │
+        │         ┌────────────────┐         │
+        │         │ Update DB      │         │
+        │         │ Update pass_tag│         │
+        │         │ Trigger notify │         │
+        │         └────────┬───────┘         │
+        └──────────────────┼─────────────────┘
+                           │
+        ┌──────────────────▼─────────────────┐
+        │ APNS Service (new module)          │
+        │                                    │
+        │ 4. Send push notification          │
+        │    ├─ Lookup: push_tokens for pet  │
+        │    ├─ Connect: APNS production     │
+        │    ├─ Cert: Pass Type ID cert      │
+        │    ├─ Topic: pass.com.petinfo.link │
+        │    └─ Payload: {} (empty)          │
+        └──────────────────┬─────────────────┘
+                           │
+        ┌──────────────────▼─────────────────┐
+        │ Apple Push Notification Service    │
+        │                                    │
+        │ 5. Delivers push to devices        │
+        └──────────────────┬─────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────┐
+│ User's iPhone (Apple Wallet)                            │
+│                                                         │
+│ 6. Receives silent push notification                   │
+│    └─ GET /api/v1/passes/.../pet-uuid                  │
+│       Header: If-Modified-Since: {last_update}         │
+│       Header: Authorization: ApplePass {token}         │
+│         ┌─────────────────┐                            │
+│         │ Response: 200 OK│                            │
+│         │ New .pkpass file│                            │
+│         └────────┬────────┘                            │
+│                  │                                      │
+│ 7. Wallet updates pass in background                   │
+│    ├─ If change message present → Show notification    │
+│    └─ If no change message → Silent update             │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## File Structure Changes
+
+```
+web_app/
+├── src/
+│   ├── api/
+│   │   ├── passes.rs (UPDATE - add webServiceURL & authToken)
+│   │   ├── passkit_webservice.rs (NEW - 5 PassKit endpoints)
+│   │   ├── pass_update_helper.rs (NEW - update trigger logic)
+│   │   └── pet.rs (UPDATE - add update triggers)
+│   │
+│   ├── models/
+│   │   ├── pass_registration.rs (NEW)
+│   │   └── pass_update.rs (NEW)
+│   │
+│   ├── services/
+│   │   ├── apns.rs (NEW - APNS push notification service)
+│   │   └── notification.rs (EXISTING - keep for WhatsApp)
+│   │
+│   ├── repo/
+│   │   └── sqlite_queries.rs (UPDATE - add pass-related queries)
+│   │
+│   ├── front/
+│   │   └── routes.rs (UPDATE - register PassKit routes)
+│   │
+│   └── config.rs (UPDATE - add APNS config)
+│
+├── Cargo.toml (UPDATE - add a2 dependency)
+│
+└── migrations/
+    └── add_pass_registrations.sql (NEW)
+```
+
+---
+
+## Change Message Strategy
+
+### For Visible Notifications (user sees alert):
+
+Add `changeMessage` to pass fields that should trigger visible notifications:
+
+```json
+{
+  "key": "name",
+  "label": "Nombre",
+  "value": "Buddy",
+  "changeMessage": "Your pet's name has been updated to %@"
+}
+```
+
+**Use for:**
+- Pet name change
+- Lost status change (critical!)
+- Important health record added
+
+### For Silent Updates (no notification):
+
+Omit `changeMessage` from fields:
+
+```json
+{
+  "key": "weight",
+  "label": "Peso",
+  "value": "15.5 kg"
+  // No changeMessage = silent update
+}
+```
+
+**Use for:**
+- Weight updates
+- Photo changes
+- Minor info edits
+- About text changes
+
+---
+
+## Security Considerations
+
+1. ✅ **Authentication token validation** - verify on every endpoint call
+2. ✅ **Rate limiting** - prevent abuse of registration endpoints
+3. ✅ **Token uniqueness** - each pass instance has unique auth token
+4. ✅ **HTTPS only** - already enforced by Nginx reverse proxy
+5. ✅ **APNS certificate security** - store in secure location (like current pass certs)
+6. ✅ **Input validation** - validate device IDs, push tokens, serial numbers
+7. ✅ **Error logging** - capture and log errors from Apple Wallet devices
+
+---
+
+## Estimated Implementation Complexity
+
+| Phase | Complexity | Time Est. | Files to Modify/Create |
+|-------|-----------|-----------|------------------------|
+| Database Schema | Low | 1 hour | 1 migration file |
+| Pass Generation Updates | Low | 2 hours | 1 file (passes.rs) |
+| PassKit Endpoints | Medium | 6 hours | 3 new files |
+| APNS Service | Medium-High | 8 hours | 1 new module + config |
+| Update Triggers | Low | 3 hours | Modify existing endpoints |
+| Database Queries | Low | 2 hours | Update sqlite_queries.rs |
+| Route Registration | Low | 1 hour | Update routes.rs |
+| Testing | Medium | 6 hours | End-to-end flow |
+| **Total** | **Medium** | **~29 hours** | **~12 files** |
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Database
+- [ ] Create `migrations/add_pass_registrations.sql`
+- [ ] Run migration on local dev database
+- [ ] Verify tables created correctly
+- [ ] Test cascade delete behavior
+
+### Phase 2: Models
+- [ ] Create `models/pass_registration.rs`
+- [ ] Create `models/pass_update.rs`
+- [ ] Add serialization/deserialization derives
+- [ ] Test model compilation
+
+### Phase 3: Database Queries
+- [ ] Add `get_or_create_auth_token()` to sqlite_queries.rs
+- [ ] Add `register_device()` to sqlite_queries.rs
+- [ ] Add `unregister_device()` to sqlite_queries.rs
+- [ ] Add `get_pass_registrations_by_serial()` to sqlite_queries.rs
+- [ ] Add `update_pass_tag()` to sqlite_queries.rs
+- [ ] Add `validate_auth_token()` to sqlite_queries.rs
+- [ ] Add `get_serial_numbers_updated_since()` to sqlite_queries.rs
+
+### Phase 4: Pass Generation
+- [ ] Update `api/passes.rs` to generate auth tokens
+- [ ] Add `webServiceURL` to pass JSON
+- [ ] Add `authenticationToken` to pass JSON
+- [ ] Initialize pass_update_tag on first pass creation
+- [ ] Test pass generation with new fields
+
+### Phase 5: APNS Service
+- [ ] Create `services/apns.rs`
+- [ ] Add `a2` dependency to Cargo.toml
+- [ ] Implement `ApnsPassNotificationService` struct
+- [ ] Implement `send_pass_update_notification()` method
+- [ ] Implement `notify_all_devices_for_pass()` method
+- [ ] Add APNS config to `config.rs`
+- [ ] Test APNS connection (sandbox first)
+
+### Phase 6: PassKit Web Service Endpoints
+- [ ] Create `api/passkit_webservice.rs`
+- [ ] Implement `register_device()` endpoint
+- [ ] Implement `get_serial_numbers()` endpoint
+- [ ] Implement `unregister_device()` endpoint
+- [ ] Implement `get_latest_pass()` endpoint
+- [ ] Implement `log_errors()` endpoint
+- [ ] Add authentication token validation middleware
+- [ ] Add routes to `front/routes.rs`
+
+### Phase 7: Update Triggers
+- [ ] Create `api/pass_update_helper.rs`
+- [ ] Implement `trigger_pass_update()` function
+- [ ] Update `PUT /pet/edit` to trigger updates
+- [ ] Update pet photo upload to trigger updates
+- [ ] Update health record creation to trigger updates
+- [ ] Update weight creation to trigger updates
+- [ ] Update lost status change to trigger updates
+
+### Phase 8: Configuration
+- [ ] Add APNS environment variables
+- [ ] Add PassKit web service URL config
+- [ ] Update SSM parameters in AWS (production)
+- [ ] Update local .env file (development)
+- [ ] Verify certificate paths are correct
+
+### Phase 9: Testing
+- [ ] Test pass download with new fields
+- [ ] Test device registration endpoint
+- [ ] Test get serial numbers endpoint
+- [ ] Test unregister endpoint
+- [ ] Test get latest pass endpoint
+- [ ] Test pet update triggers APNS push
+- [ ] Test pass updates on real iPhone
+- [ ] Test change message displays correctly
+- [ ] Test silent updates work correctly
+- [ ] Test error logging endpoint
+
+### Phase 10: Deployment
+- [ ] Run migration on production database
+- [ ] Deploy updated application
+- [ ] Verify APNS certificate is in production
+- [ ] Monitor logs for errors
+- [ ] Test with real device in production
+
+---
+
+## Potential Issues & Solutions
+
+### Issue 1: APNS Connection Failures
+**Symptoms:** Push notifications not being delivered
+**Solutions:**
+- Verify certificate is Pass Type ID certificate (not APNs)
+- Check certificate expiration date
+- Ensure using production APNS endpoint
+- Verify `passTypeIdentifier` matches certificate
+
+### Issue 2: Devices Not Receiving Updates
+**Symptoms:** Pass doesn't update on device
+**Solutions:**
+- Check push token is valid
+- Verify device is registered in database
+- Ensure `update_tag` is being updated
+- Check APNS response for errors
+- Test with sandbox environment first
+
+### Issue 3: Authentication Failures
+**Symptoms:** 401 Unauthorized errors
+**Solutions:**
+- Verify authentication token format
+- Check token is stored in database
+- Ensure `Authorization: ApplePass {token}` header format
+- Validate token hasn't been rotated
+
+### Issue 4: Pass Not Found Errors
+**Symptoms:** 404 errors when fetching pass
+**Solutions:**
+- Verify serial number exists
+- Check pet hasn't been deleted
+- Ensure pass generation logic works
+- Validate external_id mapping
+
+---
+
+## Future Enhancements
+
+1. **Google Wallet Support**
+   - Different protocol than Apple Wallet
+   - Uses Google Wallet API
+   - JWT-based updates
+
+2. **Pass Analytics**
+   - Track pass views
+   - Monitor update frequency
+   - Device distribution metrics
+
+3. **Conditional Updates**
+   - Only update if specific fields changed
+   - Rate limit updates per pass
+   - Batch updates for efficiency
+
+4. **Advanced Change Messages**
+   - Localization support
+   - Dynamic message templates
+   - Rich formatting
+
+5. **Admin Dashboard**
+   - View registered devices
+   - Monitor push notification success rate
+   - Debug failed updates
+
+---
+
+## Resources & Documentation
+
+### Official Apple Documentation
+- [PassKit Web Service Reference](https://developer.apple.com/library/archive/documentation/PassKit/Reference/PassKit_WebService/WebService.html)
+- [Wallet Developer Guide](https://developer.apple.com/library/archive/documentation/UserExperience/Conceptual/PassKit_PG/)
+- [APNs Provider API](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server)
+
+### Third-Party Resources
+- [PassKit Updates and Notifications](https://www.passcreator.com/en/blog/apple-wallet-pass-updates-and-push-notifications-how-they-work-and-how-to-use-them)
+- [Understanding Push Notifications for Wallet Passes](https://help.passkit.com/en/articles/11905171-understanding-push-notifications-for-apple-and-google-wallet-passes)
+- [Apple Wallet Pass Auto Update Tutorial](https://reinteractive.com/articles/tutorial-series-for-experienced-rails-developers/apple-wallet-pass-auto-update)
+
+### Rust Crates
+- [a2 - APNS Client](https://crates.io/crates/a2)
+- [passes - PassKit Pass Generation](https://crates.io/crates/passes)
+
+---
+
+## Questions to Consider Before Implementation
+
+1. **Certificate Management**
+   - Do you have the Pass Type ID certificate for APNS?
+   - Is it the same certificate used to sign passes?
+   - When does it expire?
+
+2. **Testing Environment**
+   - Will you test in APNS sandbox first?
+   - Do you have a test iOS device?
+   - How will you monitor APNS responses?
+
+3. **Update Frequency**
+   - Should all pet updates trigger pass updates?
+   - Any rate limiting needed?
+   - How to handle bulk updates?
+
+4. **User Experience**
+   - Which updates should show notifications?
+   - Which should be silent?
+   - What change messages to use?
+
+5. **Error Handling**
+   - How to handle failed APNS pushes?
+   - Retry logic needed?
+   - User notifications for failures?
+
+---
+
+## Next Steps
+
+1. Review this plan and confirm approach
+2. Answer questions above
+3. Begin Phase 1 implementation (Database Schema)
+4. Test each phase incrementally
+5. Deploy to production with monitoring
+
+---
+
+**Document Version:** 1.0
+**Last Updated:** 2025-11-27
+**Status:** Ready for Implementation
