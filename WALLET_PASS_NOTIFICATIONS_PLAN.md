@@ -22,6 +22,422 @@ Based on research, here's what Apple requires for pass updates:
 
 ---
 
+## Prerequisites: Apple Developer Account Setup
+
+**⚠️ IMPORTANT:** If you don't already have an Apple Developer account with a Pass Type ID certificate, you MUST complete these steps BEFORE implementing wallet pass notifications.
+
+### Step 1: Enroll in Apple Developer Program
+
+**Requirements:**
+- Cost: **$99 USD per year**
+- Apple ID (create one at https://appleid.apple.com if you don't have one)
+- Valid payment method (credit card)
+- Business information (if enrolling as an organization)
+
+**Enrollment Process:**
+
+1. **Go to Apple Developer Program enrollment page:**
+   - Visit: https://developer.apple.com/programs/enroll/
+
+2. **Sign in with your Apple ID**
+   - Use your personal Apple ID or create a new one
+   - If enrolling as an organization, you'll need D-U-N-S number
+
+3. **Choose enrollment type:**
+   - **Individual**: Personal account, apps published under your name
+   - **Organization**: Business account, requires company verification (2-3 days)
+
+4. **Complete enrollment form:**
+   - Provide contact information
+   - Accept license agreement
+   - Pay $99 annual fee
+
+5. **Wait for approval:**
+   - Individual: Usually instant
+   - Organization: 1-3 business days for verification
+
+6. **Confirmation:**
+   - You'll receive email confirmation
+   - Access to Apple Developer portal at https://developer.apple.com/account
+
+---
+
+### Step 2: Create Pass Type ID
+
+**What is a Pass Type ID?**
+- A unique reverse-domain identifier for your wallet passes (e.g., `pass.com.petinfo.link`)
+- Required to sign wallet passes and send push notifications
+- Cannot be changed once created
+
+**Creation Steps:**
+
+1. **Log in to Apple Developer Account:**
+   - Visit: https://developer.apple.com/account
+   - Go to: **Certificates, Identifiers & Profiles**
+
+2. **Create new Pass Type ID:**
+   - Click **Identifiers** in sidebar
+   - Click the **+** button (top right)
+   - Select **Pass Type IDs**
+   - Click **Continue**
+
+3. **Register Pass Type ID:**
+   - **Description**: `Pet Info Pass` (or your app name)
+   - **Identifier**: `pass.com.petinfo.link` (use your domain)
+     - Format: `pass.com.yourdomain.yourapp`
+     - Must start with `pass.`
+     - Use reverse-domain notation
+   - Click **Continue**
+   - Review and click **Register**
+
+4. **Verify creation:**
+   - You should see your Pass Type ID in the list
+   - **Status**: Should show "Enabled"
+   - **Note the identifier** - you'll need it in your code
+
+---
+
+### Step 3: Generate Pass Type ID Certificate
+
+**What is this certificate for?**
+- Signs your .pkpass files (cryptographic signature)
+- Authenticates with Apple Push Notification Service (APNS)
+- **CRITICAL**: You need the SAME certificate for both pass signing AND push notifications
+
+**Certificate Generation Process:**
+
+#### 3.1: Create Certificate Signing Request (CSR) on Mac
+
+**On macOS:**
+
+1. **Open Keychain Access:**
+   - Applications → Utilities → Keychain Access
+
+2. **Request a Certificate:**
+   - Menu: **Keychain Access** → **Certificate Assistant** → **Request a Certificate from a Certificate Authority**
+
+3. **Fill in CSR information:**
+   - **User Email Address**: Your email (e.g., `dev@petinfo.link`)
+   - **Common Name**: `Pet Info Pass Certificate` (descriptive name)
+   - **CA Email Address**: Leave blank
+   - **Request is**: Select **"Saved to disk"**
+   - Click **Continue**
+
+4. **Save CSR file:**
+   - Save as: `PassTypeID.certSigningRequest`
+   - Location: Desktop or Documents
+   - Click **Save**
+
+**On Linux (using OpenSSL):**
+
+```bash
+# Generate private key
+openssl genrsa -out pass_private_key.pem 2048
+
+# Generate CSR
+openssl req -new -key pass_private_key.pem -out PassTypeID.certSigningRequest \
+  -subj "/emailAddress=dev@petinfo.link/CN=Pet Info Pass Certificate/C=US"
+
+# IMPORTANT: Keep pass_private_key.pem secure - you'll need it later!
+```
+
+#### 3.2: Upload CSR to Apple Developer Portal
+
+1. **Go to Certificates section:**
+   - https://developer.apple.com/account/resources/certificates/list
+   - Click the **+** button (top right)
+
+2. **Select certificate type:**
+   - Scroll to **Services** section
+   - Select **Pass Type ID Certificate**
+   - Click **Continue**
+
+3. **Choose Pass Type ID:**
+   - Select the Pass Type ID you created earlier (`pass.com.petinfo.link`)
+   - Click **Continue**
+
+4. **Upload CSR:**
+   - Click **Choose File**
+   - Select your `PassTypeID.certSigningRequest` file
+   - Click **Continue**
+
+5. **Download certificate:**
+   - Click **Download**
+   - Save as: `pass_certificate.cer`
+   - **Status**: Certificate is now "Active"
+
+#### 3.3: Install and Export Certificate
+
+**On macOS:**
+
+1. **Install certificate:**
+   - Double-click `pass_certificate.cer`
+   - It will open in Keychain Access
+   - Certificate is added to **login** keychain
+
+2. **Export certificate with private key:**
+   - In Keychain Access, find "Pass Type ID: pass.com.petinfo.link"
+   - Expand the arrow to see private key underneath
+   - **Right-click** on the certificate (not the key)
+   - Select **Export "Pass Type ID: pass.com.petinfo.link"**
+   - **File Format**: Select **Personal Information Exchange (.p12)**
+   - Save as: `pass_certificate.p12`
+   - **Set a password** (remember this!)
+   - Click **Save**
+   - Enter your Mac password to allow export
+
+3. **Convert P12 to PEM format (for Rust app):**
+
+```bash
+# Extract certificate
+openssl pkcs12 -in pass_certificate.p12 -clcerts -nokeys -out pass_cert.pem
+
+# Extract private key
+openssl pkcs12 -in pass_certificate.p12 -nocerts -out pass_key_encrypted.pem
+
+# Remove passphrase from private key (optional, for production use environment variables)
+openssl rsa -in pass_key_encrypted.pem -out pass_key.pem
+
+# Verify files
+ls -la pass_cert.pem pass_key.pem
+```
+
+**On Linux:**
+
+```bash
+# You already have the private key from Step 3.1
+# Just need to convert the .cer to PEM format
+
+# Convert certificate to PEM
+openssl x509 -inform DER -in pass_certificate.cer -out pass_cert.pem
+
+# Your private key is already in PEM format
+# Copy it to the final name
+cp pass_private_key.pem pass_key.pem
+
+# Verify files
+ls -la pass_cert.pem pass_key.pem
+```
+
+---
+
+### Step 4: Download Apple WWDR Certificate
+
+**What is WWDR Certificate?**
+- Apple Worldwide Developer Relations Certificate Authority certificate
+- Required intermediate certificate for pass signing
+- Different from your Pass Type ID certificate
+
+**Download Process:**
+
+1. **Download WWDR G4 Certificate:**
+   - Visit: https://www.apple.com/certificateauthority/
+   - Scroll to **Apple Intermediate Certificates**
+   - Download: **Worldwide Developer Relations - G4** (for passes created after 2022)
+   - File: `AppleWWDRCAG4.cer`
+
+2. **Convert to PEM format:**
+
+```bash
+openssl x509 -inform DER -in AppleWWDRCAG4.cer -out wwdr.pem
+```
+
+3. **Verify you have all certificate files:**
+
+```bash
+ls -la pass_cert.pem pass_key.pem wwdr.pem
+```
+
+You should see three files:
+- `pass_cert.pem` - Your Pass Type ID certificate
+- `pass_key.pem` - Private key for your certificate
+- `wwdr.pem` - Apple WWDR intermediate certificate
+
+---
+
+### Step 5: Update Your Application Configuration
+
+**File locations for certificates:**
+
+1. **For development (local):**
+   ```bash
+   mkdir -p ~/pet-info/certs
+   cp pass_cert.pem ~/pet-info/certs/
+   cp pass_key.pem ~/pet-info/certs/
+   cp wwdr.pem ~/pet-info/certs/
+   chmod 600 ~/pet-info/certs/*.pem  # Secure permissions
+   ```
+
+2. **Update environment variables:**
+   ```bash
+   # Add to .env or export
+   export APNS_PASS_CERT_PATH="/home/user/pet-info/certs/pass_cert.pem"
+   export APNS_PASS_KEY_PATH="/home/user/pet-info/certs/pass_key.pem"
+   export APNS_ENVIRONMENT="sandbox"  # Use sandbox for testing
+   export PASS_WWDR_CERT_PATH="/home/user/pet-info/certs/wwdr.pem"
+   ```
+
+3. **For production (AWS EC2):**
+   ```bash
+   # Upload certificates to EC2 instance
+   scp pass_cert.pem user@your-ec2:/etc/pet-info/certs/
+   scp pass_key.pem user@your-ec2:/etc/pet-info/certs/
+   scp wwdr.pem user@your-ec2:/etc/pet-info/certs/
+
+   # Set secure permissions
+   ssh user@your-ec2 "chmod 600 /etc/pet-info/certs/*.pem"
+
+   # Add to SSM Parameter Store (recommended)
+   aws ssm put-parameter \
+     --name /pet-info/APNS_PASS_CERT_PATH \
+     --value "/etc/pet-info/certs/pass_cert.pem" \
+     --type String
+
+   aws ssm put-parameter \
+     --name /pet-info/APNS_PASS_KEY_PATH \
+     --value "/etc/pet-info/certs/pass_key.pem" \
+     --type String
+   ```
+
+---
+
+### Step 6: Verify Your Pass Type ID
+
+**Check your existing passes.rs implementation:**
+
+1. **Find your current Pass Type ID:**
+   ```bash
+   grep -n "passTypeIdentifier" web_app/src/api/passes.rs
+   ```
+
+2. **Verify it matches your Apple Developer account:**
+   - Should be: `pass.com.petinfo.link`
+   - If different, you'll need to either:
+     - **Option A**: Update your code to use the new Pass Type ID
+     - **Option B**: Create a new Pass Type ID in Apple Developer portal to match your code
+
+3. **Check Team Identifier:**
+   ```bash
+   grep -n "teamIdentifier" web_app/src/api/passes.rs
+   ```
+
+   - Find your Team ID in Apple Developer portal:
+     - Go to: https://developer.apple.com/account
+     - Click **Membership** in sidebar
+     - **Team ID**: 10-character alphanumeric (e.g., `S89P27T8CF`)
+   - Verify it matches your code
+
+---
+
+### Step 7: Testing Strategy
+
+**Important: Use Sandbox Environment First**
+
+1. **Start with APNS Sandbox:**
+   ```bash
+   export APNS_ENVIRONMENT="sandbox"
+   ```
+
+2. **Development workflow:**
+   - Generate passes with `webServiceURL` and `authenticationToken`
+   - Test on physical iOS device (Simulator doesn't support push notifications)
+   - Monitor logs for APNS responses
+   - Check device registration in database
+
+3. **Switch to Production:**
+   - Only after successful sandbox testing
+   - Update environment variable:
+     ```bash
+     export APNS_ENVIRONMENT="production"
+     ```
+   - Deploy to production server
+   - Test with real users
+
+---
+
+### Certificate Expiration and Renewal
+
+**Important Notes:**
+
+1. **Certificate Validity:**
+   - Pass Type ID certificates are valid for **3 years**
+   - Check expiration date:
+     ```bash
+     openssl x509 -in pass_cert.pem -noout -enddate
+     ```
+
+2. **Before Expiration:**
+   - Renew certificate 30 days before expiration
+   - Generate new CSR
+   - Download new certificate
+   - Replace old certificate files
+   - **No code changes needed** if Pass Type ID stays the same
+   - Restart application to load new certificate
+
+3. **Calendar Reminder:**
+   - Set reminder for certificate expiration
+   - Apple Developer portal will also send email reminders
+
+---
+
+### Troubleshooting Certificate Issues
+
+#### Issue: "Certificate not found" error
+**Solution:**
+- Verify file paths in configuration
+- Check file permissions (should be 600)
+- Ensure certificates are in PEM format
+
+#### Issue: "Invalid certificate" when signing passes
+**Solution:**
+- Verify certificate is for Pass Type ID (not iOS App Development)
+- Check that Pass Type ID in code matches certificate
+- Ensure WWDR certificate is included
+
+#### Issue: APNS connection fails
+**Solution:**
+- Verify using correct certificate (Pass Type ID, not APNs)
+- Check environment (sandbox vs production)
+- Ensure certificate hasn't expired
+- Test network connectivity to APNS servers
+
+#### Issue: "Unable to load private key"
+**Solution:**
+- Verify private key is in PEM format
+- Check if key is encrypted (should be decrypted)
+- Ensure key matches certificate
+- Test with: `openssl rsa -in pass_key.pem -check`
+
+---
+
+### Summary Checklist: Apple Developer Account Setup
+
+- [ ] Enroll in Apple Developer Program ($99/year)
+- [ ] Wait for account approval (instant to 3 days)
+- [ ] Create Pass Type ID (`pass.com.petinfo.link`)
+- [ ] Generate Certificate Signing Request (CSR)
+- [ ] Create Pass Type ID Certificate in Apple Developer portal
+- [ ] Download certificate (.cer file)
+- [ ] Export certificate with private key (.p12 on Mac)
+- [ ] Convert to PEM format (pass_cert.pem and pass_key.pem)
+- [ ] Download Apple WWDR G4 Certificate
+- [ ] Convert WWDR to PEM format (wwdr.pem)
+- [ ] Upload certificates to server (development and production)
+- [ ] Set secure file permissions (chmod 600)
+- [ ] Update configuration with certificate paths
+- [ ] Verify Pass Type ID matches your code
+- [ ] Verify Team ID matches your code
+- [ ] Set APNS environment to "sandbox" for testing
+- [ ] Test pass generation and signing
+- [ ] Test APNS connection
+- [ ] Set calendar reminder for certificate expiration (3 years)
+
+**Estimated Time:** 2-4 hours (including waiting for account approval)
+
+**Cost:** $99 USD/year (Apple Developer Program membership)
+
+---
+
 ## Implementation Plan
 
 ### Phase 1: Database Schema Changes
