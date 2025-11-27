@@ -2,6 +2,19 @@ resource "aws_route53domains_domain" "domain" {
   domain_name = var.domain_name
   auto_renew  = true
 
+  name_server {
+    name = aws_route53_zone.zone.name_servers[0]
+  }
+  name_server {
+    name = aws_route53_zone.zone.name_servers[1]
+  }
+  name_server {
+    name = aws_route53_zone.zone.name_servers[2]
+  }
+  name_server {
+    name = aws_route53_zone.zone.name_servers[3]
+  }
+
 
   admin_contact {
     address_line_1    = var.domain_owner_contact.address_line_1
