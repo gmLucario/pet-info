@@ -366,7 +366,6 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
 /// - All images must be PNG format (Apple Wallet requirement)
 /// - Thumbnail images are resized to optimal dimensions using `consts::PKPASS_THUMBNAIL_SIZE_PX`
 /// - Uses Lanczos3 filter for high-quality image downsampling
-/// - Converts to RGB8 (removes alpha channel) for better compression
 /// - Applies maximum PNG compression (CompressionType::Best) with adaptive filtering
 /// - Missing resources won't cause failures (graceful degradation)
 ///
@@ -409,9 +408,6 @@ async fn add_pass_resources(
             image::imageops::FilterType::Lanczos3,
         );
 
-        // Convert to RGB8 (remove alpha channel) for better compression - pet photos don't need transparency
-        let rgb_image = resized.to_rgb8();
-
         // Encode to PNG with maximum compression for smallest file size
         let mut png_bytes = Vec::new();
         let encoder = image::codecs::png::PngEncoder::new_with_quality(
@@ -421,10 +417,10 @@ async fn add_pass_resources(
         );
         encoder
             .write_image(
-                rgb_image.as_raw(),
-                rgb_image.width(),
-                rgb_image.height(),
-                image::ExtendedColorType::Rgb8,
+                resized.as_bytes(),
+                resized.width(),
+                resized.height(),
+                resized.color().into(),
             )
             .context("Failed to encode image as optimized PNG")?;
 
