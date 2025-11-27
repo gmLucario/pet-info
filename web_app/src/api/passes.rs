@@ -362,8 +362,9 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
 /// - **Thumbnail**: Pet's photo (optional, used as pass thumbnail)
 ///
 /// ## Resource Requirements
-/// - Icons should be PNG format for best compatibility
-/// - Images are automatically resized by the passes-rs crate
+/// - All images must be PNG format (Apple Wallet requirement)
+/// - Thumbnail images are resized to 180x180 pixels (@2x for 90x90pt on Retina displays)
+/// - Uses Lanczos3 filter for high-quality image downsampling
 /// - Missing resources won't cause failures (graceful degradation)
 ///
 /// ## Parameters
@@ -394,11 +395,21 @@ async fn add_pass_resources(
             .await?;
 
         // Convert to PNG format (Apple Wallet requirement - all images must be PNG)
+        // Resize to 180x180 pixels (@2x for 90x90 points thumbnail on Retina displays)
         let img = image::load_from_memory(&image_bytes)
             .context("Failed to load pet image for pass")?;
 
+        // Resize to thumbnail dimensions (180x180 for @2x Retina displays)
+        // Using Lanczos3 for high-quality downsampling
+        let resized = img.resize_to_fill(
+            180,
+            180,
+            image::imageops::FilterType::Lanczos3,
+        );
+
         let mut png_bytes = Vec::new();
-        img.write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+        resized
+            .write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
             .context("Failed to convert image to PNG format")?;
 
         package
