@@ -13,6 +13,11 @@ locals {
       type        = "String"
       description = "Environment name (prod, dev, staging)"
     }
+    CLOUDFRONT_URL = {
+      value       = "https://${module.cloudfront.cloudfront_domain_name}"
+      type        = "String"
+      description = "CloudFront URL for serving images"
+    }
   }
 
   # Merge default parameters with user-provided sensitive parameters
@@ -43,6 +48,42 @@ module "pet_info_bucket" {
       acl    = "public-read"
     },
   ]
+}
+
+module "cloudfront" {
+  source = "./modules/cloudfront"
+
+  project_name                = "pet-info"
+  bucket_regional_domain_name = module.pet_info_bucket.info.bucket_regional_domain_name
+  origin_id                   = module.pet_info_bucket.info.name
+
+  tags = {
+    Project = "pet-info"
+  }
+}
+
+resource "aws_s3_bucket_policy" "allow_access_from_cloudfront" {
+  bucket = module.pet_info_bucket.info.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontServicePrincipal"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${module.pet_info_bucket.info.arn}/pics/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = module.cloudfront.cloudfront_arn
+          }
+        }
+      }
+    ]
+  })
 }
 
 module "lambda_send_reminders" {
