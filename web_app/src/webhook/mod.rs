@@ -14,4 +14,5 @@
 //! - Other messaging platforms
 //! - Third-party service integrations
 
+pub mod routes;
 pub mod whatsapp;
