@@ -11,7 +11,7 @@ sudo -E certbot certonly --dns-route53 -d pet-info.link
 ```
 
 ```bash
-Certificate is saved at: /etc/letsencrypt/live/pet-info.link/fullchain.pem (1st section)
+Certificate is saved at: /etc/letsencrypt/live/pet-info.link/fullchain.pem
 Key is saved at:         /etc/letsencrypt/live/pet-info.link/privkey.pem
 ```
 
@@ -35,31 +35,4 @@ inside the instance:
 git reset --hard origin/main
 
 cd /home/ec2-user/ && sudo chown -R ec2-user:ec2-user pet-info/
-```
-
-```bash
-sudo -E ENV=prod nohup ./pet-info > app.log 2>&1 &
-sudo -E nohup ./pet-info > app.log 2>&1 &
-
-# Stop the app
-pkill -f pet-info
-
-# Copy new executable (after uploading it)
-# chmod +x pet-info (if needed)
-
-# Apply capability to bind to port 443
-sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info
-
-# Start the app
-cd /home/ec2-user/pet-info/web_app && source ~/.bashrc && nohup ./pet-info > app.log 2>&1 &
-
-# Verify it's running
-sleep 2 && ps aux | grep pet-info
-```
-
-[1] 27340
-
-local
-```bash
-scp -i /Users/gmlucario/Documents/learning/rust/pet-info/terraform/pet-info.pem /Users/gmlucario/Documents/learning/rust/pet-info/web_app/out/pet-info  ec2-user@3.23.154.245:/home/ec2-user/pet-info/web_app
 ```
