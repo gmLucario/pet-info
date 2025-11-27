@@ -1,18 +1,17 @@
 # Pet Info Web Application
 
-A comprehensive pet information management system built with Rust, featuring QR code generation, payment processing via MercadoPago, WhatsApp notifications, Apple Wallet integration, and PDF health reports. The application provides pet owners with a centralized platform to manage pet profiles, health records, reminders, and owner contact information.
+A pet information management system built with Rust, featuring QR code generation, payment processing via MercadoPago, WhatsApp notifications, Apple passes wallet, and PDF reports. The application provides pet owners with a centralized platform to manage pet profiles, health records, and reminders.
 
 **Demo**: https://pet-info.link
-**Edition**: Rust 2024
 
 ## 🏗️ Current Infrastructure
 
 ### Architecture Overview
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────────────────┐
-│   pet-info.link │────│   Route 53 DNS   │────│      Single EC2 Instance        │
-│   (Domain)      │    │                  │    │                                 │
-└─────────────────┘    └──────────────────┘    │  ┌──────────────────────────┐   │
+┌─────────────────┐    ┌──────────────────┐     ┌─────────────────────────────────┐
+│   pet-info.link │────│   Route 53 DNS   │──── │      Single EC2 Instance        │
+│   (Domain)      │    │                  │     │                                 │
+└─────────────────┘    └──────────────────┘     │  ┌──────────────────────────┐   │
                                                 │  │   Nginx Reverse Proxy    │   │
                                  HTTPS :443 ────┼─▶│   SSL/TLS Termination    │   │
                                                 │  └────────────┬─────────────┘   │
@@ -22,13 +21,13 @@ A comprehensive pet information management system built with Rust, featuring QR 
                                                 │  │   (localhost:8080)       │   │
                                                 │  └──────────────────────────┘   │
                                                 └─────────────────────────────────┘
-                                                         │
-                       ┌──────────────────────────────────┼──────────────────────────────────┐
-                       │                                  │                                  │
-               ┌───────▼────────┐              ┌─────────▼────────┐              ┌─────────▼────────┐
-               │   SQLite DB    │              │      S3 Bucket   │              │  SSM Parameters  │
-               │  (File-based)  │              │  (File Storage)  │              │ (Configuration)  │
-               └────────────────┘              └──────────────────┘              └──────────────────┘
+                                                          │
+                       ┌──────────────────────────────────┼─────────────────────────────────┐
+                       │                                  │                                 │
+               ┌───────▼────────┐               ┌─────────▼────────┐              ┌─────────▼────────┐
+               │   SQLite DB    │               │      S3 Bucket   │              │  SSM Parameters  │
+               │  (File-based)  │               │  (File Storage)  │              │ (Configuration)  │
+               └────────────────┘               └──────────────────┘              └──────────────────┘
 ```
 
 ### Current Deployment Stack
@@ -40,23 +39,22 @@ A comprehensive pet information management system built with Rust, featuring QR 
 - **Route 53** for DNS management
 - **Let's Encrypt SSL/TLS** certificates with certbot-dns-route53
 - **AWS SSM** Parameter Store for sensitive env values
-- **AWS Step Functions** for scheduled notifications
-- **Lambda Functions** for WhatsApp message processing
+- **AWS Step Functions** & **Lambda Functions** for scheduled notifications via WhatsApp
 
 ## 🚀 Application Features
 
 ### Core Functionality
-- **Pet Profile Management** - Create, edit, delete, and manage complete pet information including name, birthday, breed, gender, spaying/neutering status, and photos
+- **Pet Profile Management** - Create, edit, delete, and manage complete pet information including name, birthday, breed, gender, spaying/neutering status, and a pic photo
 - **QR Code Generation** - Unique QR codes for each pet linking to public profiles with PNG output using tiny-skia
-- **Payment Processing** - MercadoPago integration with subscription management and payment balance tracking
-- **WhatsApp Integration** - Two-way webhook integration for automated reminders, notifications, and interactive messages
+- **Payment Processing** - Single payment via MercadoPago
+- **WhatsApp Integration** - Two-way webhook integration for automated reminders, and interactive messages
 - **Apple Wallet Passes** - Generate digital pet ID cards (.pkpass files) for iOS devices
 - **Google OAuth 2.0** - Secure user authentication and session management
-- **PDF Reports** - Generate comprehensive pet health reports using Typst template engine
-- **File Upload & Storage** - Pet photos and document management with AWS S3 integration
-- **Health Records** - Track vaccinations, deworming, vet visits, and custom health events
+- **PDF Reports** - Generate comprehensive pet reports using Typst template engine
+- **File Upload & Storage** - Pet pic photo stored in AWS S3 integration
+- **Health Records** - Track vaccinations, deworming, and weight
 - **Pet Notes** - Rich text notes with Quill.js editor for detailed pet information
-- **Reminders System** - Create and manage pet care reminders with WhatsApp notifications via AWS Step Functions
+- **Reminders System** - Create and manage pet care reminders with WhatsApp messages
 - **Owner Contacts** - Manage multiple owner contact information for lost pet scenarios
 - **Public Pet Profiles** - Shareable public profiles accessible via QR codes or direct links
 
@@ -67,6 +65,7 @@ A comprehensive pet information management system built with Rust, featuring QR 
 - **OAuth 2.0** - Secure authentication
 - **TOTP** - Two-factor authentication support
 - **Secrets Management** - AWS SSM Parameter Store integration
+- **MTLS** - For webhooks
 
 ## 🛠️ Technical Stack
 
@@ -83,17 +82,15 @@ A comprehensive pet information management system built with Rust, featuring QR 
   - csrf 0.5.0 with AES-GCM encryption
   - argon2 0.5.3 for key derivation
   - openssl 0.10 (vendored) for TLS
-- **Async Runtime**: tokio 1.48 with sync features
-- **Serialization**: serde 1.0.228 + serde_json 1.0.145
-- **HTTP Client**: reqwest 0.12.24 with JSON and multipart support
+  - mtls for webhook endpoints
 - **Observability**:
   - logfire 0.5.0 for metrics and tracing
   - tracing 0.1.41 + opentelemetry 0.29.1
 - **AWS SDK**:
   - aws-sdk-s3 1.115.0 for file storage
-  - aws-sdk-ssm 1.100.0 for configuration (optional feature)
+  - aws-sdk-ssm 1.100.0 for configuration
   - aws-sdk-sfn 1.95.0 for Step Functions
-- **Testing**: mockall 0.13.1 for mocking
+- **Testing**: mockall 0.13.1
 
 ### Frontend
 - **Templates**: Tera HTML templates with HTMX
@@ -102,7 +99,6 @@ A comprehensive pet information management system built with Rust, featuring QR 
   - Quill.js for rich text editing
   - Cropper.js for image cropping
 - **CSS**: Pico CSS with custom theme switcher
-- **Markdown**: pulldown-cmark 0.12.2 + ammonia 4.1.2 for sanitization
 
 ### Infrastructure (Terraform)
 - **Cloud Provider**: AWS (us-east-2)
@@ -115,9 +111,6 @@ A comprehensive pet information management system built with Rust, featuring QR 
 - **Serverless**: Lambda (Rust) + Step Functions for scheduled notifications
 
 ### Additional Components
-- **Lambda Functions**: Rust-based send-reminders function with WhatsApp integration
-- **Database Migrations**: SQL-based migrations in migrations/ directory
-- **Scripts**: CLI tool for running migrations (Clap 4.5.32)
 - **Build System**: Docker-based builds for EC2 and Lambda deployments
 
 ## ⚙️ Configuration Management
@@ -152,146 +145,6 @@ cargo build --release --features ssm
 /pet-info/GOOGLE_OAUTH_CLIENT_SECRET (SecureString)
 ```
 
-## 🗄️ Database Schema
-
-The application uses SQLite with SQLCipher encryption. The database includes the following tables:
-
-### Core Tables
-- **user_app** - User accounts with email, phone, subscription status, and account roles
-- **pet** - Pet profiles with name, birthday, breed, photos, and characteristics
-- **pet_external_id** - External IDs for public pet profiles (used in QR codes)
-- **pet_linked** - Links pets to their external IDs
-
-### Health & Care
-- **pet_health** - Health records (vaccinations, deworming, vet visits)
-- **pet_weight** - Weight tracking over time
-- **pet_note** - Rich text notes about pets
-
-### User Management
-- **owner_contact** - Emergency contact information for pet owners
-- **reminder** - Scheduled reminders with WhatsApp notification integration
-
-### Payments
-- **user_sub_payment** - MercadoPago payment records with idempotency
-- **add_pet_balance** - User balance for adding additional pets
-
-### Key Features
-- **Encryption**: All data encrypted at rest with SQLCipher
-- **Cascade Deletes**: Automatic cleanup of related records
-- **Indexes**: Optimized queries on email, external_id, health_record, and execution_id
-- **Timestamps**: UTC timestamps for all records
-- **Constraints**: Unique constraints on emails, payments, and external IDs
-
-
-## 🔔 Reminder System Architecture
-
-The application uses AWS Step Functions and Lambda for scheduled WhatsApp reminders:
-
-### Workflow
-1. **User Creates Reminder** → `POST /reminder/create`
-2. **Step Function Execution Starts** → State machine is triggered with:
-   ```json
-   {
-     "when": "2025-12-01T14:00:00Z",
-     "reminder": {
-       "phone": "whatsapp-phone-number",
-       "body": "Reminder message"
-     }
-   }
-   ```
-3. **Wait State** → Step Function waits until scheduled time
-4. **Lambda Invocation** → `send-reminders` Lambda function is invoked
-5. **WhatsApp Message** → Lambda sends message via WhatsApp Business API
-
-### Lambda Function (send-reminders)
-- **Runtime**: Rust (ARM64)
-- **Trigger**: AWS Step Functions
-- **Build**: `cargo lambda build --release --arm64 --output-format zip`
-- **Payload**:
-  ```json
-  {
-    "phone": "whatsapp-phone-number",
-    "body": "Desparasitar galleta"
-  }
-  ```
-
-### Step Function Definition
-- **State Machine**: `reminder_workflow`
-- **States**: WaitState → InvokeLambda
-- **IAM Permissions**: Lambda invoke, CloudWatch logs
-- **Execution Tracking**: Each reminder has unique `execution_id` stored in database
-
-### Error Handling
-- **TODO**: Implement SQS dead letter queue for failed reminders
-- **Retry Logic**: Configured at Lambda level
-- **Monitoring**: CloudWatch logs and metrics
-
-## 🌐 API Routes & Endpoints
-
-The application provides a comprehensive REST-like API organized into logical route groups:
-
-### Public Routes
-- `GET /info/{pet_external_id}` - View public pet profile (QR code destination)
-- `GET /blog/{entry_id}` - Blog entries (privacy, terms, about, questions)
-- `GET /` - Landing page
-- `GET /static/*` - Static assets (CSS, JS, images)
-
-### Pet Management (`/pet`)
-- `GET /pet` - Pet dashboard
-- `GET /pet/list` - List user's pets
-- `GET /pet/details/{pet_id}` - Pet details form
-- `POST /pet/create` - Create new pet
-- `PUT /pet/edit/{pet_id}` - Update pet
-- `DELETE /pet/delete/{pet_id}` - Delete pet
-- `GET /pet/qr_code/{pet_external_id}` - Generate QR code (PNG)
-- `GET /pet/pdf_report/{pet_id}` - Generate PDF health report
-- `GET /pet/public_pic/{pet_external_id}` - Get pet photo
-- `GET /pet/pass/{pet_external_id}` - Download Apple Wallet pass
-
-### Health Records (`/pet/health`)
-- `GET /pet/health/{pet_external_id}/{health_type}` - View health records
-- `POST /pet/health/add` - Add health record
-- `DELETE /pet/health/delete` - Delete health record
-
-### Pet Notes (`/pet/note`)
-- `GET /pet/note/{pet_id}` - Notes view
-- `POST /pet/note/new` - Create note
-- `GET /pet/note/list/{pet_id}` - List notes
-- `DELETE /pet/note/delete` - Delete note
-
-### Reminders (`/reminder`)
-- `GET /reminder` - Reminders dashboard
-- `GET /reminder/list` - List reminders
-- `POST /reminder/create` - Create reminder (triggers Step Function)
-- `DELETE /reminder/delete/{reminder_id}` - Delete reminder
-- `POST /reminder/phone/start-verification` - Start phone verification
-- `POST /reminder/phone/send-code` - Send verification code
-- `POST /reminder/phone/verify` - Verify phone number
-- `DELETE /reminder/phone/remove` - Remove verified phone
-
-### User Profile (`/profile`)
-- `GET /profile` - Profile management
-- `POST /profile/contact/add` - Add owner contact
-- `GET /profile/contact/list` - List contacts
-- `DELETE /profile/contact/delete/{contact_id}` - Delete contact
-- `DELETE /profile/delete-data` - Delete all user data
-- `POST /profile/logout` - Logout
-
-### Checkout (`/checkout`)
-- `GET /checkout` - Checkout page
-- `POST /checkout/process` - Process MercadoPago payment
-
-### Webhooks (`/webhook`)
-- `GET /webhook/whatsapp` - WhatsApp webhook verification
-- `POST /webhook/whatsapp` - WhatsApp webhook receiver (messages & statuses)
-
-### Authentication
-- `GET /oauth/google/callback` - Google OAuth callback
-- `GET /reactivate-account` - Account reactivation page
-- `POST /reactivate-account` - Reactivate deleted account
-
-## 📊 Current Limitations & Production Readiness
-
 #### Critical Issues
 1. **Single Point of Failure** - One EC2 instance
 2. **SQLite Limitations** - Not suitable for concurrent workloads
@@ -303,21 +156,9 @@ The application provides a comprehensive REST-like API organized into logical ro
 - **Database**: SQLite → Should migrate to RDS PostgreSQL
 - **Compute**: Single instance → Need Auto Scaling Groups
 - **Storage**: Local files → Should use S3 + CloudFront CDN
-- **Monitoring**: Basic → Need CloudWatch + alerting
+- **Monitoring**: Basic → alerting
 
 ### ✅ What's Ready for Production
-
-#### Code Quality
-- **Memory Safety** - Rust prevents common vulnerabilities
-- **Type Safety** - Compile-time error prevention
-- **Error Handling** - Comprehensive error management
-- **Security** - Industry-standard cryptographic implementations
-
-#### Infrastructure Foundation
-- **IaC with Terraform** - Reproducible infrastructure
-- **SSL/TLS** - Secure communications
-- **Domain Management** - Professional DNS setup
-- **Configuration Management** - Secure parameter storage
 
 ## 🎯 Performance Characteristics
 
@@ -405,104 +246,10 @@ The infrastructure deployment includes:
 - Route 53 DNS configuration
 - Security groups and networking
 
-#### 3. EC2 Instance Setup
-
-```bash
-# SSH into EC2 instance
-ssh -i terraform/pet-info.pem ec2-user@<instance-ip>
-
-# Upload compiled binary
-scp -i terraform/pet-info.pem web_app/out/pet-info ec2-user@<instance-ip>:/home/ec2-user/pet-info/web_app/
-
-# Set up permissions
-cd /home/ec2-user/pet-info
-sudo chown -R ec2-user:ec2-user .
-chmod +x web_app/pet-info
-
-# Apply capability to bind to port 443 (if needed)
-sudo setcap CAP_NET_BIND_SERVICE=+ep /home/ec2-user/pet-info/web_app/pet-info
-
-# Start application (with SSM configuration)
-cd web_app
-nohup ./pet-info > app.log 2>&1 &
-
-# Verify it's running
-ps aux | grep pet-info
-
-# Stop application
-pkill -f pet-info
-```
-
-#### 4. SSL/TLS Certificate Setup
-```bash
-# Install certbot with Route53 plugin
-uv venv && source .venv/bin/activate && uv pip install certbot-dns-route53
-
-# Create or renew certificate
-sudo -E certbot certonly --dns-route53 -d pet-info.link
-
-# Certificate locations:
-# /etc/letsencrypt/live/pet-info.link/fullchain.pem
-# /etc/letsencrypt/live/pet-info.link/privkey.pem
-
-# Check certificate status
-sudo certbot certificates
-```
-
-### Build Features
-
-#### Compilation Modes
-```bash
-# Development build (with env vars)
-cargo build
-
-# Production build (with SSM Parameter Store)
-cargo build --release --features ssm
-```
-
-#### Docker Builds
-The project uses multi-stage Docker builds for cross-compilation:
-- **ec2.Dockerfile**: Builds for x86_64 EC2 instances
-- **lambda_build.Dockerfile**: Builds Lambda functions with ARM64 target
-
-### Server Architecture
-- **Application Port**: 8080 (HTTP, localhost only)
-- **Public Port**: 443 (HTTPS, handled by nginx reverse proxy)
-- **Protocol**: HTTP/1.1
-- **Compression**: Gzip compression enabled
-- **Sessions**: Secure cookies with configurable expiration
-- **CORS**: Configured for Google OAuth, MercadoPago, and WhatsApp APIs
-
----
-
-## 📝 Additional Resources
-
-- **Migrations**: SQL schema files in `migrations/create_tables.sql`
-- **Blog Content**: Markdown files in `web_app/web/blog/` (privacy, terms, about, questions)
-- **PDF Templates**: Typst templates in `web_app/web/reports/`
-- **Frontend Assets**: Static files in `web_app/web/static/`
-- **Templates**: Tera HTML templates in `web_app/web/templates/`
-
-## 🛠️ Development Tools
-
-- **Language**: Rust 2024 Edition
-- **Build System**: Cargo + Make + Docker
-- **Database CLI**: Custom migration tool in `scripts/`
-- **Testing**: mockall for unit testing
-- **Linting**: clippy (recommended)
-- **Formatting**: rustfmt (recommended)
-
-## 📊 Observability
-
-- **Logging**: Logfire with OpenTelemetry integration
-- **Metrics**: Prometheus-compatible metrics via Logfire
-- **Tracing**: Distributed tracing with tracing crate
-- **Monitoring**: CloudWatch (Lambda, Step Functions)
 
 ---
 
 **Status**: Production (Alpha)
 **Version**: 0.1.0
 **Last Updated**: November 2025
-**Production Readiness**: 60% (infrastructure needs scaling improvements, code is solid)
-**Demo**: https://pet-info.link
+**Production Readiness**: 75% (infrastructure needs scaling improvements, code is solid)
