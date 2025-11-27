@@ -353,30 +353,41 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
     Ok(package)
 }
 
+/// Convert to PNG format (Apple Wallet requirement - all images must be PNG)
+/// Resize to optimal thumbnail dimensions for @2x Retina displays
+fn build_thumbnail(image_bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let img = image::load_from_memory(&image_bytes).context("Failed to load pet image for pass")?;
+
+    // Resize to Apple Wallet thumbnail dimensions using Lanczos3 for high-quality downsampling
+    let resized = img.resize_to_fill(
+        consts::PKPASS_THUMBNAIL_SIZE_PX,
+        consts::PKPASS_THUMBNAIL_SIZE_PX,
+        image::imageops::FilterType::Lanczos3,
+    );
+
+    // Encode to PNG with maximum compression for smallest file size
+    let mut png_bytes = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new_with_quality(
+        Cursor::new(&mut png_bytes),
+        image::codecs::png::CompressionType::Best,
+        image::codecs::png::FilterType::Adaptive,
+    );
+    encoder
+        .write_image(
+            resized.as_bytes(),
+            resized.width(),
+            resized.height(),
+            resized.color().into(),
+        )
+        .context("Failed to encode image as optimized PNG")?;
+
+    Ok(png_bytes)
+}
+
 /// Adds visual resources to the pass package.
 ///
 /// This function adds icons and images to make the pass visually appealing.
 /// Resources include a default icon and optionally the pet's photo if available.
-///
-/// ## Resource Types
-/// - **Icon**: Default pass icon (29x29pt recommended, shown in Wallet list)
-/// - **Thumbnail**: Pet's photo (optional, used as pass thumbnail)
-///
-/// ## Resource Requirements
-/// - All images must be PNG format (Apple Wallet requirement)
-/// - Thumbnail images are resized to optimal dimensions using `consts::PKPASS_THUMBNAIL_SIZE_PX`
-/// - Uses Lanczos3 filter for high-quality image downsampling
-/// - Applies maximum PNG compression (CompressionType::Best) with adaptive filtering
-/// - Missing resources won't cause failures (graceful degradation)
-///
-/// ## Parameters
-/// - `package`: Mutable reference to the package being built
-/// - `storage_service`: Service for retrieving pet photos from storage
-/// - `pic_path`: Optional path to the pet's photo
-///
-/// ## Returns
-/// - `Ok(())`: Resources successfully added
-/// - `Err(anyhow::Error)`: Resource loading or addition failure
 async fn add_pass_resources(
     package: &mut Package,
     storage_service: &services::ImplStorageService,
@@ -396,33 +407,7 @@ async fn add_pass_resources(
             .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
             .await?;
 
-        // Convert to PNG format (Apple Wallet requirement - all images must be PNG)
-        // Resize to optimal thumbnail dimensions for @2x Retina displays
-        let img = image::load_from_memory(&image_bytes)
-            .context("Failed to load pet image for pass")?;
-
-        // Resize to Apple Wallet thumbnail dimensions using Lanczos3 for high-quality downsampling
-        let resized = img.resize_to_fill(
-            consts::PKPASS_THUMBNAIL_SIZE_PX,
-            consts::PKPASS_THUMBNAIL_SIZE_PX,
-            image::imageops::FilterType::Lanczos3,
-        );
-
-        // Encode to PNG with maximum compression for smallest file size
-        let mut png_bytes = Vec::new();
-        let encoder = image::codecs::png::PngEncoder::new_with_quality(
-            Cursor::new(&mut png_bytes),
-            image::codecs::png::CompressionType::Best,
-            image::codecs::png::FilterType::Adaptive,
-        );
-        encoder
-            .write_image(
-                resized.as_bytes(),
-                resized.width(),
-                resized.height(),
-                resized.color().into(),
-            )
-            .context("Failed to encode image as optimized PNG")?;
+        let png_bytes = build_thumbnail(image_bytes)?;
 
         package
             .add_resource(
