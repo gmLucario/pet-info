@@ -37,7 +37,7 @@
 //! - Spanish to English text conversion for better compatibility
 //! - Unicode character sanitization
 
-use crate::{api::pet::PetPublicInfoSchema, config, consts, services};
+use crate::{api::pet::PetPublicInfoSchema, consts, services};
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
 use image::ImageEncoder;
@@ -59,9 +59,6 @@ mod pass_config {
 
     /// Organization name displayed on the pass.
     pub const ORGANIZATION_NAME: &str = "Pet Info";
-
-    /// Path to the default pass icon (PNG format, recommended 29x29pt).
-    pub const ICON_PATH: &str = "pass_icon.png";
 
     /// ISO 8601 date format required by Apple Wallet.
     pub const DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
@@ -340,14 +337,10 @@ fn create_back_fields(pet_info: &PetPublicInfoSchema) -> Vec<serde_json::Value> 
 /// - Invalid certificate format
 fn create_signed_package(pass: passes::Pass) -> Result<Package> {
     let mut package = Package::new(pass);
-    let app_config = config::APP_CONFIG
-        .get()
-        .context("failed to get app config")?;
+    let cert_data = include_bytes!("../../pass_certificate.pem");
+    let key_data = include_bytes!("../../pass_private_key.pem");
 
-    let cert_data = load_file(&app_config.pass_cert_path)?;
-    let key_data = load_file(&app_config.pass_key_path)?;
-
-    let sign_config = sign::SignConfig::new(sign::WWDR::G4, &cert_data, &key_data)?;
+    let sign_config = sign::SignConfig::new(sign::WWDR::G4, cert_data, key_data)?;
 
     package.add_certificates(sign_config);
     Ok(package)
@@ -393,7 +386,7 @@ async fn add_pass_resources(
     storage_service: &services::ImplStorageService,
     pic_path: &Option<String>,
 ) -> Result<()> {
-    let icon_data = load_file(pass_config::ICON_PATH)?;
+    let icon_data = include_bytes!("../../web/static/images/maskable-512.png");
     package
         .add_resource(
             resource::Type::Icon(resource::Version::Standard),
@@ -418,21 +411,6 @@ async fn add_pass_resources(
     }
 
     Ok(())
-}
-
-/// Safely loads a file with better error context.
-///
-/// This utility function provides consistent file loading with detailed error messages.
-/// It's used for loading certificates, keys, and resource files.
-///
-/// ## Parameters
-/// - `path`: File system path to the file to load
-///
-/// ## Returns
-/// - `Ok(Vec<u8>)`: File contents as bytes
-/// - `Err(anyhow::Error)`: File loading error with context
-fn load_file(path: &str) -> Result<Vec<u8>> {
-    std::fs::read(path).with_context(|| format!("Failed to read file: {}", path))
 }
 
 /// Generates final .pkpass bytes from the package.

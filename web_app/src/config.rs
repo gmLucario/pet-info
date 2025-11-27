@@ -161,12 +161,6 @@ pub struct AppConfig {
     /// Security: Store in secure secret management system
     pub google_oauth_client_secret: String,
 
-    #[envconfig(default = "pass_certificate.pem")]
-    pub pass_cert_path: String,
-
-    #[envconfig(default = "pass_private_key.pem")]
-    pub pass_key_path: String,
-
     pub logfire_token: String,
 }
 
