@@ -1,0 +1,17 @@
+/* Ensure aria-busy shows a spinner even on non-button elements if needed, 
+   though Pico CSS usually handles this for [aria-busy="true"] globally or on specific elements. */
+
+/* Force pointer-events none when aria-busy is true to prevent double clicks 
+   (in addition to the JS logic, as a safeguard) */
+[aria-busy="true"] {
+   pointer-events: none !important;
+}
+
+/* Ensure the spinner doesn't mess up layout on links */
+a[aria-busy="true"] {
+   display: inline-block;
+   /* or inline-flex, depending on context */
+   text-decoration: none;
+   /* Pico adds the spinner as a background image or pseudo-element. 
+       We just need to make sure it's visible. */
+}
