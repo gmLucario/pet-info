@@ -37,9 +37,10 @@
 //! - Spanish to English text conversion for better compatibility
 //! - Unicode character sanitization
 
-use crate::{api::pet::PetPublicInfoSchema, config, services};
+use crate::{api::pet::PetPublicInfoSchema, config, consts, services};
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
+use image::ImageEncoder;
 use passes::{Package, resource, sign};
 use std::{io::Cursor, path::Path};
 
@@ -352,28 +353,41 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
     Ok(package)
 }
 
+/// Convert to PNG format (Apple Wallet requirement - all images must be PNG)
+/// Resize to optimal thumbnail dimensions for @2x Retina displays
+fn build_thumbnail(image_bytes: Vec<u8>) -> Result<Vec<u8>> {
+    let img = image::load_from_memory(&image_bytes).context("Failed to load pet image for pass")?;
+
+    // Resize to Apple Wallet thumbnail dimensions using Lanczos3 for high-quality downsampling
+    let resized = img.resize_to_fill(
+        consts::PKPASS_THUMBNAIL_SIZE_PX,
+        consts::PKPASS_THUMBNAIL_SIZE_PX,
+        image::imageops::FilterType::Lanczos3,
+    );
+
+    // Encode to PNG with maximum compression for smallest file size
+    let mut png_bytes = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new_with_quality(
+        Cursor::new(&mut png_bytes),
+        image::codecs::png::CompressionType::Best,
+        image::codecs::png::FilterType::Adaptive,
+    );
+    encoder
+        .write_image(
+            resized.as_bytes(),
+            resized.width(),
+            resized.height(),
+            resized.color().into(),
+        )
+        .context("Failed to encode image as optimized PNG")?;
+
+    Ok(png_bytes)
+}
+
 /// Adds visual resources to the pass package.
 ///
 /// This function adds icons and images to make the pass visually appealing.
 /// Resources include a default icon and optionally the pet's photo if available.
-///
-/// ## Resource Types
-/// - **Icon**: Default pass icon (29x29pt recommended, shown in Wallet list)
-/// - **Thumbnail**: Pet's photo (optional, used as pass thumbnail)
-///
-/// ## Resource Requirements
-/// - Icons should be PNG format for best compatibility
-/// - Images are automatically resized by the passes-rs crate
-/// - Missing resources won't cause failures (graceful degradation)
-///
-/// ## Parameters
-/// - `package`: Mutable reference to the package being built
-/// - `storage_service`: Service for retrieving pet photos from storage
-/// - `pic_path`: Optional path to the pet's photo
-///
-/// ## Returns
-/// - `Ok(())`: Resources successfully added
-/// - `Err(anyhow::Error)`: Resource loading or addition failure
 async fn add_pass_resources(
     package: &mut Package,
     storage_service: &services::ImplStorageService,
@@ -389,14 +403,16 @@ async fn add_pass_resources(
 
     if let Some(pic_path) = pic_path {
         let pic_path = Path::new(&pic_path);
-        let icon_data = storage_service
+        let image_bytes = storage_service
             .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
             .await?;
+
+        let png_bytes = build_thumbnail(image_bytes)?;
 
         package
             .add_resource(
                 resource::Type::Thumbnail(resource::Version::Standard),
-                &icon_data[..],
+                &png_bytes[..],
             )
             .map_err(|e| anyhow::anyhow!("Failed to add Thumbnail: {}", e))?;
     }
