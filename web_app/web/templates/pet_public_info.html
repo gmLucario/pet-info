@@ -9,10 +9,10 @@ perfil de ...
 {% endblock meta_desc %}
 
 {% block extra_meta %}
-    <!-- PWA:-->
-    <meta name="application-name" content="Pet-Info"/>
-    <meta name="theme-color" content="#0f172a"/>
-    <link rel="manifest" href="/pet/site.webmanifest/{{pet.external_id}}"/>
+<!-- PWA:-->
+<meta name="application-name" content="Pet-Info"/>
+<meta name="theme-color" content="#0f172a"/>
+<link rel="manifest" href="/pet/site.webmanifest/{{pet.external_id}}"/>
 {% endblock extra_meta %}
 
 {% block mid_nav_content %}
@@ -60,7 +60,14 @@ perfil de ...
 {% block content %}
 <div style="text-align:center;">
     {% if pet.pic %}
-    <img src="/pet/public_pic/{{pet.external_id}}" alt="pet pic" loading="lazy" id="pet-pic"/>
+    <div aria-busy="true" style="display: inline-block;">
+        <img 
+            src="/pet/public_pic/{{pet.external_id}}" 
+            alt="pet pic"
+            loading="lazy"
+            id="pet-pic"
+            onload="this.parentElement.removeAttribute('aria-busy')" />
+    </div>
     {% endif %}
     <h1 style="margin-top:var(--pico-typography-spacing-vertical); color: var(--pico-primary);">
         {{ pet.name | title }}

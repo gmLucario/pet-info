@@ -425,6 +425,7 @@ async fn get_profile_qr_code(
 
     Ok(web::HttpResponse::Ok()
         .content_type("image/png")
+        .set_header("HX-Trigger", "download-complete")
         .streaming(body))
 }
 
@@ -474,6 +475,7 @@ async fn get_pdf_report(
 
     Ok(web::HttpResponse::Ok()
         .content_type("application/pdf")
+        .set_header("HX-Trigger", "download-complete")
         .streaming(body))
 }
 
@@ -590,6 +592,7 @@ async fn download_pet_pass(
             "Content-Disposition",
             "attachment; filename=\"pet_info.pkpass\"",
         )
+        .set_header("HX-Trigger", "download-complete")
         .streaming(body))
 }
 
