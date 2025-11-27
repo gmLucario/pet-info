@@ -389,14 +389,22 @@ async fn add_pass_resources(
 
     if let Some(pic_path) = pic_path {
         let pic_path = Path::new(&pic_path);
-        let icon_data = storage_service
+        let image_bytes = storage_service
             .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
             .await?;
+
+        // Convert to PNG format (Apple Wallet requirement - all images must be PNG)
+        let img = image::load_from_memory(&image_bytes)
+            .context("Failed to load pet image for pass")?;
+
+        let mut png_bytes = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+            .context("Failed to convert image to PNG format")?;
 
         package
             .add_resource(
                 resource::Type::Thumbnail(resource::Version::Standard),
-                &icon_data[..],
+                &png_bytes[..],
             )
             .map_err(|e| anyhow::anyhow!("Failed to add Thumbnail: {}", e))?;
     }
