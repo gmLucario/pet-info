@@ -9,10 +9,19 @@ A comprehensive pet information management system built with Rust, featuring QR 
 
 ### Architecture Overview
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   pet-info.link │────│   Route 53 DNS   │────│  Single EC2     │
-│   (Domain)      │    │                  │    │  Instance       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────────────────┐
+│   pet-info.link │────│   Route 53 DNS   │────│      Single EC2 Instance        │
+│   (Domain)      │    │                  │    │                                 │
+└─────────────────┘    └──────────────────┘    │  ┌──────────────────────────┐   │
+                                                │  │   Nginx Reverse Proxy    │   │
+                                 HTTPS :443 ────┼─▶│   SSL/TLS Termination    │   │
+                                                │  └────────────┬─────────────┘   │
+                                                │               │                 │
+                                                │  ┌────────────▼─────────────┐   │
+                                  HTTP :8080 ───┼──│   Rust Application       │   │
+                                                │  │   (localhost:8080)       │   │
+                                                │  └──────────────────────────┘   │
+                                                └─────────────────────────────────┘
                                                          │
                        ┌──────────────────────────────────┼──────────────────────────────────┐
                        │                                  │                                  │
@@ -24,10 +33,12 @@ A comprehensive pet information management system built with Rust, featuring QR 
 
 ### Current Deployment Stack
 - **Single EC2 Instance** (t3.small)
+- **Nginx Reverse Proxy** - SSL/TLS termination on port 443, forwards to application on port 8080
+- **Rust Application** - Runs on localhost:8080 (HTTP only)
 - **SQLite Database** with SQLCipher encryption
 - **S3 Bucket** for file storage (pet photos, documents)
 - **Route 53** for DNS management
-- **SSL/TLS** termination on EC2
+- **Let's Encrypt SSL/TLS** certificates with certbot-dns-route53
 - **AWS SSM** Parameter Store for sensitive env values
 - **AWS Step Functions** for scheduled notifications
 - **Lambda Functions** for WhatsApp message processing
