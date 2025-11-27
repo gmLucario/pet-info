@@ -1,5 +1,3 @@
-//! Handlers related to the /pet/health url
-
 use crate::{
     api,
     front::{
@@ -56,7 +54,7 @@ async fn get_pet_health_view(
         .body(content))
 }
 
-/// Renders pet health records
+/// Render pet health records table
 #[web::get("{pet_external_id}/{record_type}/tbody")]
 async fn pet_health_records(
     IsUserLoggedAndCanEdit(can_edit, user_id): IsUserLoggedAndCanEdit,
@@ -95,8 +93,7 @@ async fn pet_health_records(
         .body(content))
 }
 
-/// Handles the request to add a new health record to a pet by
-/// its external id
+/// Add health record to pet
 #[web::post("{pet_external_id}/{record_type}/add")]
 async fn add_health_record(
     _: middleware::logged_user::CheckUserCanAccessService,
@@ -145,7 +142,7 @@ struct HealthDeletePath {
     record_type: models::pet::PetHealthType,
 }
 
-/// Handles the request to delete a health record to a pet
+/// Delete health record from pet
 #[web::delete("{pet_external_id}/{record_type}/{record_id}")]
 async fn delete_health_record(
     _: middleware::logged_user::CheckUserCanAccessService,

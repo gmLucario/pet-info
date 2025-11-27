@@ -1,5 +1,3 @@
-//! Handlers related to the /info/profile/{external-id} url
-
 use ntex::web;
 use serde_json::json;
 use uuid::Uuid;
@@ -9,9 +7,7 @@ use crate::{
     front::{AppState, errors, oauth, templates},
 };
 
-/// Renders a pet public info based on its `external_id`
-/// If the pet_external_id is not linked to a pet; steps to link the
-/// external id will be shown
+/// Render pet public profile page
 #[web::get("/{pet_external_id}")]
 async fn get_pet_info_view(
     app_state: web::types::State<AppState>,

@@ -1,5 +1,3 @@
-//! Handlers not linked to a specific url
-
 use ntex::web;
 use ntex_files::NamedFile;
 use ntex_identity::Identity;
@@ -10,18 +8,18 @@ use crate::{
     front::{AppState, errors, middleware, oauth, session, templates, utils},
 };
 
-/// Serve `favicon.ico`
+/// Serve favicon.ico
 #[web::get("/favicon.ico")]
 async fn serve_favicon() -> Result<impl web::Responder, web::Error> {
     Ok(NamedFile::open("web/static/images/favicon.ico")?)
 }
 
-/// Return a [UrlNotFound](errors::UserError::UrlNotFound) error for urls not defined
+/// Handle 404 not found
 pub async fn serve_not_found() -> Result<web::HttpResponse, web::Error> {
     Err(errors::UserError::UrlNotFound.into())
 }
 
-/// Endpoint to render the index view
+/// Render index page
 #[web::get("/")]
 async fn index(cookie: ntex_session::Session) -> Result<impl web::Responder, web::Error> {
     let (auth_url, csrf_state) = oauth::get_new_auth_url();
@@ -53,7 +51,7 @@ async fn index(cookie: ntex_session::Session) -> Result<impl web::Responder, web
         ))
 }
 
-/// Endpoint to render the reactivate account starting point
+/// Render reactivate account page
 #[web::get("/reactivate-account")]
 async fn get_reactivate_account_view(
     _: session::WebAppSession,
@@ -69,8 +67,7 @@ async fn get_reactivate_account_view(
     ))
 }
 
-/// Endpoint handles the request to reactivate an account.
-/// An account is deactivated if the user deleted all the data
+/// Handle account reactivation request
 #[web::post("/reactivate-account")]
 async fn reactivate_account(
     _: middleware::csrf_token::CsrfToken,

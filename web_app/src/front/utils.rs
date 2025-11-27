@@ -1,7 +1,3 @@
-//! # Front end Utils
-//!
-//! Here are functions needed in all the front end app
-
 use anyhow::Context;
 use chrono::NaiveDate;
 use chrono_tz::Tz;
@@ -9,39 +5,14 @@ use futures::StreamExt;
 
 use crate::front;
 
-/// Creates an HTTP redirect response to the specified URL.
-///
-/// # Arguments
-/// * `url` - The destination URL to redirect to
-///
-/// # Returns
-/// * `Result<ntex::web::HttpResponse, ntex::web::Error>` - HTTP 302 redirect response
-///
-/// # Example
-/// ```rust
-/// let response = redirect_to("/login")?;
-/// ```
+/// Create HTTP redirect response
 pub fn redirect_to(url: &str) -> Result<ntex::web::HttpResponse, ntex::web::Error> {
     Ok(ntex::web::HttpResponse::Found()
         .header("location", url)
         .finish())
 }
 
-/// Extracts and concatenates all bytes from a multipart field.
-///
-/// This function processes a multipart field stream and collects all the bytes
-/// into a single Vec<u8>. Optimized to pre-allocate capacity and avoid intermediate allocations.
-///
-/// # Arguments
-/// * `field` - The multipart field to extract bytes from
-///
-/// # Returns
-/// * `Vec<u8>` - All bytes from the field concatenated together
-///
-/// # Example
-/// ```rust
-/// let file_data = get_bytes_value(field).await;
-/// ```
+/// Extract and concatenate bytes from multipart field
 pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
     field
         .filter_map(|x| async move { x.ok() })
@@ -50,16 +21,7 @@ pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
         .concat()
 }
 
-/// Converts bytes result to UTF-8 string if possible.
-///
-/// Helper function that attempts to convert a bytes result from multipart
-/// processing into a valid UTF-8 string. Optimized to avoid unnecessary allocations.
-///
-/// # Arguments
-/// * `x` - Result containing bytes or multipart error
-///
-/// # Returns
-/// * `Option<String>` - Some(string) if conversion succeeds, None otherwise
+/// Convert bytes to UTF-8 string if valid
 async fn get_bytes_as_str(
     x: Result<ntex::util::Bytes, ntex_multipart::MultipartError>,
 ) -> Option<String> {
@@ -70,22 +32,7 @@ async fn get_bytes_as_str(
     None
 }
 
-/// Extracts and concatenates all UTF-8 string values from a multipart field.
-///
-/// This function processes a multipart field stream and attempts to convert
-/// all chunks to UTF-8 strings, then concatenates them together. Optimized
-/// to reduce allocations by using a single String buffer.
-///
-/// # Arguments
-/// * `field` - The multipart field to extract string data from
-///
-/// # Returns
-/// * `String` - All valid UTF-8 strings from the field concatenated together
-///
-/// # Example
-/// ```rust
-/// let form_value = get_field_value(field).await;
-/// ```
+/// Extract and concatenate string values from multipart field
 pub async fn get_field_value(field: ntex_multipart::Field) -> String {
     field
         .filter_map(get_bytes_as_str)
@@ -94,29 +41,7 @@ pub async fn get_field_value(field: ntex_multipart::Field) -> String {
         .join("")
 }
 
-/// Extracts and parses the timezone from HTTP request headers.
-///
-/// Looks for a 'timezone' header in the request and attempts to parse it
-/// into a valid timezone using the chrono-tz crate. Optimized for cleaner
-/// error handling and more descriptive error messages.
-///
-/// # Arguments
-/// * `request_headers` - HTTP headers from the incoming request
-///
-/// # Returns
-/// * `anyhow::Result<Tz>` - Parsed timezone or error if not found/invalid
-///
-/// # Errors
-/// Returns an error if:
-/// - No 'timezone' header is present
-/// - Header value is not valid UTF-8
-/// - Timezone string is not recognized
-///
-/// # Example
-/// ```rust
-/// let tz = extract_usertimezone(&headers)?;
-/// let local_time = utc_time.with_timezone(&tz);
-/// ```
+/// Extract and parse timezone from request headers
 pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::Result<Tz> {
     let header_value = request_headers
         .get("timezone")
@@ -131,33 +56,7 @@ pub fn extract_usertimezone(request_headers: &ntex::http::HeaderMap) -> anyhow::
         .with_context(|| format!("Invalid timezone: '{}'", timezone_str))
 }
 
-/// Formats the difference between two dates in a human-readable format.
-///
-/// Calculates the time span between two dates and returns a localized string
-/// representation in Spanish. The calculation uses approximate values:
-/// - 365 days per year (leap years not considered)
-/// - 30 days per month (average month length)
-///
-/// Optimized to minimize string allocations and use const values.
-///
-/// # Arguments
-/// * `start_date` - The earlier date
-/// * `end_date` - The later date (function handles order automatically)
-///
-/// # Returns
-/// * `String` - Formatted difference like "2 años 3 meses 15 días"
-///
-/// # Notes
-/// - Zero values are omitted from the output
-/// - If difference is less than 1 day, returns "0 días"
-/// - Output is in Spanish
-///
-/// # Example
-/// ```rust
-/// let birth = NaiveDate::from_ymd(2020, 1, 1);
-/// let now = NaiveDate::from_ymd(2023, 6, 15);
-/// let age = fmt_dates_difference(birth, now); // "3 años 5 meses 14 días"
-/// ```
+/// Format date difference as human-readable Spanish text
 pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> String {
     const DAYS_PER_YEAR: i64 = 365;
     const DAYS_PER_MONTH: i64 = 30;
@@ -194,20 +93,7 @@ pub fn fmt_dates_difference(start_date: NaiveDate, end_date: NaiveDate) -> Strin
     }
 }
 
-/// Gets the current UTC datetime with time set to 00:00:00.
-///
-/// Returns the current UTC date with the time component reset to midnight.
-/// Useful for date-only comparisons or when you need a consistent time
-/// for date-based operations.
-///
-/// # Returns
-/// * `chrono::DateTime<chrono::Utc>` - Current UTC date at 00:00:00
-///
-/// # Example
-/// ```rust
-/// let today_start = get_utc_now_with_default_time();
-/// // 2023-06-15T00:00:00Z
-/// ```
+/// Get current UTC date at 00:00:00
 pub fn get_utc_now_with_default_time() -> chrono::DateTime<chrono::Utc> {
     chrono::Utc::now()
         .with_time(chrono::NaiveTime::default())
@@ -215,61 +101,13 @@ pub fn get_utc_now_with_default_time() -> chrono::DateTime<chrono::Utc> {
         .unwrap()
 }
 
-/// Filters a string to contain only alphanumeric characters.
-///
-/// Removes all non-alphanumeric characters from the input string,
-/// keeping only letters (a-z, A-Z) and digits (0-9). Useful for
-/// sanitizing user input or creating safe identifiers. Optimized
-/// to pre-allocate capacity and use iterator methods efficiently.
-///
-/// # Arguments
-/// * `s` - The input string to filter
-///
-/// # Returns
-/// * `String` - Filtered string containing only alphanumeric characters
-///
-/// # Example
-/// ```rust
-/// let clean = filter_only_alphanumeric_chars("Hello, World! 123");
-/// assert_eq!(clean, "HelloWorld123");
-/// ```
+/// Filter string to alphanumeric characters only
 pub fn filter_only_alphanumeric_chars(s: &str) -> String {
     // Direct collection is more efficient than intermediate Vec
     s.chars().filter(|c| c.is_ascii_alphanumeric()).collect()
 }
 
-/// Crops an image into a circular shape with optimized performance.
-///
-/// Takes an image and creates a circular crop at the specified coordinates.
-/// The function is optimized for performance using squared distance calculations
-/// to avoid expensive square root operations and pre-converted RGBA format
-/// for faster pixel access.
-///
-/// # Arguments
-/// * `pic` - The source image containing both image data and format information
-/// * `x` - X coordinate of the circle center
-/// * `y` - Y coordinate of the circle center  
-/// * `diameter` - Diameter of the circular crop in pixels
-///
-/// # Returns
-/// * `anyhow::Result<Vec<u8>>` - PNG image data of the circular crop
-///
-/// # Errors
-/// Returns an error if:
-/// - Image format is not supported
-/// - Image data is corrupted
-/// - PNG encoding fails
-///
-/// # Performance Notes
-/// - Uses squared distance comparison instead of sqrt for ~2-3x speed improvement
-/// - Pre-converts image to RGBA8 format for faster pixel access
-/// - Pre-allocates result buffer to avoid memory reallocations
-///
-/// # Example
-/// ```rust
-/// let circular_avatar = crop_circle(&pic, 100, 100, 200)?;
-/// std::fs::write("avatar.png", circular_avatar)?;
-/// ```
+/// Crop image into circular shape
 pub fn crop_circle(
     pic: &front::forms::pet::Pic,
     x: u32,
@@ -324,17 +162,9 @@ pub fn crop_circle(
 }
 
 #[cfg(test)]
-/// Test module for utility functions.
-///
-/// Contains unit tests for all public utility functions to ensure
-/// correct behavior and error handling.
 mod tests {
     use super::*;
 
-    /// Tests successful timezone extraction from valid header.
-    ///
-    /// Verifies that a properly formatted timezone header can be
-    /// extracted and parsed into a valid Tz instance.
     #[test]
     fn test_extract_valid_usertimezone() -> anyhow::Result<()> {
         let vec = vec![("timezone", "America/Mexico_City"), ("Accept", "text/html")];
@@ -346,7 +176,6 @@ mod tests {
         Ok(())
     }
 
-    /// Tests redirect response creation with various URLs.
     #[test]
     fn test_redirect_to() {
         let redirect = redirect_to("/login");
@@ -357,7 +186,6 @@ mod tests {
         assert_eq!(response.headers().get("location").unwrap(), "/login");
     }
 
-    /// Tests date difference formatting with various scenarios.
     #[test]
     fn test_fmt_dates_difference() {
         use chrono::NaiveDate;
@@ -393,14 +221,12 @@ mod tests {
         assert_eq!(result1, result2);
     }
 
-    /// Tests UTC datetime with default time functionality.
     #[test]
     fn test_get_utc_now_with_default_time() {
         let dt = get_utc_now_with_default_time();
         assert_eq!(dt.time(), chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap());
     }
 
-    // Tests alphanumeric character filtering.
     #[test]
     fn test_filter_only_alphanumeric_chars() {
         // Basic test
@@ -428,7 +254,6 @@ mod tests {
         assert_eq!(filter_only_alphanumeric_chars("café123"), "caf123");
     }
 
-    /// Tests missing timezone header handling.
     #[test]
     fn test_extract_usertimezone_missing_header() {
         let vec = vec![("Accept", "text/html"), ("User-Agent", "test")];
@@ -438,7 +263,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// Tests invalid UTF-8 in timezone header.
     #[test]
     fn test_extract_usertimezone_invalid_utf8() {
         use ntex::http::{
@@ -458,7 +282,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// Tests crop circle with mock image data.
     #[test]
     fn test_crop_circle_basic() {
         // Create a simple 10x10 red PNG image for testing
@@ -488,7 +311,6 @@ mod tests {
         assert_eq!(&cropped_data[0..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
     }
 
-    /// Tests crop circle with invalid image format.
     #[test]
     fn test_crop_circle_invalid_format() {
         let pic = crate::front::forms::pet::Pic {
@@ -500,7 +322,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// Tests crop circle with corrupted image data.
     #[test]
     fn test_crop_circle_corrupted_data() {
         let pic = crate::front::forms::pet::Pic {
@@ -512,7 +333,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// Tests get_bytes_as_str helper function.
     #[ntex::test]
     async fn test_get_bytes_as_str() {
         use ntex::util::Bytes;
@@ -543,7 +363,6 @@ mod tests {
         assert_eq!(result, Some("".to_string()));
     }
 
-    /// Tests get_utc_now_with_default_time consistency.
     #[test]
     fn test_get_utc_now_time_zone_is_utc() {
         let dt = get_utc_now_with_default_time();

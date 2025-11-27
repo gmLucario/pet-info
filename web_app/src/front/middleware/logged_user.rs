@@ -1,6 +1,3 @@
-//! Module to serialize the logged user information to:
-//! - Apply business allow actions
-
 use ntex::{
     http::Payload,
     web::{Error, FromRequest, HttpRequest},
@@ -9,8 +6,7 @@ use ntex_identity::RequestIdentity;
 
 use crate::front;
 
-/// Every logged request must have the serialized user [session](crate::front::session::WebAppSession)
-/// this block will extract the logged user session data from the [request](ntex::web::HttpRequest)
+/// Extract logged user session from request
 impl<Err> FromRequest<Err> for front::session::WebAppSession {
     type Error = Error;
 
@@ -23,11 +19,10 @@ impl<Err> FromRequest<Err> for front::session::WebAppSession {
     }
 }
 
-/// Checks if the request is made by a user with a valid membership
+/// Check user has valid service membership
 pub struct CheckUserCanAccessService;
 
-/// Checks if the request is made by a user with
-/// valid conditions to edit its own data
+/// Check user is logged and can edit
 pub struct IsUserLoggedAndCanEdit(pub bool, pub Option<i64>);
 
 impl<Err> FromRequest<Err> for IsUserLoggedAndCanEdit {
@@ -66,7 +61,7 @@ fn serialize_logged_user_session(str: &str) -> serde_json::Result<front::session
     serde_json::from_str::<front::session::WebAppSession>(str)
 }
 
-/// Extracts the [front::session::WebAppSession] from a string session cookie
+/// Extract session from auth cookie
 fn get_logged_user_session(
     auth_cookie: Option<String>,
 ) -> Result<front::session::WebAppSession, Error> {

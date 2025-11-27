@@ -1,5 +1,3 @@
-//! Handlers related to the PetInfo id tag payment
-
 use crate::{
     api, config, consts,
     front::{AppState, errors, forms, middleware, session, templates, utils},
@@ -10,9 +8,7 @@ use ntex::web;
 use ntex_identity::Identity;
 use serde_json::json;
 
-/// Endpoint to render the checkout to pay the PetInfo id tag.
-/// If the user payed without finish the id tag register, the user
-/// will be redirect to the add form
+/// Render checkout page
 #[web::get("")]
 async fn get_checkout_view(
     user_session: session::WebAppSession,
@@ -47,14 +43,12 @@ async fn get_checkout_view(
         .body(content))
 }
 
-/// Represents the process_payment response endpoint [post]
 #[derive(serde::Serialize)]
 struct PaymResponse {
     id: usize,
 }
 
-/// Endpoint to handle the payment request made by the user to adquire a
-/// PetInfo id tag.
+/// Process payment request
 #[web::post("/process_payment")]
 async fn process_payment(
     _: middleware::csrf_token::CsrfToken,
