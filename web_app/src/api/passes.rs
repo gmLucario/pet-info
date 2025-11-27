@@ -37,7 +37,7 @@
 //! - Spanish to English text conversion for better compatibility
 //! - Unicode character sanitization
 
-use crate::{api::pet::PetPublicInfoSchema, config, services};
+use crate::{api::pet::PetPublicInfoSchema, config, consts, services};
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
 use passes::{Package, resource, sign};
@@ -363,7 +363,7 @@ fn create_signed_package(pass: passes::Pass) -> Result<Package> {
 ///
 /// ## Resource Requirements
 /// - All images must be PNG format (Apple Wallet requirement)
-/// - Thumbnail images are resized to 180x180 pixels (@2x for 90x90pt on Retina displays)
+/// - Thumbnail images are resized to optimal dimensions using `consts::PKPASS_THUMBNAIL_SIZE_PX`
 /// - Uses Lanczos3 filter for high-quality image downsampling
 /// - Missing resources won't cause failures (graceful degradation)
 ///
@@ -395,15 +395,14 @@ async fn add_pass_resources(
             .await?;
 
         // Convert to PNG format (Apple Wallet requirement - all images must be PNG)
-        // Resize to 180x180 pixels (@2x for 90x90 points thumbnail on Retina displays)
+        // Resize to optimal thumbnail dimensions for @2x Retina displays
         let img = image::load_from_memory(&image_bytes)
             .context("Failed to load pet image for pass")?;
 
-        // Resize to thumbnail dimensions (180x180 for @2x Retina displays)
-        // Using Lanczos3 for high-quality downsampling
+        // Resize to Apple Wallet thumbnail dimensions using Lanczos3 for high-quality downsampling
         let resized = img.resize_to_fill(
-            180,
-            180,
+            consts::PKPASS_THUMBNAIL_SIZE_PX,
+            consts::PKPASS_THUMBNAIL_SIZE_PX,
             image::imageops::FilterType::Lanczos3,
         );
 
