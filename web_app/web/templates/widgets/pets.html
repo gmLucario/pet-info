@@ -19,8 +19,8 @@
                     </li>
                 </ul>
                 <ul>
-                    <li><a href="/pet/qr_code/{{pet.external_id}}" download="qr_code_profile.png">qr_code</a></li>
-                    <li><a href="/pet/pdf_report/{{pet.id}}" download="pet_report.pdf">pdf</a></li>
+                    <li><a href="/pet/qr_code/{{pet.external_id}}" data-download="qr_code_profile.png">qr_code</a></li>
+                    <li><a href="/pet/pdf_report/{{pet.id}}" data-download="pet_report.pdf">pdf</a></li>
                 </ul>
             </nav>
         </header>
@@ -39,7 +39,7 @@
 
         <footer style="text-align: center;">
             <button class="outline contrast">
-                <a href="/pet/pass/{{pet.external_id}}" >📱 Agregar a Wallet</a>
+                <a href="/pet/pass/{{pet.external_id}}" data-download="pet_info.pkpass">📱 Agregar a Wallet</a>
             </button>
         </footer>
     </article>

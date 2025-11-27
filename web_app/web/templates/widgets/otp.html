@@ -1,5 +1,5 @@
 {% if otp_step == 'OTP_VERIFICATION' %}
-    {% include "widgets/otp_verification.html" %}
+{% include "widgets/otp_verification.html" %}
 {% elif otp_step == 'OTP_SUCCESS' %}
 {% set delete_url = "/reminder/verified-phone" %}
 <p hx-target="this" hx-swap="outerHTML">{% include "widgets/trash_icon.html" %} {{phone_reminder}}
@@ -10,8 +10,7 @@
     <p>no se pudo verificar su whats. Intentar de nuevo</p>
 </u>
 {% else %}
-<form id="reminders-phone-add" hx-post="/reminder/send-verification-code" hx-target="this" hx-swap="outerHTML"
-    hx-disabled-elt="find input[type='submit']" hx-indicator="find #spinner">
+<form id="reminders-phone-add" hx-post="/reminder/send-verification-code" hx-target="this" hx-swap="outerHTML">
     <fieldset class="grid">
         <select name="country_phone_code" required>
             <option selected data-countryCode="MX" value="521">Mexico (+52)</option>
