@@ -157,6 +157,8 @@ pub struct AppConfig {
     #[envconfig(default = "https://www.googleapis.com/oauth2/v1/certs")]
     pub google_oauth_auth_provider_x509_cert_url: String,
 
+    pub cloudfront_url: String,
+
     /// 🔒 SENSITIVE: Google OAuth client secret
     /// Security: Store in secure secret management system
     pub google_oauth_client_secret: String,

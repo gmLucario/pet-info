@@ -61,8 +61,8 @@ perfil de ...
 <div style="text-align:center;">
     {% if pet.pic %}
     <div aria-busy="true" style="display: inline-block;">
-        <img 
-            src="/pet/public_pic/{{pet.external_id}}" 
+        <img
+            src="{{ pet_pic_url }}"
             alt="pet pic"
             loading="lazy"
             id="pet-pic"
