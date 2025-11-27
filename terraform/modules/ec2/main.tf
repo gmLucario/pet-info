@@ -155,63 +155,6 @@ resource "null_resource" "upload_ssl_certificates" {
   }
 }
 
-# Upload Apple Wallet Pass certificate files
-resource "null_resource" "upload_pass_certificates" {
-  depends_on = [null_resource.deploy_app]
-
-  # Deploy only on initial instance creation
-  triggers = {
-    instance_id = aws_instance.app_instance.id
-  }
-
-  # Upload pass certificate
-  provisioner "file" {
-    source      = var.pass_cert_path
-    destination = "/tmp/pass_certificate.pem"
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-
-  # Upload pass private key
-  provisioner "file" {
-    source      = var.pass_key_path
-    destination = "/tmp/pass_private_key.pem"
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-
-  # Move pass files to final location
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mv /tmp/pass_certificate.pem ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
-      "sudo mv /tmp/pass_private_key.pem ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
-      "sudo chown ec2-user:ec2-user ${var.sensitive_instance_envs["PASS_CERT_PATH"].value} ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}",
-      "sudo chmod 644 ${var.sensitive_instance_envs["PASS_CERT_PATH"].value}",
-      "sudo chmod 600 ${var.sensitive_instance_envs["PASS_KEY_PATH"].value}"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = tls_private_key.web_key.private_key_pem
-      host        = aws_eip.this.public_ip
-      timeout     = "5m"
-    }
-  }
-}
-
 data "aws_ami" "amazon_arm" {
   most_recent = true
   owners      = ["amazon"]
