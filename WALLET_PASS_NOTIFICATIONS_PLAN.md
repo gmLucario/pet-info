@@ -567,9 +567,17 @@ initialize_pass_update_tag(&pet.external_id, &repo).await?;
 
 ---
 
-### Phase 3: Apple PassKit Web Service Endpoints
+### Phase 3: Apple PassKit Web Service Webhook Endpoints
 
-**Create new module: `web_app/src/api/passkit_webservice.rs`**
+**Create new webhook module following the same structure as `webhook/whatsapp/`:**
+
+```
+web_app/src/webhook/passkit/
+├── mod.rs              # Module documentation and re-exports
+├── routes.rs           # HTTP endpoint handlers (5 PassKit endpoints)
+├── handler.rs          # Business logic (validate tokens, update registrations)
+└── schemas.rs          # Request/response data structures
+```
 
 Required endpoints per Apple specification:
 
@@ -613,42 +621,454 @@ Body: { "logs": ["error message 1", "error message 2"] }
 Response: 200 OK
 ```
 
+---
+
 **Module structure:**
 
-```rust
-// web_app/src/api/passkit_webservice.rs
+#### `web_app/src/webhook/passkit/mod.rs`
 
-use ntex::web::{self, HttpRequest, HttpResponse, Error};
+```rust
+//! Apple PassKit Web Service webhook integration module
+//!
+//! This module provides webhook handling for Apple Wallet PassKit integration.
+//! It implements the 5 required endpoints per Apple's PassKit Web Service specification.
+//!
+//! ## Submodules
+//!
+//! - [`handler`] - Business logic for processing PassKit webhook requests
+//! - [`routes`] - HTTP endpoint handlers for PassKit webhooks
+//! - [`schemas`] - Data structures for PassKit webhook payloads
+//!
+//! ## Apple PassKit Web Service Protocol
+//!
+//! When a user adds a pass to Apple Wallet, the device registers with these endpoints
+//! to receive automatic updates. When pass data changes, we send APNS push notifications
+//! and the device fetches the latest pass version.
+//!
+//! ## Security
+//!
+//! Authentication is handled via unique authentication tokens embedded in each pass.
+//! Apple Wallet sends these tokens in the `Authorization: ApplePass {token}` header.
+
+pub mod handler;
+pub mod routes;
+pub mod schemas;
+
+// Re-export route handlers for convenience
+pub use routes::{
+    register_device,
+    get_serial_numbers,
+    unregister_device,
+    get_latest_pass,
+    log_errors
+};
+```
+
+#### `web_app/src/webhook/passkit/schemas.rs`
+
+```rust
+//! Data structures for PassKit webhook requests and responses
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+/// Request body for device registration
+#[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
+    /// APNS push token for this device
     #[serde(rename = "pushToken")]
     pub push_token: String,
 }
 
-#[derive(Serialize)]
-pub struct PassesResponse {
+/// Response for get serial numbers endpoint
+#[derive(Debug, Serialize)]
+pub struct SerialNumbersResponse {
+    /// Timestamp of the last update
     #[serde(rename = "lastUpdated")]
     pub last_updated: String,
+
+    /// List of serial numbers for passes updated since the given timestamp
     #[serde(rename = "serialNumbers")]
     pub serial_numbers: Vec<String>,
 }
 
-#[derive(Deserialize)]
+/// Request body for log errors endpoint
+#[derive(Debug, Deserialize)]
 pub struct LogRequest {
+    /// Array of error messages from Apple Wallet devices
     pub logs: Vec<String>,
 }
 
-// Endpoint implementations
-pub async fn register_device(...) -> Result<HttpResponse, Error> { ... }
-pub async fn get_serial_numbers(...) -> Result<HttpResponse, Error> { ... }
-pub async fn unregister_device(...) -> Result<HttpResponse, Error> { ... }
-pub async fn get_latest_pass(...) -> Result<HttpResponse, Error> { ... }
-pub async fn log_errors(...) -> Result<HttpResponse, Error> { ... }
+/// Query parameters for get serial numbers endpoint
+#[derive(Debug, Deserialize)]
+pub struct SerialNumbersQuery {
+    /// Optional timestamp - only return passes updated after this time
+    #[serde(rename = "passesUpdatedSince")]
+    pub passes_updated_since: Option<String>,
+}
+```
 
-// Helper: Validate authentication token
-async fn validate_auth_token(serial_number: &str, token: &str, repo: &Repo) -> Result<bool> { ... }
+#### `web_app/src/webhook/passkit/handler.rs`
+
+```rust
+//! Business logic for PassKit webhook processing
+
+use crate::repo;
+use anyhow::{Context, Result};
+
+/// Validates authentication token for a pass
+///
+/// Checks if the provided token matches the stored authentication token
+/// for the given serial number.
+///
+/// # Arguments
+///
+/// * `serial_number` - The pass serial number (pet external_id)
+/// * `auth_token` - The authentication token from the request header
+/// * `repo` - Database repository
+///
+/// # Returns
+///
+/// * `Ok(true)` if token is valid
+/// * `Ok(false)` if token is invalid
+/// * `Err` if database error occurs
+pub async fn validate_auth_token(
+    serial_number: &str,
+    auth_token: &str,
+    repo: &repo::ImplAppRepo,
+) -> Result<bool> {
+    repo.validate_auth_token(serial_number, auth_token)
+        .await
+        .context("Failed to validate auth token")
+}
+
+/// Registers a device for pass updates
+///
+/// Creates or updates a device registration in the database.
+///
+/// # Arguments
+///
+/// * `device_id` - Apple device library identifier
+/// * `pass_type_id` - Pass type identifier (e.g., "pass.com.petinfo.link")
+/// * `serial_number` - Pass serial number (pet external_id)
+/// * `push_token` - APNS push token for notifications
+/// * `repo` - Database repository
+///
+/// # Returns
+///
+/// * `Ok(true)` if new registration was created
+/// * `Ok(false)` if existing registration was updated
+pub async fn register_device_for_pass(
+    device_id: &str,
+    pass_type_id: &str,
+    serial_number: &str,
+    push_token: &str,
+    repo: &repo::ImplAppRepo,
+) -> Result<bool> {
+    let is_new = repo
+        .register_device(device_id, pass_type_id, serial_number, push_token)
+        .await
+        .context("Failed to register device")?;
+
+    logfire::info!(
+        "Device registered for pass updates: device={device_id}, pass={serial_number}, new={is_new}",
+        device_id = device_id,
+        serial_number = serial_number,
+        is_new = is_new
+    );
+
+    Ok(is_new)
+}
+
+/// Unregisters a device from pass updates
+///
+/// Removes the device registration from the database.
+///
+/// # Arguments
+///
+/// * `device_id` - Apple device library identifier
+/// * `pass_type_id` - Pass type identifier
+/// * `serial_number` - Pass serial number
+/// * `repo` - Database repository
+pub async fn unregister_device_from_pass(
+    device_id: &str,
+    pass_type_id: &str,
+    serial_number: &str,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
+    repo.unregister_device(device_id, pass_type_id, serial_number)
+        .await
+        .context("Failed to unregister device")?;
+
+    logfire::info!(
+        "Device unregistered from pass updates: device={device_id}, pass={serial_number}",
+        device_id = device_id,
+        serial_number = serial_number
+    );
+
+    Ok(())
+}
+
+/// Gets serial numbers for passes updated since a given timestamp
+///
+/// Returns all serial numbers for passes registered to a device
+/// that have been updated after the specified timestamp.
+///
+/// # Arguments
+///
+/// * `device_id` - Apple device library identifier
+/// * `pass_type_id` - Pass type identifier
+/// * `updated_since` - Optional timestamp filter
+/// * `repo` - Database repository
+///
+/// # Returns
+///
+/// * Tuple of (last_updated_timestamp, serial_numbers)
+pub async fn get_updated_serial_numbers(
+    device_id: &str,
+    pass_type_id: &str,
+    updated_since: Option<&str>,
+    repo: &repo::ImplAppRepo,
+) -> Result<(String, Vec<String>)> {
+    repo.get_serial_numbers_updated_since(device_id, pass_type_id, updated_since)
+        .await
+        .context("Failed to get updated serial numbers")
+}
+
+/// Logs errors from Apple Wallet devices
+///
+/// Stores error messages in the database for debugging.
+///
+/// # Arguments
+///
+/// * `logs` - Array of error messages
+/// * `repo` - Database repository
+pub async fn log_device_errors(
+    logs: Vec<String>,
+    repo: &repo::ImplAppRepo,
+) -> Result<()> {
+    for log in logs {
+        logfire::warn!("PassKit device error: {log}", log = log);
+
+        // Store in database for debugging
+        repo.insert_pass_error_log(None, &log)
+            .await
+            .context("Failed to insert pass error log")?;
+    }
+
+    Ok(())
+}
+```
+
+#### `web_app/src/webhook/passkit/routes.rs`
+
+```rust
+//! PassKit webhook HTTP endpoint handlers
+//!
+//! Implements the 5 required endpoints per Apple's PassKit Web Service specification.
+//! These endpoints allow Apple Wallet to register devices, check for updates,
+//! and fetch the latest version of passes.
+
+use super::{handler, schemas};
+use crate::{
+    api::passes,
+    config,
+    front::{AppState, errors},
+};
+use ntex::web;
+
+/// Extract authentication token from Authorization header
+///
+/// Expected format: "Authorization: ApplePass {token}"
+fn extract_auth_token(req: &web::HttpRequest) -> Result<String, web::Error> {
+    let auth_header = req
+        .headers()
+        .get("Authorization")
+        .ok_or_else(|| errors::UserError::Unauthorized)?
+        .to_str()
+        .map_err(|_| errors::UserError::Unauthorized)?;
+
+    // Remove "ApplePass " prefix
+    let token = auth_header
+        .strip_prefix("ApplePass ")
+        .ok_or_else(|| errors::UserError::Unauthorized)?;
+
+    Ok(token.to_string())
+}
+
+/// Register device for pass updates (POST)
+///
+/// Called when a user adds a pass to Apple Wallet.
+/// Stores the device's push token for sending update notifications.
+#[web::post("/devices/{device_id}/registrations/{pass_type_id}/{serial_number}")]
+pub async fn register_device(
+    req: web::HttpRequest,
+    path: web::types::Path<(String, String, String)>,
+    body: web::types::Json<schemas::RegisterRequest>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let (device_id, pass_type_id, serial_number) = path.into_inner();
+
+    // Validate authentication token
+    let auth_token = extract_auth_token(&req)?;
+    let is_valid = handler::validate_auth_token(&serial_number, &auth_token, &app_state.repo)
+        .await
+        .map_err(|_| errors::UserError::Unauthorized)?;
+
+    if !is_valid {
+        return Err(errors::UserError::Unauthorized.into());
+    }
+
+    // Register device
+    let is_new = handler::register_device_for_pass(
+        &device_id,
+        &pass_type_id,
+        &serial_number,
+        &body.push_token,
+        &app_state.repo,
+    )
+    .await
+    .map_err(|e| {
+        logfire::error!("Failed to register device: {error}", error = e.to_string());
+        errors::UserError::InternalError
+    })?;
+
+    // Return 201 for new registration, 200 for update
+    if is_new {
+        Ok(web::HttpResponse::Created().finish())
+    } else {
+        Ok(web::HttpResponse::Ok().finish())
+    }
+}
+
+/// Get serial numbers for updated passes (GET)
+///
+/// Returns list of pass serial numbers that have been updated
+/// since the provided timestamp.
+#[web::get("/devices/{device_id}/registrations/{pass_type_id}")]
+pub async fn get_serial_numbers(
+    path: web::types::Path<(String, String)>,
+    query: web::types::Query<schemas::SerialNumbersQuery>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let (device_id, pass_type_id) = path.into_inner();
+
+    // Get updated serial numbers
+    let (last_updated, serial_numbers) = handler::get_updated_serial_numbers(
+        &device_id,
+        &pass_type_id,
+        query.passes_updated_since.as_deref(),
+        &app_state.repo,
+    )
+    .await
+    .map_err(|e| {
+        logfire::error!("Failed to get serial numbers: {error}", error = e.to_string());
+        errors::UserError::InternalError
+    })?;
+
+    let response = schemas::SerialNumbersResponse {
+        last_updated,
+        serial_numbers,
+    };
+
+    Ok(web::HttpResponse::Ok().json(&response))
+}
+
+/// Unregister device from pass updates (DELETE)
+///
+/// Called when a user removes a pass from Apple Wallet.
+#[web::delete("/devices/{device_id}/registrations/{pass_type_id}/{serial_number}")]
+pub async fn unregister_device(
+    req: web::HttpRequest,
+    path: web::types::Path<(String, String, String)>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let (device_id, pass_type_id, serial_number) = path.into_inner();
+
+    // Validate authentication token
+    let auth_token = extract_auth_token(&req)?;
+    let is_valid = handler::validate_auth_token(&serial_number, &auth_token, &app_state.repo)
+        .await
+        .map_err(|_| errors::UserError::Unauthorized)?;
+
+    if !is_valid {
+        return Err(errors::UserError::Unauthorized.into());
+    }
+
+    // Unregister device
+    handler::unregister_device_from_pass(&device_id, &pass_type_id, &serial_number, &app_state.repo)
+        .await
+        .map_err(|e| {
+            logfire::error!("Failed to unregister device: {error}", error = e.to_string());
+            errors::UserError::InternalError
+        })?;
+
+    Ok(web::HttpResponse::Ok().finish())
+}
+
+/// Get latest version of pass (GET)
+///
+/// Returns the latest .pkpass file for a given serial number.
+/// Supports If-Modified-Since header to return 304 if pass hasn't changed.
+#[web::get("/passes/{pass_type_id}/{serial_number}")]
+pub async fn get_latest_pass(
+    req: web::HttpRequest,
+    path: web::types::Path<(String, String)>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    let (_pass_type_id, serial_number) = path.into_inner();
+
+    // Validate authentication token
+    let auth_token = extract_auth_token(&req)?;
+    let is_valid = handler::validate_auth_token(&serial_number, &auth_token, &app_state.repo)
+        .await
+        .map_err(|_| errors::UserError::Unauthorized)?;
+
+    if !is_valid {
+        return Err(errors::UserError::Unauthorized.into());
+    }
+
+    // Check If-Modified-Since header
+    if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
+        // TODO: Compare with pass_update_tag timestamp
+        // If not modified, return 304
+        // For now, always return the pass
+    }
+
+    // Generate and return the latest pass
+    // Reuse the existing pass generation logic from api/passes.rs
+    let pass_bytes = passes::generate_pet_pass_by_serial(
+        &serial_number,
+        &app_state.repo,
+        &app_state.storage_service,
+    )
+    .await
+    .map_err(|e| {
+        logfire::error!("Failed to generate pass: {error}", error = e.to_string());
+        errors::UserError::NotFound
+    })?;
+
+    Ok(web::HttpResponse::Ok()
+        .content_type("application/vnd.apple.pkpass")
+        .body(pass_bytes))
+}
+
+/// Log errors from devices (POST)
+///
+/// Apple Wallet devices can report errors for debugging.
+#[web::post("/log")]
+pub async fn log_errors(
+    body: web::types::Json<schemas::LogRequest>,
+    app_state: web::types::State<AppState>,
+) -> Result<impl web::Responder, web::Error> {
+    handler::log_device_errors(body.logs.clone(), &app_state.repo)
+        .await
+        .map_err(|e| {
+            logfire::error!("Failed to log device errors: {error}", error = e.to_string());
+            errors::UserError::InternalError
+        })?;
+
+    Ok(web::HttpResponse::Ok().finish())
+}
 ```
 
 ---
@@ -874,43 +1294,30 @@ pub struct Config {
 
 ### Phase 7: Route Registration
 
-**Update `web_app/src/front/routes.rs`:**
+**Update `web_app/src/webhook/mod.rs` to include passkit module:**
 
 ```rust
-use crate::api::passkit_webservice;
+pub mod passkit;
+pub mod whatsapp;
+```
+
+**Update `web_app/src/front/routes.rs` to register PassKit webhook routes:**
+
+```rust
+use crate::webhook::passkit;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg
         // ... existing routes
 
-        // PassKit Web Service endpoints
+        // PassKit Web Service webhook endpoints
         .service(
             web::scope("/api/v1")
-                // Register device
-                .route(
-                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}",
-                    web::post().to(passkit_webservice::register_device)
-                )
-                // Get serial numbers
-                .route(
-                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}",
-                    web::get().to(passkit_webservice::get_serial_numbers)
-                )
-                // Unregister device
-                .route(
-                    "/devices/{deviceLibraryIdentifier}/registrations/{passTypeIdentifier}/{serialNumber}",
-                    web::delete().to(passkit_webservice::unregister_device)
-                )
-                // Get latest pass
-                .route(
-                    "/passes/{passTypeIdentifier}/{serialNumber}",
-                    web::get().to(passkit_webservice::get_latest_pass)
-                )
-                // Log errors
-                .route(
-                    "/log",
-                    web::post().to(passkit_webservice::log_errors)
-                )
+                .service(passkit::register_device)
+                .service(passkit::get_serial_numbers)
+                .service(passkit::unregister_device)
+                .service(passkit::get_latest_pass)
+                .service(passkit::log_errors)
         );
 }
 ```
@@ -1152,10 +1559,18 @@ curl https://pet-info.link/api/v1/passes/pass.com.petinfo.link/PET-UUID \
 web_app/
 ├── src/
 │   ├── api/
-│   │   ├── passes.rs (UPDATE - add webServiceURL & authToken)
-│   │   ├── passkit_webservice.rs (NEW - 5 PassKit endpoints)
+│   │   ├── passes.rs (UPDATE - add webServiceURL & authToken generation)
 │   │   ├── pass_update_helper.rs (NEW - update trigger logic)
 │   │   └── pet.rs (UPDATE - add update triggers)
+│   │
+│   ├── webhook/
+│   │   ├── mod.rs (UPDATE - add passkit module export)
+│   │   ├── passkit/  (NEW - PassKit Web Service webhook module)
+│   │   │   ├── mod.rs (NEW - module documentation)
+│   │   │   ├── routes.rs (NEW - 5 HTTP endpoint handlers)
+│   │   │   ├── handler.rs (NEW - business logic)
+│   │   │   └── schemas.rs (NEW - request/response structures)
+│   │   └── whatsapp/ (EXISTING - keep as is)
 │   │
 │   ├── models/
 │   │   ├── pass_registration.rs (NEW)
@@ -1169,7 +1584,7 @@ web_app/
 │   │   └── sqlite_queries.rs (UPDATE - add pass-related queries)
 │   │
 │   ├── front/
-│   │   └── routes.rs (UPDATE - register PassKit routes)
+│   │   └── routes.rs (UPDATE - register PassKit webhook routes)
 │   │
 │   └── config.rs (UPDATE - add APNS config)
 │
@@ -1289,14 +1704,24 @@ Omit `changeMessage` from fields:
 - [ ] Add APNS config to `config.rs`
 - [ ] Test APNS connection (sandbox first)
 
-### Phase 6: PassKit Web Service Endpoints
-- [ ] Create `api/passkit_webservice.rs`
-- [ ] Implement `register_device()` endpoint
-- [ ] Implement `get_serial_numbers()` endpoint
-- [ ] Implement `unregister_device()` endpoint
-- [ ] Implement `get_latest_pass()` endpoint
-- [ ] Implement `log_errors()` endpoint
-- [ ] Add authentication token validation middleware
+### Phase 6: PassKit Web Service Webhook Endpoints
+- [ ] Create `webhook/passkit/` directory
+- [ ] Create `webhook/passkit/mod.rs` (module documentation)
+- [ ] Create `webhook/passkit/schemas.rs` (request/response structures)
+- [ ] Create `webhook/passkit/handler.rs` (business logic)
+  - [ ] Implement `validate_auth_token()` function
+  - [ ] Implement `register_device_for_pass()` function
+  - [ ] Implement `unregister_device_from_pass()` function
+  - [ ] Implement `get_updated_serial_numbers()` function
+  - [ ] Implement `log_device_errors()` function
+- [ ] Create `webhook/passkit/routes.rs` (HTTP endpoint handlers)
+  - [ ] Implement `register_device()` endpoint
+  - [ ] Implement `get_serial_numbers()` endpoint
+  - [ ] Implement `unregister_device()` endpoint
+  - [ ] Implement `get_latest_pass()` endpoint
+  - [ ] Implement `log_errors()` endpoint
+  - [ ] Implement `extract_auth_token()` helper
+- [ ] Update `webhook/mod.rs` to export passkit module
 - [ ] Add routes to `front/routes.rs`
 
 ### Phase 7: Update Triggers
