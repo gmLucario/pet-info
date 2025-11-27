@@ -1,30 +1,19 @@
 use std::sync::LazyLock;
 use tera::Tera;
 
-/// Global Tera template engine instance for web HTML templates.
-///
-/// This lazy-loaded static instance loads all HTML templates from the
-/// `web/templates/` directory and its subdirectories. The templates are
-/// compiled once at first access and cached for subsequent use.
+/// HTML templates from web/templates/
 pub static WEB_TEMPLATES: LazyLock<Tera> =
     LazyLock::new(|| Tera::new("web/templates/**/*.html").unwrap());
 
+/// Webmanifest templates
 pub static WEB_MANIFESTS: LazyLock<Tera> =
     LazyLock::new(|| Tera::new("web/templates/**/*.webmanifest").unwrap());
 
-/// Global Tera template engine instance for PDF report templates.
-///
-/// This lazy-loaded static instance loads all Typst templates from the
-/// `web/reports/` directory. These templates are used for generating
-/// PDF reports using the Typst typesetting system.
+/// Typst templates for PDF reports
 pub static PDF_REPORT_TEMPLATES: LazyLock<Tera> =
     LazyLock::new(|| Tera::new("web/reports/**/*.typ").unwrap());
 
-/// Global Tera template engine instance for blog markdown templates.
-///
-/// This lazy-loaded static instance loads all Markdown templates from the
-/// `web/blog/` directory. These templates are used for rendering blog
-/// content and posts.
+/// Markdown blog templates
 pub static BLOG_TEMPLATES: LazyLock<Tera> = LazyLock::new(|| Tera::new("web/blog/*.md").unwrap());
 
 #[cfg(test)]
