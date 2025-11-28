@@ -6,12 +6,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait StorageService {
-    async fn save_pic(
-        &self,
-        user_email: &str,
-        file_name: &str,
-        body: Vec<u8>,
-    ) -> anyhow::Result<()>;
+    async fn save_pic(&self, path: &str, body: Vec<u8>) -> anyhow::Result<()>;
 
     async fn get_pic_as_bytes(&self, file_name: &str) -> anyhow::Result<Vec<u8>>;
 }

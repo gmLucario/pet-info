@@ -276,9 +276,7 @@ pub fn crop_circle(
     y: u32,
     diameter: u32,
 ) -> anyhow::Result<Vec<u8>> {
-    let img_extension =
-        image::ImageFormat::from_extension(&pic.filename_extension).context("invalid extension")?;
-    let original_img = image::load_from_memory_with_format(&pic.body, img_extension)?;
+    let original_img = image::load_from_memory(&pic.body)?;
 
     let radius = (diameter / 2) as i32;
     let radius_squared = radius * radius;
@@ -472,10 +470,7 @@ mod tests {
             .unwrap();
         }
 
-        let pic = crate::front::forms::pet::Pic {
-            body: img_data,
-            filename_extension: "png".to_string(),
-        };
+        let pic = crate::front::forms::pet::Pic { body: img_data };
 
         // Test basic cropping
         let result = crop_circle(&pic, 5, 5, 6);
@@ -492,8 +487,7 @@ mod tests {
     #[test]
     fn test_crop_circle_invalid_format() {
         let pic = crate::front::forms::pet::Pic {
-            body: vec![1, 2, 3, 4],                // Invalid image data
-            filename_extension: "xyz".to_string(), // Invalid extension
+            body: vec![1, 2, 3, 4], // Invalid image data
         };
 
         let result = crop_circle(&pic, 5, 5, 6);
@@ -505,7 +499,6 @@ mod tests {
     fn test_crop_circle_corrupted_data() {
         let pic = crate::front::forms::pet::Pic {
             body: vec![1, 2, 3, 4], // Invalid PNG data
-            filename_extension: "png".to_string(),
         };
 
         let result = crop_circle(&pic, 5, 5, 6);

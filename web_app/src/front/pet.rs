@@ -68,12 +68,7 @@ async fn process_image_field(field: ntex_multipart::Field) -> anyhow::Result<for
         );
     }
 
-    let extension = crate::utils::detect_image_format(&body);
-
-    Ok(forms::pet::Pic {
-        filename_extension: extension.to_string(),
-        body,
-    })
+    Ok(forms::pet::Pic { body })
 }
 
 /// Deserializes multipart form data into a pet creation form
@@ -136,7 +131,6 @@ async fn deserialize_pet_form(
 
     if let (Some(cropper_box), Some(pet_pic)) = (cropper_box, pet_pic) {
         form.pet_pic = Some(forms::pet::PetPic {
-            filename_extension: "png".to_string(),
             body: utils::crop_circle(&pet_pic, cropper_box.x, cropper_box.y, cropper_box.diameter)?,
         })
     }
@@ -698,7 +692,6 @@ async fn edit_pet_details(
 
     api::pet::update_pet_to_user(
         user.id,
-        &user.email,
         pet_form,
         &app_state.repo,
         &app_state.storage_service,

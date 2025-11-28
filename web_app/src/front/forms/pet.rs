@@ -1,5 +1,6 @@
-use crate::{front::utils, models};
+use crate::models;
 use chrono::{NaiveDate, Utc};
+use openssl::sha::sha256;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -13,13 +14,11 @@ pub struct CropperBox {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Pic {
     pub body: Vec<u8>,
-    pub filename_extension: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct PetPic {
     pub body: Vec<u8>,
-    pub filename_extension: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -57,16 +56,12 @@ impl From<CreatePetForm> for models::pet::Pet {
 }
 
 impl CreatePetForm {
-    pub fn get_pet_pic_filename(&self) -> String {
-        utils::filter_only_alphanumeric_chars(&self.pet_full_name).to_lowercase()
-    }
-
-    pub fn get_pic_storage_path(&self, user_email: &str) -> Option<String> {
+    pub fn get_pic_storage_path(&self) -> Option<String> {
         self.pet_pic.as_ref().map(|pic| {
-            let pic_filename = self.get_pet_pic_filename();
-            let pic_extension = pic.filename_extension.to_string();
+            let hash = sha256(&pic.body);
+            let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
 
-            format!("pics/{user_email}/{pic_filename}.{pic_extension}").to_lowercase()
+            format!("pics/{hash_hex}")
         })
     }
 }

@@ -43,7 +43,6 @@ use uuid::Uuid;
 /// - File upload fails
 async fn update_or_create_pet(
     user_id: i64,
-    user_email: &str,
     insert: bool,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
@@ -64,10 +63,9 @@ async fn update_or_create_pet(
         }
     }
 
-    let pic_filename = pet_info.get_pet_pic_filename();
     let pet: models::pet::Pet = models::pet::Pet {
         user_app_id: user_id,
-        pic: pet_info.get_pic_storage_path(user_email),
+        pic: pet_info.get_pic_storage_path(),
         external_id: pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4),
         ..pet_info.clone().into()
     };
@@ -81,10 +79,8 @@ async fn update_or_create_pet(
         repo.update_pet(&pet).await?;
     }
 
-    if let Some(pet_pic) = pet_info.pet_pic {
-        storage_service
-            .save_pic(user_email, &pic_filename, pet_pic.body)
-            .await?;
+    if let (Some(path), Some(pic_body)) = (&pet.pic, pet_info.pet_pic) {
+        storage_service.save_pic(path, pic_body.body).await?;
     }
 
     Ok(())
@@ -132,15 +128,7 @@ pub async fn add_new_pet_to_user(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    update_or_create_pet(
-        user_state.user_id,
-        &user_state.user_email,
-        true,
-        pet_info,
-        repo,
-        storage_service,
-    )
-    .await?;
+    update_or_create_pet(user_state.user_id, true, pet_info, repo, storage_service).await?;
 
     if user_state.pet_balance > 0 {
         repo.set_pet_balance(user_state.user_id, user_state.pet_balance - 1)
@@ -166,12 +154,11 @@ pub async fn add_new_pet_to_user(
 /// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn update_pet_to_user(
     user_id: i64,
-    user_email: &str,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    update_or_create_pet(user_id, user_email, false, pet_info, repo, storage_service).await
+    update_or_create_pet(user_id, false, pet_info, repo, storage_service).await
 }
 
 /// Pet sex/gender enumeration.
@@ -283,10 +270,9 @@ pub async fn get_pet_user_to_edit(
         is_spaying_neutering: pet.is_spaying_neutering,
         is_female: pet.is_female,
         about_pet: pet.about,
-        pet_pic: pet.pic.map(|path| front::forms::pet::PetPic {
-            body: vec![],
-            filename_extension: path,
-        }),
+        pet_pic: pet
+            .pic
+            .map(|_| front::forms::pet::PetPic { body: vec![] }),
         pet_external_id: Some(pet.external_id),
     })
 }
@@ -907,12 +893,7 @@ mod tests {
 
     #[async_trait]
     impl StorageService for MockStorageService {
-        async fn save_pic(
-            &self,
-            _user_email: &str,
-            _file_name: &str,
-            _body: Vec<u8>,
-        ) -> anyhow::Result<()> {
+        async fn save_pic(&self, _path: &str, _body: Vec<u8>) -> anyhow::Result<()> {
             Ok(())
         }
 
