@@ -19,9 +19,6 @@
                             <li>el tamaño de la imagen debe ser menor a {{ PIC_PET_MAX_SIZE_BYTES | filesizeformat }}</li>
                             <li>extensiones validas: <i>{{ ACCEPTED_IMAGE_EXTENSIONS | join(sep=", ") }}.</i></li>
                             <li>selecciona el área deseada</li>
-                            {% if pet.pet_pic %}
-                            <li>Reemplazará: <small><code>{{ pet.pet_pic.filename_extension }}</code></small></li>
-                            {% endif %}
                         </ul>
                     </small>
                 </label>
