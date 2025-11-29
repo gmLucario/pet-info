@@ -51,22 +51,21 @@ async fn update_or_create_pet(
     let _span = logfire::span!("update_or_create_pet").entered();
 
     if let Some(external_id) = pet_info.pet_external_id {
-        let is_external_id_valid = repo
-            .is_pet_external_id_linked(&external_id)
-            .await?
-            .map(|is_linked| !is_linked)
-            .unwrap_or_else(|| false)
-            && insert;
-
-        if !is_external_id_valid {
-            bail!("invalid pet_external_id")
+        // Check if the external ID exists and is not already linked to a pet.
+        // is_pet_external_id_linked returns:
+        // Some(true) -> linked (invalid)
+        // Some(false) -> not linked (valid)
+        // None -> tag doesn't exist (invalid)
+        if insert && repo.is_pet_external_id_linked(&external_id).await? != Some(false) {
+            bail!("invalid pet_external_id");
         }
     }
 
-    let pet: models::pet::Pet = models::pet::Pet {
+    let external_id = pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4);
+    let pet = models::pet::Pet {
         user_app_id: user_id,
-        pic: pet_info.get_pic_storage_path(),
-        external_id: pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4),
+        pic: pet_info.build_pic_storage_path(external_id),
+        external_id,
         ..pet_info.clone().into()
     };
 
@@ -80,7 +79,7 @@ async fn update_or_create_pet(
     }
 
     if let (Some(path), Some(pic_body)) = (&pet.pic, pet_info.pet_pic) {
-        storage_service.save_pic(path, pic_body.body).await?;
+        storage_service.save_pic(path, pic_body).await?;
     }
 
     Ok(())
@@ -270,9 +269,7 @@ pub async fn get_pet_user_to_edit(
         is_spaying_neutering: pet.is_spaying_neutering,
         is_female: pet.is_female,
         about_pet: pet.about,
-        pet_pic: pet
-            .pic
-            .map(|_| front::forms::pet::PetPic { body: vec![] }),
+        pet_pic: pet.pic.map(|_| vec![]),
         pet_external_id: Some(pet.external_id),
     })
 }
@@ -313,11 +310,6 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
     fn from(val: models::pet::Pet) -> Self {
         let mut pic_path = "pics/default".to_string();
         if let Some(path) = val.pic {
-            let path = Path::new(&path)
-                .with_extension("")
-                .to_str()
-                .unwrap_or("pics/default")
-                .to_string();
             pic_path = path;
         }
 
@@ -419,13 +411,9 @@ pub async fn get_public_pic(
         .get_pet_pic_path_by_external_id(pet_external_id)
         .await?
     {
-        let pic_path = Path::new(&pic_path);
-
         return Ok(Some(PetPublicPic {
-            body: storage_service
-                .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
-                .await?,
-            extension: pic_path
+            body: storage_service.get_pic_as_bytes(&pic_path).await?,
+            extension: Path::new(&pic_path)
                 .extension()
                 .and_then(|p| p.to_str())
                 .unwrap_or("png")

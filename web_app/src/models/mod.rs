@@ -3,3 +3,5 @@ pub mod payment;
 pub mod pet;
 pub mod reminder;
 pub mod user_app;
+
+pub type Pic = Vec<u8>;

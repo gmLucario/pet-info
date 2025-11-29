@@ -7,8 +7,6 @@ use chrono::NaiveDate;
 use chrono_tz::Tz;
 use futures::StreamExt;
 
-use crate::front;
-
 /// Creates an HTTP redirect response to the specified URL.
 ///
 /// # Arguments
@@ -271,12 +269,12 @@ pub fn filter_only_alphanumeric_chars(s: &str) -> String {
 /// std::fs::write("avatar.png", circular_avatar)?;
 /// ```
 pub fn crop_circle(
-    pic: &front::forms::pet::Pic,
+    pic: &crate::models::Pic,
     x: u32,
     y: u32,
     diameter: u32,
 ) -> anyhow::Result<Vec<u8>> {
-    let original_img = image::load_from_memory(&pic.body)?;
+    let original_img = image::load_from_memory(pic)?;
 
     let radius = (diameter / 2) as i32;
     let radius_squared = radius * radius;
@@ -460,17 +458,12 @@ mod tests {
     #[test]
     fn test_crop_circle_basic() {
         // Create a simple 10x10 red PNG image for testing
-        let mut img_data = Vec::new();
+        let mut pic = Vec::new();
         {
             let img = image::RgbImage::from_fn(10, 10, |_, _| image::Rgb([255, 0, 0]));
-            img.write_to(
-                &mut std::io::Cursor::new(&mut img_data),
-                image::ImageFormat::Png,
-            )
-            .unwrap();
+            img.write_to(&mut std::io::Cursor::new(&mut pic), image::ImageFormat::Png)
+                .unwrap();
         }
-
-        let pic = crate::front::forms::pet::Pic { body: img_data };
 
         // Test basic cropping
         let result = crop_circle(&pic, 5, 5, 6);
@@ -486,9 +479,7 @@ mod tests {
     /// Tests crop circle with invalid image format.
     #[test]
     fn test_crop_circle_invalid_format() {
-        let pic = crate::front::forms::pet::Pic {
-            body: vec![1, 2, 3, 4], // Invalid image data
-        };
+        let pic = vec![1, 2, 3, 4]; // Invalid image data;
 
         let result = crop_circle(&pic, 5, 5, 6);
         assert!(result.is_err());
@@ -497,9 +488,7 @@ mod tests {
     /// Tests crop circle with corrupted image data.
     #[test]
     fn test_crop_circle_corrupted_data() {
-        let pic = crate::front::forms::pet::Pic {
-            body: vec![1, 2, 3, 4], // Invalid PNG data
-        };
+        let pic = vec![1, 2, 3, 4];
 
         let result = crop_circle(&pic, 5, 5, 6);
         assert!(result.is_err());

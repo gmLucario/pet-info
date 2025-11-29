@@ -1,6 +1,5 @@
 use crate::models;
 use chrono::{NaiveDate, Utc};
-use openssl::sha::sha256;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -9,16 +8,6 @@ pub struct CropperBox {
     pub x: u32,
     pub y: u32,
     pub diameter: u32,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct Pic {
-    pub body: Vec<u8>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct PetPic {
-    pub body: Vec<u8>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -31,7 +20,7 @@ pub struct CreatePetForm {
     pub is_spaying_neutering: bool,
     pub is_female: bool,
     pub about_pet: String,
-    pub pet_pic: Option<PetPic>,
+    pub pet_pic: Option<crate::models::Pic>,
     pub pet_external_id: Option<Uuid>,
 }
 
@@ -56,13 +45,8 @@ impl From<CreatePetForm> for models::pet::Pet {
 }
 
 impl CreatePetForm {
-    pub fn get_pic_storage_path(&self) -> Option<String> {
-        self.pet_pic.as_ref().map(|pic| {
-            let hash = sha256(&pic.body);
-            let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
-
-            format!("pics/{hash_hex}")
-        })
+    pub fn build_pic_storage_path(&self, external_id: Uuid) -> Option<String> {
+        self.pet_pic.as_ref().map(|_| format!("pics/{external_id}"))
     }
 }
 
