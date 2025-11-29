@@ -43,7 +43,6 @@ use uuid::Uuid;
 /// - File upload fails
 async fn update_or_create_pet(
     user_id: i64,
-    user_email: &str,
     insert: bool,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
@@ -52,23 +51,21 @@ async fn update_or_create_pet(
     let _span = logfire::span!("update_or_create_pet").entered();
 
     if let Some(external_id) = pet_info.pet_external_id {
-        let is_external_id_valid = repo
-            .is_pet_external_id_linked(&external_id)
-            .await?
-            .map(|is_linked| !is_linked)
-            .unwrap_or_else(|| false)
-            && insert;
-
-        if !is_external_id_valid {
-            bail!("invalid pet_external_id")
+        // Check if the external ID exists and is not already linked to a pet.
+        // is_pet_external_id_linked returns:
+        // Some(true) -> linked (invalid)
+        // Some(false) -> not linked (valid)
+        // None -> tag doesn't exist (invalid)
+        if insert && repo.is_pet_external_id_linked(&external_id).await? != Some(false) {
+            bail!("invalid pet_external_id");
         }
     }
 
-    let pic_filename = pet_info.get_pet_pic_filename();
-    let pet: models::pet::Pet = models::pet::Pet {
+    let external_id = pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4);
+    let pet = models::pet::Pet {
         user_app_id: user_id,
-        pic: pet_info.get_pic_storage_path(user_email),
-        external_id: pet_info.pet_external_id.unwrap_or_else(Uuid::new_v4),
+        pic: pet_info.build_pic_storage_path(external_id),
+        external_id,
         ..pet_info.clone().into()
     };
 
@@ -81,10 +78,8 @@ async fn update_or_create_pet(
         repo.update_pet(&pet).await?;
     }
 
-    if let Some(pet_pic) = pet_info.pet_pic {
-        storage_service
-            .save_pic(user_email, &pic_filename, pet_pic.body)
-            .await?;
+    if let (Some(path), Some(pic_body)) = (&pet.pic, pet_info.pet_pic) {
+        storage_service.save_pic(path, pic_body).await?;
     }
 
     Ok(())
@@ -132,15 +127,7 @@ pub async fn add_new_pet_to_user(
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    update_or_create_pet(
-        user_state.user_id,
-        &user_state.user_email,
-        true,
-        pet_info,
-        repo,
-        storage_service,
-    )
-    .await?;
+    update_or_create_pet(user_state.user_id, true, pet_info, repo, storage_service).await?;
 
     if user_state.pet_balance > 0 {
         repo.set_pet_balance(user_state.user_id, user_state.pet_balance - 1)
@@ -166,12 +153,11 @@ pub async fn add_new_pet_to_user(
 /// * `anyhow::Result<()>` - Success confirmation or error details
 pub async fn update_pet_to_user(
     user_id: i64,
-    user_email: &str,
     pet_info: front::forms::pet::CreatePetForm,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
 ) -> anyhow::Result<()> {
-    update_or_create_pet(user_id, user_email, false, pet_info, repo, storage_service).await
+    update_or_create_pet(user_id, false, pet_info, repo, storage_service).await
 }
 
 /// Pet sex/gender enumeration.
@@ -283,10 +269,7 @@ pub async fn get_pet_user_to_edit(
         is_spaying_neutering: pet.is_spaying_neutering,
         is_female: pet.is_female,
         about_pet: pet.about,
-        pet_pic: pet.pic.map(|path| front::forms::pet::PetPic {
-            body: vec![],
-            filename_extension: path,
-        }),
+        pet_pic: pet.pic.map(|_| vec![]),
         pet_external_id: Some(pet.external_id),
     })
 }
@@ -315,8 +298,8 @@ pub struct PetPublicInfoSchema {
     pub is_lost: bool,
     /// Description and additional information about the pet
     pub about_pet: String,
-    /// Whether the pet has a picture available
-    pub pic: Option<String>,
+    /// Whether the pet has a picture available or default one
+    pub pic_path: String,
 }
 
 /// Converts a Pet model to PetPublicInfoSchema for public display.
@@ -325,6 +308,11 @@ pub struct PetPublicInfoSchema {
 /// viewing, including all relevant information for found pet scenarios.
 impl From<models::pet::Pet> for PetPublicInfoSchema {
     fn from(val: models::pet::Pet) -> Self {
+        let mut pic_path = "pics/default".to_string();
+        if let Some(path) = val.pic {
+            pic_path = path;
+        }
+
         PetPublicInfoSchema {
             external_id: val.external_id.to_string(),
             name: val.pet_name,
@@ -332,7 +320,7 @@ impl From<models::pet::Pet> for PetPublicInfoSchema {
                 true => Sex::Female,
                 false => Sex::Male,
             },
-            pic: val.pic,
+            pic_path,
             pet_breed: val.breed,
             last_weight: val.last_weight,
             fmt_age: front::utils::fmt_dates_difference(
@@ -423,13 +411,9 @@ pub async fn get_public_pic(
         .get_pet_pic_path_by_external_id(pet_external_id)
         .await?
     {
-        let pic_path = Path::new(&pic_path);
-
         return Ok(Some(PetPublicPic {
-            body: storage_service
-                .get_pic_as_bytes(pic_path.with_extension("").to_str().unwrap_or_default())
-                .await?,
-            extension: pic_path
+            body: storage_service.get_pic_as_bytes(&pic_path).await?,
+            extension: Path::new(&pic_path)
                 .extension()
                 .and_then(|p| p.to_str())
                 .unwrap_or("png")
@@ -897,12 +881,7 @@ mod tests {
 
     #[async_trait]
     impl StorageService for MockStorageService {
-        async fn save_pic(
-            &self,
-            _user_email: &str,
-            _file_name: &str,
-            _body: Vec<u8>,
-        ) -> anyhow::Result<()> {
+        async fn save_pic(&self, _path: &str, _body: Vec<u8>) -> anyhow::Result<()> {
             Ok(())
         }
 

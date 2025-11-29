@@ -19,7 +19,6 @@ perfil de ...
 {% endblock mid_nav_content %}
 
 {% block extra_css %}
-{% if pet.pic %}
 <style>
     img {
         height: 30vh;
@@ -54,21 +53,18 @@ perfil de ...
         }
     }
 </style>
-{% endif %}
 {% endblock extra_css %}
 
 {% block content %}
 <div style="text-align:center;">
-    {% if pet.pic %}
     <div aria-busy="true" style="display: inline-block;">
-        <img 
-            src="/pet/public_pic/{{pet.external_id}}" 
+        <img
+            src="{{ pet_pic_url }}"
             alt="pet pic"
             loading="lazy"
             id="pet-pic"
             onload="this.parentElement.removeAttribute('aria-busy')" />
     </div>
-    {% endif %}
     <h1 style="margin-top:var(--pico-typography-spacing-vertical); color: var(--pico-primary);">
         {{ pet.name | title }}
     </h1>

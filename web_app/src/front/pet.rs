@@ -57,7 +57,7 @@ fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> b
 }
 
 /// Processes an image field, validating size and extracting file data
-async fn process_image_field(field: ntex_multipart::Field) -> anyhow::Result<forms::pet::Pic> {
+async fn process_image_field(field: ntex_multipart::Field) -> anyhow::Result<crate::models::Pic> {
     let body = utils::get_bytes_value(field).await;
 
     // Validate image size
@@ -68,12 +68,7 @@ async fn process_image_field(field: ntex_multipart::Field) -> anyhow::Result<for
         );
     }
 
-    let extension = crate::utils::detect_image_format(&body);
-
-    Ok(forms::pet::Pic {
-        filename_extension: extension.to_string(),
-        body,
-    })
+    Ok(body)
 }
 
 /// Deserializes multipart form data into a pet creation form
@@ -99,7 +94,7 @@ async fn deserialize_pet_form(
 
     let mut form = forms::pet::CreatePetForm::default();
     let mut cropper_box: Option<forms::pet::CropperBox> = None;
-    let mut pet_pic: Option<forms::pet::Pic> = None;
+    let mut pet_pic: Option<crate::models::Pic> = None;
 
     while let Ok(Some(field)) = payload.try_next().await {
         let headers = field.headers();
@@ -135,10 +130,12 @@ async fn deserialize_pet_form(
     }
 
     if let (Some(cropper_box), Some(pet_pic)) = (cropper_box, pet_pic) {
-        form.pet_pic = Some(forms::pet::PetPic {
-            filename_extension: "png".to_string(),
-            body: utils::crop_circle(&pet_pic, cropper_box.x, cropper_box.y, cropper_box.diameter)?,
-        })
+        form.pet_pic = Some(utils::crop_circle(
+            &pet_pic,
+            cropper_box.x,
+            cropper_box.y,
+            cropper_box.diameter,
+        )?);
     }
 
     Ok(form)
@@ -698,7 +695,6 @@ async fn edit_pet_details(
 
     api::pet::update_pet_to_user(
         user.id,
-        &user.email,
         pet_form,
         &app_state.repo,
         &app_state.storage_service,

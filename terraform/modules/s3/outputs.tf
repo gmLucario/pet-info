@@ -1,6 +1,7 @@
 output "info" {
   value = {
-    name = aws_s3_bucket.bucket.id
-    arn  = aws_s3_bucket.bucket.arn
+    name                        = aws_s3_bucket.bucket.id
+    arn                         = aws_s3_bucket.bucket.arn
+    bucket_regional_domain_name = aws_s3_bucket.bucket.bucket_regional_domain_name
   }
 }

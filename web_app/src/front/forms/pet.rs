@@ -1,4 +1,4 @@
-use crate::{front::utils, models};
+use crate::models;
 use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -11,18 +11,6 @@ pub struct CropperBox {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct Pic {
-    pub body: Vec<u8>,
-    pub filename_extension: String,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct PetPic {
-    pub body: Vec<u8>,
-    pub filename_extension: String,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct CreatePetForm {
     pub id: i64,
     pub pet_full_name: String,
@@ -32,7 +20,7 @@ pub struct CreatePetForm {
     pub is_spaying_neutering: bool,
     pub is_female: bool,
     pub about_pet: String,
-    pub pet_pic: Option<PetPic>,
+    pub pet_pic: Option<crate::models::Pic>,
     pub pet_external_id: Option<Uuid>,
 }
 
@@ -57,17 +45,8 @@ impl From<CreatePetForm> for models::pet::Pet {
 }
 
 impl CreatePetForm {
-    pub fn get_pet_pic_filename(&self) -> String {
-        utils::filter_only_alphanumeric_chars(&self.pet_full_name).to_lowercase()
-    }
-
-    pub fn get_pic_storage_path(&self, user_email: &str) -> Option<String> {
-        self.pet_pic.as_ref().map(|pic| {
-            let pic_filename = self.get_pet_pic_filename();
-            let pic_extension = pic.filename_extension.to_string();
-
-            format!("pics/{user_email}/{pic_filename}.{pic_extension}").to_lowercase()
-        })
+    pub fn build_pic_storage_path(&self, external_id: Uuid) -> Option<String> {
+        self.pet_pic.as_ref().map(|_| format!("pics/{external_id}"))
     }
 }
 

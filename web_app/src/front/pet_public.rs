@@ -1,5 +1,6 @@
 //! Handlers related to the /info/profile/{external-id} url
 
+use anyhow::Context;
 use ntex::web;
 use serde_json::json;
 use uuid::Uuid;
@@ -50,6 +51,13 @@ async fn get_pet_info_view(
             ))
         })?;
 
+    let app_config = crate::config::APP_CONFIG
+        .get()
+        .context("failed to get app config")
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("failed to get app config: {e}"))
+        })?;
+
     let context = tera::Context::from_value(json!({
         "pet": pet,
         "owner_contacts": api::user::get_owner_contacts(0, Some(pet_external_id), &app_state.repo)
@@ -58,7 +66,11 @@ async fn get_pet_info_view(
             errors::ServerError::InternalServerError(format!(
                 "function get_owner_contacts raised an error: {e}"
             ))
-        })?
+        })?,
+        "pet_pic_url": format!("{}/{}",
+            app_config.cloudfront_url,
+            pet.pic_path,
+        ),
     }))
     .unwrap_or_default();
 

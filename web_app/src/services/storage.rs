@@ -8,19 +8,13 @@ pub struct StorageHandler {
 
 #[async_trait]
 impl crate::services::StorageService for StorageHandler {
-    async fn save_pic(
-        &self,
-        user_email: &str,
-        file_name: &str,
-        body: Vec<u8>,
-    ) -> anyhow::Result<()> {
+    async fn save_pic(&self, path: &str, body: Vec<u8>) -> anyhow::Result<()> {
         let body = aws_sdk_s3::primitives::ByteStream::from(body);
-        let pic_path = format!("pics/{user_email}/{file_name}").to_lowercase();
 
         self.client
             .put_object()
             .bucket(consts::S3_MAIN_BUCKET_NAME)
-            .key(pic_path)
+            .key(path)
             .body(body)
             .send()
             .await?;
