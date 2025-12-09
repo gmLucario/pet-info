@@ -213,22 +213,3 @@ pub async fn delete_reminder(
     Ok(())
 }
 
-/// Updates a reminder's execution details after rescheduling.
-///
-/// Called by the Lambda function after scheduling the next occurrence
-/// of a recurring reminder.
-///
-/// # Arguments
-/// * `reminder_id` - ID of the reminder to update
-/// * `new_execution_id` - The new Step Function execution ARN
-/// * `new_send_at` - The new scheduled send time
-/// * `repo` - Repository instance for database operations
-pub async fn reschedule_reminder(
-    reminder_id: i64,
-    new_execution_id: String,
-    new_send_at: DateTime<Utc>,
-    repo: &repo::ImplAppRepo,
-) -> anyhow::Result<()> {
-    repo.update_reminder_execution(reminder_id, &new_execution_id, new_send_at)
-        .await
-}

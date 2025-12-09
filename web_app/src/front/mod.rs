@@ -3,7 +3,6 @@ pub mod blog;
 pub mod checkout;
 pub mod errors;
 pub mod forms;
-pub mod internal_api;
 pub mod middleware;
 pub mod oauth;
 pub mod pet;

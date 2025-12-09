@@ -431,22 +431,6 @@ pub trait AppRepo {
 
     // Reminders Management
 
-    /// Retrieves the execution ID for a specific reminder.
-    ///
-    /// This is used for tracking scheduled reminder executions in external systems.
-    ///
-    /// # Arguments
-    /// * `user_id` - The user's unique identifier (for authorization)
-    /// * `reminder_id` - The reminder's unique identifier
-    ///
-    /// # Returns
-    /// * `Some(execution_id)` if the reminder has an execution ID, `None` otherwise
-    async fn get_reminder_execution_id(
-        &self,
-        user_id: i64,
-        reminder_id: i64,
-    ) -> anyhow::Result<Option<String>>;
-
     /// Retrieves all active reminders for a user.
     ///
     /// # Arguments
@@ -478,7 +462,7 @@ pub trait AppRepo {
     /// * `user_id` - The user's unique identifier (for authorization)
     async fn delete_user_reminder(&self, reminder_id: i64, user_id: i64) -> anyhow::Result<()>;
 
-    /// Updates a reminder's execution details after scheduling or rescheduling.
+    /// Updates a reminder's execution details after scheduling.
     ///
     /// # Arguments
     /// * `reminder_id` - The unique identifier of the reminder to update
@@ -490,15 +474,6 @@ pub trait AppRepo {
         new_execution_id: &str,
         new_send_at: chrono::DateTime<chrono::Utc>,
     ) -> anyhow::Result<()>;
-
-    /// Checks if a reminder exists (for internal API use).
-    ///
-    /// # Arguments
-    /// * `reminder_id` - The unique identifier of the reminder to check
-    ///
-    /// # Returns
-    /// * `true` if the reminder exists, `false` otherwise
-    async fn check_reminder_exists(&self, reminder_id: i64) -> anyhow::Result<bool>;
 }
 
 /// Type alias for a boxed implementation of the AppRepo trait.

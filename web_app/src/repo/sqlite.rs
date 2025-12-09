@@ -687,20 +687,6 @@ impl AppRepo for SqlxSqliteRepo {
         Ok(rows.into_iter().map(models::reminder::Reminder::from).collect())
     }
 
-    async fn get_reminder_execution_id(
-        &self,
-        user_id: i64,
-        reminder_id: i64,
-    ) -> anyhow::Result<Option<String>> {
-        Ok(sqlx::query_scalar::<_, String>(
-            "SELECT execution_id FROM reminder WHERE id=$1 AND user_app_id=$2 LIMIT 1;",
-        )
-        .bind(reminder_id)
-        .bind(user_id)
-        .fetch_optional(&self.db_pool)
-        .await?)
-    }
-
     async fn insert_user_remider(
         &self,
         reminder: &models::reminder::Reminder,
@@ -752,14 +738,5 @@ impl AppRepo for SqlxSqliteRepo {
             .await?;
 
         Ok(())
-    }
-
-    async fn check_reminder_exists(&self, reminder_id: i64) -> anyhow::Result<bool> {
-        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM reminder WHERE id = $1 LIMIT 1")
-            .bind(reminder_id)
-            .fetch_optional(&self.db_pool)
-            .await?;
-
-        Ok(exists.is_some())
     }
 }

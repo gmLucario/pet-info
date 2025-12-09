@@ -164,11 +164,6 @@ pub struct AppConfig {
     pub google_oauth_client_secret: String,
 
     pub logfire_token: String,
-
-    /// 🔒 SENSITIVE: Internal API secret for Lambda callbacks
-    /// Security: Used to authenticate internal API calls from Lambda functions
-    #[envconfig(default = "")]
-    pub internal_api_secret: String,
 }
 
 impl AppConfig {

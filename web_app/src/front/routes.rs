@@ -4,7 +4,7 @@
 //! Routes are grouped by functionality into logical scopes for better organization
 //! and maintainability.
 
-use super::{blog, checkout, internal_api, pet, pet_health, pet_note, pet_public, profile, reminder};
+use super::{blog, checkout, pet, pet_health, pet_note, pet_public, profile, reminder};
 use ntex::web;
 
 /// Configures public pet profile routes.
@@ -152,18 +152,3 @@ pub fn blog(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/blog").service((blog::get_blog_entry,)));
 }
 
-/// Configures internal API routes for Lambda callbacks.
-///
-/// These routes are not exposed to the public internet and are only
-/// called by internal Lambda functions. They require authentication via
-/// the X-Internal-Secret header.
-///
-/// # Routes
-/// - `POST /api/internal/reschedule` - Update reminder after rescheduling
-/// - `GET /api/internal/reminder/{reminder_id}/active` - Check if reminder is active
-pub fn internal_api(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/api/internal").service((
-        internal_api::reschedule_reminder,
-        internal_api::check_reminder_active,
-    )));
-}

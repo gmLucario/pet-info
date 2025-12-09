@@ -98,8 +98,6 @@ module "lambda_send_reminders" {
     WHATSAPP_BUSINESS_PHONE_NUMBER_ID = var.sensitive_instance_envs["WHATSAPP_BUSINESS_PHONE_NUMBER_ID"].value
     WHATSAPP_BUSINESS_AUTH            = var.sensitive_instance_envs["WHATSAPP_BUSINESS_AUTH"].value
     STEP_FUNCTION_ARN                 = local.step_function_arn
-    WEB_APP_API_URL                   = var.sensitive_instance_envs["WEB_APP_API_URL"].value
-    INTERNAL_API_SECRET               = var.sensitive_instance_envs["INTERNAL_API_SECRET"].value
   }
   lambda_details = {
     name         = "send_reminders"

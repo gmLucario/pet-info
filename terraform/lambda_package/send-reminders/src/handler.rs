@@ -8,8 +8,6 @@ use crate::config;
 /// Full payload from Step Function
 #[derive(Deserialize, Debug)]
 pub struct IncomingMessage {
-    /// Original scheduled time
-    pub when: String,
     /// Reminder data (phone and body)
     pub reminder: ReminderData,
     /// Optional repeat configuration for recurring reminders
@@ -39,34 +37,6 @@ pub struct RepeatConfig {
 pub struct OutgoingMessage {
     pub req_id: String,
     pub msg: String,
-}
-
-/// Check if reminder still exists (not deleted by user)
-async fn check_reminder_active(reminder_id: i64) -> Result<bool, Error> {
-    let url = format!(
-        "{}/api/internal/reminder/{}/active",
-        config::APP_CONFIG.web_app_api_url, reminder_id
-    );
-
-    let response = reqwest::Client::new()
-        .get(&url)
-        .header("X-Internal-Secret", &config::APP_CONFIG.internal_api_secret)
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        tracing::warn!("Failed to check reminder status: {}", response.status());
-        // If we can't check, assume it's active to avoid missing reminders
-        return Ok(true);
-    }
-
-    #[derive(Deserialize)]
-    struct ActiveResponse {
-        active: bool,
-    }
-
-    let result: ActiveResponse = response.json().await?;
-    Ok(result.active)
 }
 
 async fn send_msg(phone_number: &str, body: &str) -> Result<(), Error> {
@@ -160,8 +130,8 @@ async fn schedule_next_reminder(
     });
 
     // Start new Step Function execution with named execution for tracking
-    let config = aws_config::load_from_env().await;
-    let sfn_client = aws_sdk_sfn::Client::new(&config);
+    let aws_config = aws_config::load_from_env().await;
+    let sfn_client = aws_sdk_sfn::Client::new(&aws_config);
 
     let result = sfn_client
         .start_execution()
@@ -175,44 +145,7 @@ async fn schedule_next_reminder(
 
     tracing::info!("Started new Step Function execution: {}", new_execution_arn);
 
-    // Update reminder in database with new execution details
-    update_reminder_in_db(reminder_id, &new_execution_arn, next_when).await?;
-
     Ok(new_execution_arn)
-}
-
-async fn update_reminder_in_db(
-    reminder_id: i64,
-    new_execution_id: &str,
-    new_send_at: DateTime<Utc>,
-) -> Result<(), Error> {
-    let url = format!(
-        "{}/api/internal/reschedule",
-        config::APP_CONFIG.web_app_api_url
-    );
-
-    let response = reqwest::Client::new()
-        .post(&url)
-        .header("X-Internal-Secret", &config::APP_CONFIG.internal_api_secret)
-        .json(&json!({
-            "reminder_id": reminder_id,
-            "new_execution_id": new_execution_id,
-            "new_send_at": new_send_at.to_rfc3339()
-        }))
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        tracing::error!("Failed to update reminder in DB: {}", error_text);
-        return Err(Box::new(simple_error::SimpleError::new(format!(
-            "Failed to update reminder: {}",
-            error_text
-        ))));
-    }
-
-    tracing::info!("Updated reminder {} in database", reminder_id);
-    Ok(())
 }
 
 #[tracing::instrument()]
@@ -226,17 +159,6 @@ pub async fn function_handler(
         payload.reminder.phone,
         payload.repeat_config.is_some()
     );
-
-    // For recurring reminders, check if the reminder is still active
-    if let Some(reminder_id) = payload.reminder_id {
-        if !check_reminder_active(reminder_id).await? {
-            tracing::info!("Reminder {} has been deleted, skipping", reminder_id);
-            return Ok(OutgoingMessage {
-                req_id: event.context.request_id,
-                msg: "reminder was deleted, skipped".into(),
-            });
-        }
-    }
 
     // Send the WhatsApp message
     send_msg(&payload.reminder.phone, &payload.reminder.body).await?;
