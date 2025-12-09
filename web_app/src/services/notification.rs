@@ -86,21 +86,20 @@ impl crate::services::NotificationService for NotificationHandler {
         while let Some(page) = paginator.next().await {
             let page = page?;
             for execution in page.executions() {
-                if let Some(name) = execution.name() {
-                    if name.starts_with(&prefix) {
-                        tracing::info!(
-                            "Stopping execution {} for reminder {}",
-                            execution.execution_arn(),
-                            reminder_id
-                        );
-                        // Best effort - don't fail if one stop fails
-                        let _ = self
-                            .client
-                            .stop_execution()
-                            .execution_arn(execution.execution_arn())
-                            .send()
-                            .await;
-                    }
+                let name = execution.name();
+                if name.starts_with(&prefix) {
+                    tracing::info!(
+                        "Stopping execution {} for reminder {}",
+                        execution.execution_arn(),
+                        reminder_id
+                    );
+                    // Best effort - don't fail if one stop fails
+                    let _ = self
+                        .client
+                        .stop_execution()
+                        .execution_arn(execution.execution_arn())
+                        .send()
+                        .await;
                 }
             }
         }

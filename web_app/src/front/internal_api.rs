@@ -17,7 +17,7 @@ fn verify_internal_secret(req: &web::HttpRequest) -> bool {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if let Ok(Some(config)) = config::APP_CONFIG.get() {
+    if let Some(config) = config::APP_CONFIG.get() {
         !config.internal_api_secret.is_empty() && secret == config.internal_api_secret
     } else {
         false
