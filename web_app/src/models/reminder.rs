@@ -23,9 +23,18 @@ pub enum RepeatType {
     #[display("monthly")]
     #[serde(alias = "monthly", rename(serialize = "monthly"))]
     Monthly,
-    #[display("yearly")]
-    #[serde(alias = "yearly", rename(serialize = "yearly"))]
-    Yearly,
+}
+
+impl RepeatType {
+    /// Returns the maximum allowed interval for this repeat type.
+    /// Based on AWS Step Functions 1-year maximum execution duration.
+    pub fn max_interval(&self) -> i32 {
+        match self {
+            RepeatType::Daily => 365,   // 1 year in days
+            RepeatType::Weekly => 52,   // 1 year in weeks
+            RepeatType::Monthly => 12,  // 1 year in months
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -35,6 +44,29 @@ pub struct RepeatConfig {
 }
 
 impl RepeatConfig {
+    /// Validates the repeat configuration.
+    /// Returns an error message in Spanish if invalid, None if valid.
+    pub fn validate(&self) -> Option<String> {
+        if self.repeat_interval < 1 {
+            return Some("El intervalo debe ser al menos 1".to_string());
+        }
+
+        let max = self.repeat_type.max_interval();
+        if self.repeat_interval > max {
+            let unit = match self.repeat_type {
+                RepeatType::Daily => "días",
+                RepeatType::Weekly => "semanas",
+                RepeatType::Monthly => "meses",
+            };
+            return Some(format!(
+                "El intervalo máximo para repetición es {} {} (1 año)",
+                max, unit
+            ));
+        }
+
+        None
+    }
+
     /// Returns the Spanish summary for the repeat configuration
     pub fn summary_spanish(&self) -> String {
         match (&self.repeat_type, self.repeat_interval) {
@@ -44,8 +76,6 @@ impl RepeatConfig {
             (RepeatType::Weekly, n) => format!("Se repite cada {} semanas", n),
             (RepeatType::Monthly, 1) => "Se repite mensualmente".to_string(),
             (RepeatType::Monthly, n) => format!("Se repite cada {} meses", n),
-            (RepeatType::Yearly, 1) => "Se repite anualmente".to_string(),
-            (RepeatType::Yearly, n) => format!("Se repite cada {} años", n),
         }
     }
 }

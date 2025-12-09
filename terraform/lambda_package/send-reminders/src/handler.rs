@@ -108,6 +108,9 @@ async fn send_msg(phone_number: &str, body: &str) -> Result<(), Error> {
     ))))
 }
 
+/// Calculates the next execution time based on repeat type and interval.
+/// Note: Maximum intervals are enforced by the web app (365 days, 52 weeks, 12 months)
+/// to stay within AWS Step Functions 1-year execution limit.
 fn calculate_next_execution(repeat_type: &str, interval: i32) -> DateTime<Utc> {
     let now = Utc::now();
     match repeat_type {
@@ -115,9 +118,6 @@ fn calculate_next_execution(repeat_type: &str, interval: i32) -> DateTime<Utc> {
         "weekly" => now + chrono::Duration::weeks(interval as i64),
         "monthly" => now
             .checked_add_months(Months::new(interval as u32))
-            .unwrap_or(now),
-        "yearly" => now
-            .checked_add_months(Months::new((interval * 12) as u32))
             .unwrap_or(now),
         _ => now + chrono::Duration::days(1), // fallback to daily
     }

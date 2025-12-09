@@ -251,8 +251,15 @@ async fn create_reminder(
             .finish());
     }
 
-    // Parse repeat configuration from form
-    let repeat_config = parse_repeat_config(&form.repeat_type, form.repeat_interval);
+    // Parse and validate repeat configuration from form
+    let repeat_config = match parse_repeat_config(&form.repeat_type, form.repeat_interval) {
+        Ok(config) => config,
+        Err(error_msg) => {
+            return Ok(web::HttpResponse::BadRequest()
+                .content_type("text/html; charset=utf-8")
+                .body(error_msg));
+        }
+    };
 
     if let Some(user_dt) = form.when.and_local_timezone(user_timezone).single() {
         api::reminder::schedule_reminder(
@@ -280,12 +287,13 @@ async fn create_reminder(
         .finish())
 }
 
-/// Parses repeat configuration from form input
+/// Parses and validates repeat configuration from form input.
+/// Returns Ok(Some(config)) if valid, Ok(None) if no repeat, Err(message) if invalid.
 fn parse_repeat_config(
     repeat_type: &Option<String>,
     repeat_interval: Option<i32>,
-) -> Option<models::reminder::RepeatConfig> {
-    let rt = repeat_type.as_ref().and_then(|t| {
+) -> Result<Option<models::reminder::RepeatConfig>, String> {
+    let rt = match repeat_type.as_ref().and_then(|t| {
         if t.is_empty() {
             return None;
         }
@@ -293,13 +301,22 @@ fn parse_repeat_config(
             "daily" => Some(models::reminder::RepeatType::Daily),
             "weekly" => Some(models::reminder::RepeatType::Weekly),
             "monthly" => Some(models::reminder::RepeatType::Monthly),
-            "yearly" => Some(models::reminder::RepeatType::Yearly),
             _ => None,
         }
-    })?;
+    }) {
+        Some(rt) => rt,
+        None => return Ok(None),
+    };
 
-    Some(models::reminder::RepeatConfig {
+    let config = models::reminder::RepeatConfig {
         repeat_type: rt,
         repeat_interval: repeat_interval.unwrap_or(1),
-    })
+    };
+
+    // Validate the configuration
+    if let Some(error) = config.validate() {
+        return Err(error);
+    }
+
+    Ok(Some(config))
 }

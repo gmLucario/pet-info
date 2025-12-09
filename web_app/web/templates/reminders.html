@@ -40,15 +40,15 @@ Recordatorios
                     <option value="daily">Diario</option>
                     <option value="weekly">Semanal</option>
                     <option value="monthly">Mensual</option>
-                    <option value="yearly">Anual</option>
                 </select>
             </label>
             <div id="repeat_interval_container" style="display: none;">
                 <label>
-                    Cada cuántos?
+                    <span id="repeat_interval_label">Cada cuántos?</span>
                     <input type="number" name="repeat_interval" id="repeat_interval"
                            min="1" max="365" value="1" oninput="updateRepeatUI()">
                 </label>
+                <small id="repeat_max_hint" style="color: #666;"></small>
             </div>
             <div id="repeat_summary" style="font-style: italic; color: #666;"></div>
         </fieldset>
@@ -58,24 +58,46 @@ Recordatorios
     </form>
 </div>
 <script>
+// Max intervals based on AWS Step Functions 1-year limit
+const REPEAT_LIMITS = {
+    daily: { max: 365, unit: 'días', label: 'Cada cuántos días?' },
+    weekly: { max: 52, unit: 'semanas', label: 'Cada cuántas semanas?' },
+    monthly: { max: 12, unit: 'meses', label: 'Cada cuántos meses?' }
+};
+
 function updateRepeatUI() {
     const type = document.getElementById('repeat_type').value;
-    const interval = document.getElementById('repeat_interval').value || 1;
+    const intervalInput = document.getElementById('repeat_interval');
     const container = document.getElementById('repeat_interval_container');
     const summary = document.getElementById('repeat_summary');
+    const hint = document.getElementById('repeat_max_hint');
+    const label = document.getElementById('repeat_interval_label');
 
     container.style.display = type ? 'block' : 'none';
 
     if (!type) {
         summary.textContent = '';
+        hint.textContent = '';
         return;
     }
 
+    const limit = REPEAT_LIMITS[type];
+    if (limit) {
+        intervalInput.max = limit.max;
+        label.textContent = limit.label;
+        hint.textContent = `Máximo: ${limit.max} ${limit.unit} (1 año)`;
+
+        // Clamp value if exceeds max
+        if (parseInt(intervalInput.value) > limit.max) {
+            intervalInput.value = limit.max;
+        }
+    }
+
+    const interval = intervalInput.value || 1;
     const summaries = {
         daily: interval == 1 ? 'Se repite diariamente' : `Se repite cada ${interval} días`,
         weekly: interval == 1 ? 'Se repite semanalmente' : `Se repite cada ${interval} semanas`,
-        monthly: interval == 1 ? 'Se repite mensualmente' : `Se repite cada ${interval} meses`,
-        yearly: interval == 1 ? 'Se repite anualmente' : `Se repite cada ${interval} años`
+        monthly: interval == 1 ? 'Se repite mensualmente' : `Se repite cada ${interval} meses`
     };
     summary.textContent = summaries[type] || '';
 }
