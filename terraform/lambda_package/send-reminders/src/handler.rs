@@ -123,6 +123,13 @@ fn calculate_next_execution(repeat_type: &str, interval: i32) -> DateTime<Utc> {
     }
 }
 
+/// Generates a unique execution name for a reminder.
+/// Format: `reminder-{reminder_id}-{timestamp}`
+/// IMPORTANT: Must match the format used in web_app/src/services/notification.rs
+fn generate_execution_name(reminder_id: i64) -> String {
+    format!("reminder-{}-{}", reminder_id, Utc::now().timestamp_millis())
+}
+
 async fn schedule_next_reminder(
     payload: &IncomingMessage,
     repeat_config: &RepeatConfig,
@@ -152,13 +159,14 @@ async fn schedule_next_reminder(
         "user_timezone": timezone
     });
 
-    // Start new Step Function execution
+    // Start new Step Function execution with named execution for tracking
     let config = aws_config::load_from_env().await;
     let sfn_client = aws_sdk_sfn::Client::new(&config);
 
     let result = sfn_client
         .start_execution()
         .state_machine_arn(&config::APP_CONFIG.step_function_arn)
+        .name(generate_execution_name(reminder_id))
         .input(new_payload.to_string())
         .send()
         .await?;

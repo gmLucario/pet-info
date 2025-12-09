@@ -175,11 +175,13 @@ pub async fn get_scheduled_reminders(
     repo.get_active_user_remiders(user_app_id).await
 }
 
-/// Deletes a scheduled reminder and cancels its delivery.
+/// Deletes a scheduled reminder and cancels all related Step Function executions.
 ///
-/// Removes a reminder from the database and cancels its scheduled
-/// delivery through the notification service to prevent it from
-/// being sent.
+/// Stops all running Step Function executions for this reminder (using execution
+/// name prefix matching) and removes the reminder from the database.
+///
+/// This approach handles recurring reminders correctly by finding all executions
+/// with names matching `reminder-{reminder_id}-*` pattern.
 ///
 /// # Arguments
 /// * `reminder_id` - ID of the reminder to delete
@@ -190,16 +192,9 @@ pub async fn get_scheduled_reminders(
 /// # Returns
 /// * `anyhow::Result<()>` - Success confirmation or error details
 ///
-/// # Process
-/// 1. Retrieve execution ID for the reminder
-/// 2. Cancel scheduled notification if execution ID exists
-/// 3. Delete reminder from database
-/// 4. Record cancellation metrics
-///
 /// # Errors
 /// Returns an error if:
 /// - Database operations fail
-/// - Notification service cancellation fails
 /// - User doesn't own the specified reminder
 pub async fn delete_reminder(
     reminder_id: i64,
@@ -207,15 +202,15 @@ pub async fn delete_reminder(
     repo: &repo::ImplAppRepo,
     notification_service: &services::ImplNotificationService,
 ) -> anyhow::Result<()> {
-    if let Some(execution_id) = repo.get_reminder_execution_id(user_id, reminder_id).await? {
-        notification_service
-            .cancel_reminder_to_phone_number(&execution_id)
-            .await?;
+    // Cancel all Step Function executions for this reminder
+    notification_service
+        .cancel_reminder_executions(reminder_id)
+        .await?;
 
-        metric::incr_reminder_action_statds("cancel");
-    }
-
-    repo.delete_user_reminder(reminder_id, user_id).await
+    // Delete from database
+    repo.delete_user_reminder(reminder_id, user_id).await?;
+    metric::incr_reminder_action_statds("cancel");
+    Ok(())
 }
 
 /// Updates a reminder's execution details after rescheduling.

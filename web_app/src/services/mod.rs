@@ -19,7 +19,9 @@ pub trait NotificationService {
         reminder_id: i64,
     ) -> anyhow::Result<String>;
 
-    async fn cancel_reminder_to_phone_number(&self, execution_id: &str) -> anyhow::Result<()>;
+    /// Cancels all Step Function executions for a given reminder.
+    /// Uses execution name prefix matching to find and stop all related executions.
+    async fn cancel_reminder_executions(&self, reminder_id: i64) -> anyhow::Result<()>;
 }
 
 pub type ImplStorageService = Box<dyn StorageService>;
