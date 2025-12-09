@@ -16,6 +16,7 @@ pub trait NotificationService {
     async fn send_reminder_to_phone_number(
         &self,
         info: &api::reminder::ScheduleReminderInfo,
+        reminder_id: i64,
     ) -> anyhow::Result<String>;
 
     async fn cancel_reminder_to_phone_number(&self, execution_id: &str) -> anyhow::Result<()>;

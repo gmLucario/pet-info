@@ -5,6 +5,9 @@ use std::sync::LazyLock;
 pub struct AppConfig {
     pub whatsapp_business_phone_number_id: u64,
     pub whatsapp_business_auth: String,
+    pub step_function_arn: String,
+    pub web_app_api_url: String,
+    pub internal_api_secret: String,
 }
 
 impl AppConfig {

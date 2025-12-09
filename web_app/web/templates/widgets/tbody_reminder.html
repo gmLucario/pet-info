@@ -5,6 +5,23 @@
         {% include "widgets/trash_icon.html" %}
     </td>
     <td>{{ reminder.send_at | date(format="%v, %R", timezone=reminder.user_timezone, locale="es_MX") }}</td>
-    <td data-tooltip="vía: {{reminder.notification_type}}">{{ reminder.body }}</td>
+    <td data-tooltip="vía: {{reminder.notification_type}}">
+        {{ reminder.body }}
+        {% if reminder.repeat_config %}
+        <br><small style="color: #666;">
+            {% set rt = reminder.repeat_config.repeat_type %}
+            {% set ri = reminder.repeat_config.repeat_interval %}
+            {% if rt == "daily" %}
+                {% if ri == 1 %}Se repite diariamente{% else %}Se repite cada {{ ri }} días{% endif %}
+            {% elif rt == "weekly" %}
+                {% if ri == 1 %}Se repite semanalmente{% else %}Se repite cada {{ ri }} semanas{% endif %}
+            {% elif rt == "monthly" %}
+                {% if ri == 1 %}Se repite mensualmente{% else %}Se repite cada {{ ri }} meses{% endif %}
+            {% elif rt == "yearly" %}
+                {% if ri == 1 %}Se repite anualmente{% else %}Se repite cada {{ ri }} años{% endif %}
+            {% endif %}
+        </small>
+        {% endif %}
+    </td>
 </tr>
 {% endfor %}

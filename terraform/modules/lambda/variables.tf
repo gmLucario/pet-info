@@ -11,3 +11,12 @@ variable "env" {
   default   = {}
   sensitive = true
 }
+
+variable "additional_policy" {
+  description = "Optional additional IAM policy for the Lambda function"
+  type = object({
+    actions   = list(string)
+    resources = list(string)
+  })
+  default = null
+}

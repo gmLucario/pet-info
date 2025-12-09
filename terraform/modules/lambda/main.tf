@@ -19,6 +19,22 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_role.name
 }
 
+resource "aws_iam_role_policy" "lambda_additional_policy" {
+  count = var.additional_policy != null ? 1 : 0
+
+  name = "${var.lambda_details.name}-additional-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = var.additional_policy.actions
+      Resource = var.additional_policy.resources
+    }]
+  })
+}
+
 resource "aws_lambda_function" "lambda" {
 
   function_name    = var.lambda_details.name

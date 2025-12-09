@@ -8,6 +8,10 @@ pub struct UserReminderForm {
     #[serde(deserialize_with = "deserialize_when_user_input")]
     pub when: NaiveDateTime,
     pub body: String,
+    #[serde(default)]
+    pub repeat_type: Option<String>,
+    #[serde(default)]
+    pub repeat_interval: Option<i32>,
 }
 
 fn deserialize_when_user_input<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>

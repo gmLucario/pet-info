@@ -22,7 +22,7 @@ Recordatorios
 </nav>
 {% endif %}
 <div popover id="{{modal_id}}">
-    <form method="dialog" style="padding: 2rem;" hx-post='/reminder' hx-swap="none" hx-on::after-request="this.reset()"
+    <form method="dialog" style="padding: 2rem;" hx-post='/reminder' hx-swap="none" hx-on::after-request="this.reset(); updateRepeatUI();"
         hx-headers='js:{timezone: Intl.DateTimeFormat().resolvedOptions().timeZone}'>
         <fieldset>
             <label>
@@ -33,12 +33,53 @@ Recordatorios
                 Recordatorio
                 <textarea name="body" placeholder="Cual seria el recordatorio"></textarea>
             </label>
+            <label>
+                Repetir
+                <select name="repeat_type" id="repeat_type" onchange="updateRepeatUI()">
+                    <option value="">Sin repetición</option>
+                    <option value="daily">Diario</option>
+                    <option value="weekly">Semanal</option>
+                    <option value="monthly">Mensual</option>
+                    <option value="yearly">Anual</option>
+                </select>
+            </label>
+            <div id="repeat_interval_container" style="display: none;">
+                <label>
+                    Cada cuántos?
+                    <input type="number" name="repeat_interval" id="repeat_interval"
+                           min="1" max="365" value="1" oninput="updateRepeatUI()">
+                </label>
+            </div>
+            <div id="repeat_summary" style="font-style: italic; color: #666;"></div>
         </fieldset>
 
         <button style="width: 100%;"
             hx-on:click="document.getElementById('{{modal_id}}').hidePopover()">Guardar</button>
     </form>
 </div>
+<script>
+function updateRepeatUI() {
+    const type = document.getElementById('repeat_type').value;
+    const interval = document.getElementById('repeat_interval').value || 1;
+    const container = document.getElementById('repeat_interval_container');
+    const summary = document.getElementById('repeat_summary');
+
+    container.style.display = type ? 'block' : 'none';
+
+    if (!type) {
+        summary.textContent = '';
+        return;
+    }
+
+    const summaries = {
+        daily: interval == 1 ? 'Se repite diariamente' : `Se repite cada ${interval} días`,
+        weekly: interval == 1 ? 'Se repite semanalmente' : `Se repite cada ${interval} semanas`,
+        monthly: interval == 1 ? 'Se repite mensualmente' : `Se repite cada ${interval} meses`,
+        yearly: interval == 1 ? 'Se repite anualmente' : `Se repite cada ${interval} años`
+    };
+    summary.textContent = summaries[type] || '';
+}
+</script>
 
 <table class="striped">
     <thead>

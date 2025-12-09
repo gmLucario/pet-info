@@ -1,5 +1,5 @@
 use crate::{
-    api, consts,
+    api, consts, models,
     front::{
         AppState, errors, forms,
         middleware::{
@@ -251,6 +251,9 @@ async fn create_reminder(
             .finish());
     }
 
+    // Parse repeat configuration from form
+    let repeat_config = parse_repeat_config(&form.repeat_type, form.repeat_interval);
+
     if let Some(user_dt) = form.when.and_local_timezone(user_timezone).single() {
         api::reminder::schedule_reminder(
             api::reminder::ScheduleReminderInfo {
@@ -258,6 +261,7 @@ async fn create_reminder(
                 phone_number: user.phone_reminder.unwrap(),
                 when: user_dt,
                 body: form.body.to_string(),
+                repeat_config,
             },
             &app_state.repo,
             &app_state.notification_service,
@@ -274,4 +278,28 @@ async fn create_reminder(
         .content_type("text/html; charset=utf-8")
         .set_header("HX-Trigger", "reminderRecordUpdated")
         .finish())
+}
+
+/// Parses repeat configuration from form input
+fn parse_repeat_config(
+    repeat_type: &Option<String>,
+    repeat_interval: Option<i32>,
+) -> Option<models::reminder::RepeatConfig> {
+    let rt = repeat_type.as_ref().and_then(|t| {
+        if t.is_empty() {
+            return None;
+        }
+        match t.as_str() {
+            "daily" => Some(models::reminder::RepeatType::Daily),
+            "weekly" => Some(models::reminder::RepeatType::Weekly),
+            "monthly" => Some(models::reminder::RepeatType::Monthly),
+            "yearly" => Some(models::reminder::RepeatType::Yearly),
+            _ => None,
+        }
+    })?;
+
+    Some(models::reminder::RepeatConfig {
+        repeat_type: rt,
+        repeat_interval: repeat_interval.unwrap_or(1),
+    })
 }

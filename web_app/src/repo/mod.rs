@@ -477,6 +477,28 @@ pub trait AppRepo {
     /// * `reminder_id` - The unique identifier of the reminder to delete
     /// * `user_id` - The user's unique identifier (for authorization)
     async fn delete_user_reminder(&self, reminder_id: i64, user_id: i64) -> anyhow::Result<()>;
+
+    /// Updates a reminder's execution details after scheduling or rescheduling.
+    ///
+    /// # Arguments
+    /// * `reminder_id` - The unique identifier of the reminder to update
+    /// * `new_execution_id` - The new Step Function execution ARN
+    /// * `new_send_at` - The new scheduled send time
+    async fn update_reminder_execution(
+        &self,
+        reminder_id: i64,
+        new_execution_id: &str,
+        new_send_at: chrono::DateTime<chrono::Utc>,
+    ) -> anyhow::Result<()>;
+
+    /// Checks if a reminder exists (for internal API use).
+    ///
+    /// # Arguments
+    /// * `reminder_id` - The unique identifier of the reminder to check
+    ///
+    /// # Returns
+    /// * `true` if the reminder exists, `false` otherwise
+    async fn check_reminder_exists(&self, reminder_id: i64) -> anyhow::Result<bool>;
 }
 
 /// Type alias for a boxed implementation of the AppRepo trait.

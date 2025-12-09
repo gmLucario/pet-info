@@ -86,18 +86,31 @@ resource "aws_s3_bucket_policy" "allow_access_from_cloudfront" {
   })
 }
 
+locals {
+  # Construct Step Function ARN for Lambda environment (avoids circular dependency)
+  step_function_arn = "arn:aws:states:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:stateMachine:reminder_workflow"
+}
+
 module "lambda_send_reminders" {
   source = "./modules/lambda"
-
 
   env = {
     WHATSAPP_BUSINESS_PHONE_NUMBER_ID = var.sensitive_instance_envs["WHATSAPP_BUSINESS_PHONE_NUMBER_ID"].value
     WHATSAPP_BUSINESS_AUTH            = var.sensitive_instance_envs["WHATSAPP_BUSINESS_AUTH"].value
+    STEP_FUNCTION_ARN                 = local.step_function_arn
+    WEB_APP_API_URL                   = var.sensitive_instance_envs["WEB_APP_API_URL"].value
+    INTERNAL_API_SECRET               = var.sensitive_instance_envs["INTERNAL_API_SECRET"].value
   }
   lambda_details = {
     name         = "send_reminders"
     desc         = "send a whats reminder to a user"
     code_package = "lambda_package/send-reminders/out/bootstrap.zip"
+  }
+
+  # Permission for Lambda to start new Step Function executions (for recurring reminders)
+  additional_policy = {
+    actions   = ["states:StartExecution"]
+    resources = [local.step_function_arn]
   }
 }
 
@@ -145,7 +158,8 @@ module "send_reminders_step_function" {
         Resource = "arn:aws:states:::lambda:invoke"
         Parameters = {
           FunctionName = module.lambda_send_reminders.info.arn,
-          "Payload.$"  = "$.reminder"
+          # Pass full payload so Lambda can access repeat_config and reminder_id
+          "Payload.$" = "$"
         }
       }
     }

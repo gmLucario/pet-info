@@ -14,7 +14,26 @@ impl crate::services::NotificationService for NotificationHandler {
     async fn send_reminder_to_phone_number(
         &self,
         info: &api::reminder::ScheduleReminderInfo,
+        reminder_id: i64,
     ) -> anyhow::Result<String> {
+        let mut payload = json!({
+            "when": info.when.to_rfc3339(),
+            "reminder": {
+                "phone": info.phone_number,
+                "body": info.body
+            }
+        });
+
+        // Include repeat config if present (for recurring reminders)
+        if let Some(ref config) = info.repeat_config {
+            payload["repeat_config"] = json!({
+                "repeat_type": config.repeat_type.to_string(),
+                "repeat_interval": config.repeat_interval
+            });
+            payload["reminder_id"] = json!(reminder_id);
+            payload["user_timezone"] = json!(info.when.timezone().name());
+        }
+
         let rsp = self
             .client
             .start_execution()
@@ -24,16 +43,7 @@ impl crate::services::NotificationService for NotificationHandler {
                     .context("failed to get app config")?
                     .aws_sfn_arn_wb_notifications,
             )
-            .input(
-                json!({
-                    "when": info.when.to_rfc3339(),
-                    "reminder": {
-                        "phone": info.phone_number,
-                        "body": info.body
-                    }
-                })
-                .to_string(),
-            )
+            .input(payload.to_string())
             .send()
             .await?;
 

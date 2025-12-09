@@ -677,13 +677,14 @@ impl AppRepo for SqlxSqliteRepo {
         &self,
         user_id: i64,
     ) -> anyhow::Result<Vec<models::reminder::Reminder>> {
-        Ok(
+        let rows: Vec<models::reminder::ReminderRow> =
             sqlx::query_as(sqlite_queries::QUERY_GET_USER_ACTIVE_REMINDERS)
                 .bind(user_id)
                 .bind(Utc::now())
                 .fetch_all(&self.db_pool)
-                .await?,
-        )
+                .await?;
+
+        Ok(rows.into_iter().map(models::reminder::Reminder::from).collect())
     }
 
     async fn get_reminder_execution_id(
@@ -704,6 +705,14 @@ impl AppRepo for SqlxSqliteRepo {
         &self,
         reminder: &models::reminder::Reminder,
     ) -> anyhow::Result<i64> {
+        let (repeat_type, repeat_interval) = match &reminder.repeat_config {
+            Some(config) => (
+                Some(config.repeat_type.to_string()),
+                Some(config.repeat_interval),
+            ),
+            None => (None, None),
+        };
+
         Ok(sqlx::query(sqlite_queries::QUERY_INSERT_USER_REMINDER)
             .bind(reminder.user_app_id)
             .bind(reminder.body.to_string())
@@ -712,6 +721,8 @@ impl AppRepo for SqlxSqliteRepo {
             .bind(reminder.send_at)
             .bind(reminder.user_timezone.to_string())
             .bind(reminder.created_at)
+            .bind(repeat_type)
+            .bind(repeat_interval)
             .execute(&self.db_pool)
             .await?
             .last_insert_rowid())
@@ -725,5 +736,30 @@ impl AppRepo for SqlxSqliteRepo {
             .await?;
 
         Ok(())
+    }
+
+    async fn update_reminder_execution(
+        &self,
+        reminder_id: i64,
+        new_execution_id: &str,
+        new_send_at: chrono::DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        sqlx::query(sqlite_queries::QUERY_UPDATE_REMINDER_EXECUTION)
+            .bind(new_send_at)
+            .bind(new_execution_id)
+            .bind(reminder_id)
+            .execute(&self.db_pool)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn check_reminder_exists(&self, reminder_id: i64) -> anyhow::Result<bool> {
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM reminder WHERE id = $1 LIMIT 1")
+            .bind(reminder_id)
+            .fetch_optional(&self.db_pool)
+            .await?;
+
+        Ok(exists.is_some())
     }
 }
