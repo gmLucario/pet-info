@@ -116,22 +116,14 @@ pub async fn schedule_reminder(
     repo: &repo::ImplAppRepo,
     notification_service: &services::ImplNotificationService,
 ) -> anyhow::Result<()> {
-    // Insert reminder first with placeholder execution_id to get the reminder_id
-    let placeholder_execution_id = format!("pending_{}", Utc::now().timestamp_millis());
+    // Insert reminder to get the reminder_id
     let reminder_id = repo
-        .insert_user_remider(&create_reminder_model(
-            &reminder_info,
-            placeholder_execution_id,
-        ))
+        .insert_user_remider(&create_reminder_model(&reminder_info))
         .await?;
 
-    // Now call notification service with the reminder_id
-    let execution_id = notification_service
+    // Start Step Function with execution name: reminder-{id}-{timestamp}
+    notification_service
         .send_reminder_to_phone_number(&reminder_info, reminder_id)
-        .await?;
-
-    // Update reminder with actual execution_id
-    repo.update_reminder_execution(reminder_id, &execution_id, reminder_info.when.to_utc())
         .await?;
 
     metric::incr_reminder_action_statds("schedule");
@@ -140,15 +132,11 @@ pub async fn schedule_reminder(
 }
 
 /// Creates a reminder model from the provided information.
-fn create_reminder_model(
-    reminder_info: &ScheduleReminderInfo,
-    execution_id: String,
-) -> models::reminder::Reminder {
+fn create_reminder_model(reminder_info: &ScheduleReminderInfo) -> models::reminder::Reminder {
     models::reminder::Reminder {
         id: 0,
         user_app_id: reminder_info.user_id,
         body: reminder_info.body.clone(),
-        execution_id,
         notification_type: models::reminder::ReminderNotificationType::WhatsApp,
         user_timezone: reminder_info.when.timezone().name().to_string(),
         send_at: reminder_info.when.to_utc(),
@@ -212,4 +200,3 @@ pub async fn delete_reminder(
     metric::incr_reminder_action_statds("cancel");
     Ok(())
 }
-

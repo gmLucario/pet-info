@@ -306,21 +306,17 @@ WHERE
 
 pub const QUERY_INSERT_USER_REMINDER: &str = r#"
 INSERT INTO reminder(
-    user_app_id,body,execution_id,notification_type,send_at,user_timezone,created_at,repeat_type,repeat_interval
-) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9);
+    user_app_id,body,notification_type,send_at,user_timezone,created_at,repeat_type,repeat_interval
+) VALUES($1,$2,$3,$4,$5,$6,$7,$8);
 "#;
 
 pub const QUERY_GET_USER_ACTIVE_REMINDERS: &str = r#"
 SELECT
-    r.id,r.user_app_id,r.body,r.execution_id,
+    r.id,r.user_app_id,r.body,
     r.notification_type,r.send_at,r.user_timezone,
     r.created_at,r.repeat_type,r.repeat_interval
 FROM reminder AS r
 WHERE r.user_app_id = $1 AND r.send_at>=$2
-"#;
-
-pub const QUERY_UPDATE_REMINDER_EXECUTION: &str = r#"
-UPDATE reminder SET send_at = $1, execution_id = $2 WHERE id = $3;
 "#;
 
 pub const QUERY_DELETE_USER_APP_DATA: &str = r#"

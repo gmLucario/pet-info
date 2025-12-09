@@ -702,7 +702,6 @@ impl AppRepo for SqlxSqliteRepo {
         Ok(sqlx::query(sqlite_queries::QUERY_INSERT_USER_REMINDER)
             .bind(reminder.user_app_id)
             .bind(reminder.body.to_string())
-            .bind(reminder.execution_id.to_string())
             .bind(reminder.notification_type.to_string())
             .bind(reminder.send_at)
             .bind(reminder.user_timezone.to_string())
@@ -718,22 +717,6 @@ impl AppRepo for SqlxSqliteRepo {
         sqlx::query("DELETE FROM reminder WHERE id=$1 AND user_app_id=$2")
             .bind(reminder_id)
             .bind(user_id)
-            .execute(&self.db_pool)
-            .await?;
-
-        Ok(())
-    }
-
-    async fn update_reminder_execution(
-        &self,
-        reminder_id: i64,
-        new_execution_id: &str,
-        new_send_at: chrono::DateTime<Utc>,
-    ) -> anyhow::Result<()> {
-        sqlx::query(sqlite_queries::QUERY_UPDATE_REMINDER_EXECUTION)
-            .bind(new_send_at)
-            .bind(new_execution_id)
-            .bind(reminder_id)
             .execute(&self.db_pool)
             .await?;
 
