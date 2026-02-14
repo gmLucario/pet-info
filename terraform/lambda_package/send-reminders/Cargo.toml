@@ -7,12 +7,13 @@ edition = "2021"
 
 lambda_runtime = "0.13.0"
 serde = "1"
-serde_json = "1.0.140"
+serde_json = "1.0.149"
 tokio = { version = "1", features = ["macros"] }
-reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
-envconfig = "0.11.0"
+reqwest = { version = "0.12.28", features = ["json", "rustls-tls"] }
+envconfig = "0.11.1"
 simple-error = "0.2.3"
 openssl = { version = "0.10", features = ["vendored"] }
+tracing = "0.1.44"
 
 
 [profile.release]
