@@ -1,4 +1,4 @@
-FROM ghcr.io/cargo-lambda/cargo-lambda:latest as builder
+FROM ghcr.io/cargo-lambda/cargo-lambda:latest AS builder
 
 WORKDIR /build
 

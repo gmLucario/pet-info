@@ -40,7 +40,7 @@ resource "null_resource" "deploy_app" {
   provisioner "remote-exec" {
     inline = [
       "echo 'Waiting for user-data script to complete...'",
-      "while [ ! -f /tmp/user-data-complete ]; do sleep 10; done",
+      "while [ ! -f /home/ec2-user/user-data-complete ]; do echo 'File not found yet, listing /home/ec2-user:'; ls -la /home/ec2-user/; sleep 10; done",
       "echo 'User-data script completed, ready for deployment'"
     ]
 

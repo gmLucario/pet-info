@@ -237,6 +237,11 @@ make tf_format
 make deploy_prod_infra
 ```
 
+> Note: to see the ec2 logs:
+```bash
+cat /var/log/cloud-init-output.log
+```
+
 The infrastructure deployment includes:
 - EC2 instance with IAM role and instance profile
 - S3 bucket for file storage

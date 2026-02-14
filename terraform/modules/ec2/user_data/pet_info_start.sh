@@ -59,10 +59,22 @@ else
     exit 1
 fi
 
+# Copy Meta Outbound API CA certificate
+log "  Copying Meta Outbound API CA certificate..."
+sudo mkdir -p /etc/nginx/certs
+sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/MetaOutboundAPICA2025-12.pem \
+    /etc/nginx/certs/MetaOutboundAPICA2025-12.pem
+
+# Create combined trust store
+log "  Creating combined trust store for Webhooks..."
+cat /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem \
+    /etc/nginx/certs/MetaOutboundAPICA2025-12.pem \
+    | sudo tee /etc/nginx/certs/webhook_trust_store.pem > /dev/null
+
 # Set proper permissions for certificate directory
 sudo chmod 755 /etc/nginx/certs
 sudo chmod 644 /etc/nginx/certs/*
-log "✓ mTLS certificates configured for Nginx"
+log "✓ mTLS certificates configured for Nginx (DigiCert + Meta CAs)"
 
 # Configure Nginx (but don't start it yet - SSL certs will be uploaded by Terraform provisioner)
 log "Configuring Nginx..."
@@ -106,4 +118,5 @@ log "Data volume mounted successfully"
 log "=== pet-info EC2 instance setup complete ==="
 
 # Create completion marker file for terraform provisioner
-touch /tmp/user-data-complete
+touch /home/ec2-user/user-data-complete
+chown ec2-user:ec2-user /home/ec2-user/user-data-complete
