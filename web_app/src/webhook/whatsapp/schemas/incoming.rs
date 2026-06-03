@@ -64,7 +64,8 @@ pub struct Metadata {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Contact {
     /// Profile information
-    pub profile: Profile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<Profile>,
     /// WhatsApp ID (phone number)
     pub wa_id: String,
 }

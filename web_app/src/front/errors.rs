@@ -1,6 +1,5 @@
 use super::templates;
 use derive_more::{Display, Error};
-use log::error;
 use ntex::{http, web};
 
 #[derive(Debug, Display, Error)]
