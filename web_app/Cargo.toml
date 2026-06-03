@@ -23,7 +23,7 @@ image = { version = "=0.25.5"}
 ab_glyph = "0.2"
 pulldown-cmark = "0.12.2"
 ammonia = "4.1.2"
-totp-rs = "5.7.0"
+totp-rs = "5.7.1"
 openssl = { version = "0.10", features = ["vendored"] }
 passes = "1.0.1"
 html2text = "0.15.5"
@@ -42,7 +42,7 @@ sqlx = { version = "=0.8.6", default-features = false, features = [ "runtime-tok
 csrf = "0.5.0"
 argon2 = "0.5.3"
 reqwest = { version = "0.12.28", features = ["json", "multipart"] }
-rust_decimal = { version = "1.40",  features = ["serde-with-float"] }
+rust_decimal = { version = "1.42",  features = ["serde-with-float"] }
 rust_decimal_macros = "1.40"
 envconfig = "0.11.1"
 # Logfire to instrument Rust code.
@@ -53,23 +53,23 @@ opentelemetry = "0.29.1"
 # Tools app
 derive_more = { version = "2.1.1", features = ["display", "error"] }
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-uuid = { version = "1.21.0", features = [ "v4", "serde" ] }
-chrono = { version = "0.4.43", features = [ "serde" ] }
+serde_json = "1.0.150"
+uuid = { version = "1.23.2", features = [ "v4", "serde" ] }
+chrono = { version = "0.4.44", features = [ "serde" ] }
 async-trait = "0.1.89"
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 base64 = "0.22.1"
-futures = "0.3.31"
+futures = "0.3.32"
 simplelog = "0.12.2"
-log = "0.4.29"
-tokio = { version = "1.49", features = ["sync"] }
+log = "0.4.31"
+tokio = { version = "1.52", features = ["sync"] }
 chrono-tz = "0.10.4"
 
 # aws
-aws-config = { version = "1.8.14", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.123.0"
-aws-sdk-ssm = { version = "1.104.0", optional = true }
-aws-sdk-sfn = "1.99.0"
+aws-config = { version = "1.8.18", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.135.0"
+aws-sdk-ssm = { version = "1.112.0", optional = true }
+aws-sdk-sfn = "1.107.0"
 
 [dev-dependencies]
 mockall = "0.13.1"
