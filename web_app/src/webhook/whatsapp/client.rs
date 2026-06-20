@@ -203,7 +203,7 @@ impl WhatsAppClient {
         filename: &str,
     ) -> Result<String> {
         let upload_endpoint = format!(
-            "https://graph.facebook.com/v22.0/{}/media",
+            "https://graph.facebook.com/v25.0/{}/media",
             self.phone_number_id
         );
 

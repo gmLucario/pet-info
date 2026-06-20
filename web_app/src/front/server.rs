@@ -58,9 +58,11 @@ async fn index(cookie: ntex_session::Session) -> Result<impl web::Responder, web
 async fn get_reactivate_account_view(
     _: session::WebAppSession,
 ) -> Result<impl web::Responder, web::Error> {
+    let context = tera::Context::new();
+
     Ok(web::HttpResponse::Ok().body(
         templates::WEB_TEMPLATES
-            .render("reactivate_account.html", &tera::Context::new())
+            .render("reactivate_account.html", &context)
             .map_err(|e| {
                 errors::ServerError::TemplateError(format!(
                     "at /reactivate-account endpoint the template couldnt be rendered: {e}"

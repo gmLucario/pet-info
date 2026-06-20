@@ -12,10 +12,11 @@ notas de tu mascota
 <script src="/static/js/quill.js"></script>
 {% endblock extra_css %}
 
-{% block mid_nav_content %}
-{% endblock mid_nav_content %}
-
 {% block content %}
+<div style="text-align: center; margin-bottom: 2rem;">
+  <h1 style="color: var(--pico-primary); margin-bottom: 0.5rem;">{{ pet_name | default(value="Mascota") | title }}</h1>
+  <p style="color: var(--pico-muted-color); font-size: 1.2rem;">Notas</p>
+</div>
 {% if can_edit | default(value=false) %}
 {% set modal_id = "note_modal" %}
 {% include "widgets/btn_open_modal.html" %}

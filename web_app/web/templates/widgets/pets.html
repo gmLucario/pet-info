@@ -3,44 +3,56 @@
     <article hx-target="this" hx-swap="outerHTML">
         <header>
             <nav>
+                <aside>
+                    <ul>
+                        <h3><a href="/pet/details/{{pet.id}}">{{ pet.name | title }}</a></h3>
+                        <p class="pet-card-subtitle">
+                            {{ pet.breed | title }} • {{ pet.sex | title }} • {{ pet.fmt_age }}
+                        </p>
+                    </ul>
+                </aside>
                 <ul>
-                    <li>
-                        <a href="/pet/details/{{pet.id}}">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                class="icon icon-tabler icons-tabler-outline icon-tabler-file-pencil">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
-                                <path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2z" />
-                            </svg>
-                            <strong>{{ pet.name | title }}</strong>
+                    <li> <a href="/pet/qr_code/{{pet.external_id}}" data-download="qr_code_profile.png" class="icon-btn"
+                            title="Descargar Código QR">
+                            <span class="material-symbols-outlined">qr_code</span>
+                        </a>
+                    </li>
+                    <li><a href="/pet/pdf_report/{{pet.id}}" data-download="pet_report.pdf" class="icon-btn"
+                            title="Descargar Reporte PDF">
+                            <span class="material-symbols-outlined">picture_as_pdf</span>
                         </a>
                     </li>
                 </ul>
-                <ul>
-                    <li><a href="/pet/qr_code/{{pet.external_id}}" data-download="qr_code_profile.png">qr_code</a></li>
-                    <li><a href="/pet/pdf_report/{{pet.id}}" data-download="pet_report.pdf">pdf</a></li>
-                </ul>
             </nav>
         </header>
-        <container style="text-align: center;">
-            <p>{{ pet.breed }} {{ pet.sex }} {{ pet.fmt_age }}</p>
-            <p><code><a href="/info/{{pet.external_id}}">https://pet-info.link/info/{{pet.external_id}}</a></code>
-            </p>
+        <container>
+            <div class="pet-card-body">
+                <div class="public-link-area">
+                    <div class="public-link-container">
+                        <span class="public-link-text"><a href="/info/{{pet.external_id}}">pet-info.link/info/{{pet.external_id}}</a></span>
+                        <button class="copy-btn material-symbols-outlined" data-copy-path="/info/{{pet.external_id}}"
+                            title="Copiar Link Público">
+                            content_copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin: 1rem auto;">
+                <ul>
+                    <li><a href="/pet/health/{{pet.external_id}}/weight">peso</a></li>
+                    <li><a href="/pet/health/{{pet.external_id}}/vaccine">vacunas</a></li>
+                    <li><a href="/pet/health/{{pet.external_id}}/deworm">Desparasitaciones</a></li>
+                    <li><a href="/pet/note/{{pet.id}}">nota(s)</a></li>
+                </ul>
+            </div>
         </container>
 
-        <ul>
-            <li><a href="/pet/health/{{pet.external_id}}/weight">peso</a></li>
-            <li><a href="/pet/health/{{pet.external_id}}/vaccine">vacunas</a></li>
-            <li><a href="/pet/health/{{pet.external_id}}/deworm">Desparasitaciones</a></li>
-            <li><a href="/pet/note/{{pet.id}}">nota(s)</a></li>
-        </ul>
-
         <footer style="text-align: center;">
-            <button class="outline contrast">
-                <a href="/pet/pass/{{pet.external_id}}" data-download="pet_info.pkpass">📱 Agregar a Wallet</a>
-            </button>
+            <a href="/pet/pass/{{pet.external_id}}" data-download="pet_info.pkpass" role="button"
+                class="outline contrast wallet-btn">
+                <span class="material-symbols-outlined">wallet</span>
+                Agregar a Wallet
+            </a>
         </footer>
     </article>
     {% endfor %}

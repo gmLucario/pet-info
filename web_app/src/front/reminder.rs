@@ -2,10 +2,7 @@ use crate::{
     api, consts,
     front::{
         AppState, errors, forms,
-        middleware::{
-            csrf_token::CsrfToken,
-            logged_user::{CheckUserCanAccessService, IsUserLoggedAndCanEdit},
-        },
+        middleware::{csrf_token::CsrfToken, logged_user::CheckUserCanAccessService},
         session, templates, utils,
     },
 };
@@ -18,13 +15,13 @@ use serde_json::json;
 /// Renders the reminder view section
 #[web::get("")]
 async fn get_reminder_view(
-    _: IsUserLoggedAndCanEdit,
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::from_value(json!({
         "reminders": api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
-        "can_schedule_reminder": user.phone_reminder.is_some(),
+        "can_schedule_reminder": user.phone_reminder.is_some() && user.can_access_service(),
+        "show_menu": true,
     })).unwrap_or_default();
 
     let content = templates::WEB_TEMPLATES
@@ -44,7 +41,6 @@ async fn get_reminder_view(
 /// the reminders table view
 #[web::get("/tbody")]
 async fn get_reminder_records(
-    _: IsUserLoggedAndCanEdit,
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
@@ -206,7 +202,6 @@ async fn remove_verified_phone(
 /// Handles the request to delete a reminder
 #[web::delete("/{reminder_id}")]
 async fn delete_reminder(
-    _: IsUserLoggedAndCanEdit,
     session::WebAppSession { user, .. }: session::WebAppSession,
     params: web::types::Path<(i64,)>,
     app_state: web::types::State<AppState>,
@@ -235,7 +230,6 @@ async fn delete_reminder(
 /// Handles the request to create a reminder
 #[web::post("")]
 async fn create_reminder(
-    _: IsUserLoggedAndCanEdit,
     session::WebAppSession { user, .. }: session::WebAppSession,
     r: ntex::web::HttpRequest,
     form: web::types::Form<forms::user::UserReminderForm>,

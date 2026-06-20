@@ -1,10 +1,6 @@
 use crate::{
     api, consts,
-    front::{
-        AppState, errors,
-        middleware::{self, logged_user::IsUserLoggedAndCanEdit},
-        session, templates,
-    },
+    front::{AppState, errors, middleware, session, templates},
 };
 use ntex::web;
 use ntex_identity::Identity;
@@ -15,11 +11,12 @@ use serde_json::json;
 #[web::get("")]
 async fn get_profile_view(
     session::WebAppSession { user, .. }: session::WebAppSession,
-    IsUserLoggedAndCanEdit(can_edit, _): IsUserLoggedAndCanEdit,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
+    let user_can_access_service = user.can_access_service();
+
     let context = tera::Context::from_value(json!({
-        "can_edit": &can_edit,
+        "can_edit": user_can_access_service,
         "owner_contacts": &api::user::get_owner_contacts(user.id, None, &app_state.repo)
             .await
             .map_err(|e| {
@@ -37,7 +34,8 @@ async fn get_profile_view(
         "otp_step": if user.phone_reminder.is_some() {"OTP_SUCCESS"} else {"OTP_START"},
         "phone_reminder": user.phone_reminder,
         "service_price": &format!("{:.2}", consts::ADD_PET_PRICE),
-        "can_access_service": user.can_access_service(),
+        "can_access_service": user_can_access_service,
+        "show_menu": true,
     }))
     .unwrap_or_default();
 
@@ -87,24 +85,20 @@ async fn add_new_owner_contact(
 
 #[web::get("contact")]
 async fn get_owner_contacts(
-    IsUserLoggedAndCanEdit(can_edit, user_id): IsUserLoggedAndCanEdit,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let mut context = tera::Context::new();
-    context.insert("can_edit", &can_edit);
-
-    if let Some(user_id) = user_id {
-        context.insert(
-            "owner_contacts",
-            &api::user::get_owner_contacts(user_id, None, &app_state.repo)
-                .await
-                .map_err(|e| {
-                    errors::ServerError::InternalServerError(format!(
-                        "function get_owner_contacts raised an error: {e}"
-                    ))
-                })?,
-        );
-    }
+    let context = tera::Context::from_value(json!({
+        "can_edit": &user.can_access_service(),
+        "owner_contacts": &api::user::get_owner_contacts(user.id, None, &app_state.repo)
+            .await
+            .map_err(|e| {
+                errors::ServerError::InternalServerError(format!(
+                    "function get_owner_contacts raised an error: {e}"
+                ))
+            })?,
+    }))
+    .unwrap_or_default();
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/owner_contact_list.html", &context)

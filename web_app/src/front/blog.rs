@@ -30,7 +30,8 @@ async fn get_blog_entry(
         "blog": Blog {
             title: blog_name,
             content: html_output,
-        }
+        },
+        "show_menu": true,
     }))
     .unwrap_or_default();
 

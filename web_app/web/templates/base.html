@@ -50,28 +50,21 @@
     <header>
         <div class="container">
             <nav>
-                <ul>
-                    <li>
-                        <a href="/" style="--pico-font-family: Pacifico, cursive;" data-discover="true">
-                            <h3>Pet-Info</h3>
-                        </a>
-                    </li>
-                </ul>
-                {% block mid_nav_content %}
-                <ul>
-                    <li>
-                        <details class="dropdown">
-                            <summary>{% block mid_nav_summary %}{% endblock mid_nav_summary %}</summary>
-                            <ul dir="rtl">
-                                <li><a href="/profile">Perfil</a></li>
-                                <li><a href="/pet">Mascotas</a></li>
-                                <li><a href="/reminder">Recordatorios</a></li>
-                            </ul>
-                        </details>
-                    </li>
-                </ul>
-                {% endblock mid_nav_content %}
-                <ul>
+                {% if show_menu | default(value=false) %}
+                <div class="container" style="text-align: center;">
+                    <nav aria-label="breadcrumb" style="--pico-nav-breadcrumb-divider: '🐶';">
+                        <ul>
+                            <li><a href="/profile">Perfil</a></li>
+                            <li><a href="/pet">Mascotas</a></li>
+                            <li><a href="/reminder">Recordatorios</a></li>
+                        </ul>
+                    </nav>
+                </div>
+                {% else %}
+                    {% block mid_nav_content %}
+                    {% endblock mid_nav_content %}
+                {% endif %}
+                <ul style="margin-left: auto;">
                     <li>
                         <fieldset class="theme-toggle-container">
                             <input name="theme" type="checkbox" id="theme-toggle" />
@@ -83,9 +76,7 @@
                     </li>
                 </ul>
             </nav>
-        </div>
     </header>
-
     <div class="container">
         {% block content %}
         {% endblock content %}

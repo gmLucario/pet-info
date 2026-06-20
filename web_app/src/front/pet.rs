@@ -167,6 +167,7 @@ async fn get_pet_view(
                 "function get_user_pets_cards raised an error: {e}"
             ))
         })?,
+        "show_menu": true,
     }))
     .unwrap_or_default();
 
@@ -633,6 +634,7 @@ async fn get_pet_details_form(
         })?,
         "PIC_PET_MAX_SIZE_BYTES": consts::PIC_PET_MAX_SIZE_BYTES,
         "ACCEPTED_IMAGE_EXTENSIONS": consts::ACCEPTED_IMAGE_EXTENSIONS,
+        "show_menu": true,
     }))
     .unwrap_or_default();
 

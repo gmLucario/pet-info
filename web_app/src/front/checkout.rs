@@ -31,6 +31,7 @@ async fn get_checkout_view(
         "email": &user_session.user.email,
         "mercado_pago_public_key": &app_config.mercado_pago_public_key,
         "back_url": format!("{}/pet", app_config.base_url()),
+        "show_menu": true,
     }))
     .unwrap_or_default();
 

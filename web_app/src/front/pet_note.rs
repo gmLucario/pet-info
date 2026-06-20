@@ -11,24 +11,30 @@ use super::forms;
 /// Renders the notes of a pet view
 #[web::get("{pet_id}")]
 async fn get_pet_notes_view(
-    middleware::logged_user::IsUserLoggedAndCanEdit(can_edit, user_id): middleware::logged_user::IsUserLoggedAndCanEdit,
+    session::WebAppSession { user, .. }: session::WebAppSession,
     params: web::types::Path<(i64,)>,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_id = params.0;
+    let pet_name = app_state
+        .repo
+        .get_pet_by_id(pet_id, user.id)
+        .await
+        .map(|pet| pet.pet_name)
+        .ok();
+
     let context = tera::Context::from_value(json!({
-        "can_edit": can_edit,
+        "can_edit": &user.can_access_service(),
         "pet_id": pet_id,
-        "notes": if let Some(user_id) = user_id {
-            api::pet::get_pet_notes(user_id, pet_id, &app_state.repo).await
+        "pet_name": pet_name,
+        "show_menu": true,
+        "notes":
+            api::pet::get_pet_notes(user.id, pet_id, &app_state.repo).await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
                     "function get_pet_notes raised an error: {e}"
                 ))
-            })?
-        } else {
-            vec![]
-        },
+            })?,
     }))
     .unwrap_or_default();
 

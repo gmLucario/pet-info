@@ -8,10 +8,21 @@
 health record table
 {% endblock meta_desc %}
 
-{% block mid_nav_content %}
-{% endblock mid_nav_content %}
-
 {% block content %}
+<div style="text-align: center; margin-bottom: 2rem;">
+  <h1 style="color: var(--pico-primary); margin-bottom: 0.5rem;">{{ pet_name | title }}</h1>
+  <p style="color: var(--pico-muted-color); font-size: 1.2rem;">
+    {% if record_type == "weight" %}
+      Historial de Peso
+    {% elif record_type == "vaccine" %}
+      Historial de Vacunas
+    {% elif record_type == "deworm" %}
+      Historial de Desparasitaciones
+    {% else %}
+      {{ record_type | title }}
+    {% endif %}
+  </p>
+</div>
 {% if can_edit %}
 {% set modal_id = "health_modal" %}
 {% include "widgets/btn_open_modal.html" %}

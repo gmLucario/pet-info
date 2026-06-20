@@ -5,16 +5,121 @@ pets
 {% endblock title %}
 
 {% block meta_desc %}
-lista de tus mascotas registradas
+Lista de tus mascotas registradas en Pet-Info
 {% endblock meta_desc %}
+
+{% block extra_meta %}
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+{% endblock extra_meta %}
+
+{% block extra_css %}
+<style>
+  /* Material Icons styling */
+  .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+      display: inline-block;
+  }
+ 
+  /* Public Link Box */
+  .public-link-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+  }
+
+  .public-link-container {
+      display: flex;
+      align-items: center;
+      margin: auto 1rem;
+  }
+
+  .public-link-text {
+    font-family: 'JetBrains Mono', monospace;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      flex-grow: 1;
+  }
+
+  .copy-btn {
+      cursor: pointer;
+      color: var(--pico-muted-color);
+      transition: color 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      background: transparent;
+      border: none;
+      padding: 0;
+  }
+
+  .copy-btn:hover {
+      color: var(--pico-color);
+  }
+
+  .copy-success {
+      color: var(--pico-primary) !important;
+  }
+
+  /* Apple Wallet CTA Button */
+  .wallet-btn {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.75rem 1rem;
+      margin-top: 0.5rem;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+  }
+
+  /* Floating Action Button */
+  .fab {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      background-color: var(--pico-primary);
+      color: var(--pico-primary-inverse);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+      border: none;
+      text-decoration: none;
+  }
+
+  .fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+      color: var(--pico-primary-inverse);
+      text-decoration: none;
+      background-color: var(--pico-primary-hover);
+  }
+
+  .fab:active {
+      transform: scale(0.95);
+  }
+
+  .fab span {
+      font-size: 1.75rem;
+  }
+</style>
+{% endblock extra_css %}
 
 {% block mid_nav_summary %}Mascotas{% endblock mid_nav_summary %}
 
 {% block content %}
-<nav style="padding: 1em;">
-  <ul></ul>
-  <ul><a href="/checkout" role="button" style="border-radius: 50%;"><strong>+</strong></a></ul>
-</nav>
 
 {% if get_pets_error %}
 <div class="container" style="text-align: center;">
@@ -25,4 +130,38 @@ lista de tus mascotas registradas
   {% include "widgets/pets.html" %}
 {% endif %}
 
+<!-- Floating Action Button -->
+<a href="/checkout" class="fab" title="Añadir Mascota">
+  <span class="material-symbols-outlined">add</span>
+</a>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Handle copy to clipboard buttons
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const path = this.getAttribute('data-copy-path');
+                // Construct full public URL dynamically
+                const textToCopy = window.location.origin + path;
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalIcon = this.textContent;
+                    this.textContent = 'check';
+                    this.classList.add('copy-success');
+                    
+                    setTimeout(() => {
+                        this.textContent = 'content_copy';
+                        this.classList.remove('copy-success');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Could not copy link: ', err);
+                });
+            });
+        });
+    });
+</script>
+{% endblock extra_js %}

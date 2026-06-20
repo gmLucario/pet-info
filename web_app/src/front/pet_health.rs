@@ -24,10 +24,23 @@ async fn get_pet_health_view(
     app_state: web::types::State<AppState>,
     path: web::types::Path<HealthPath>,
 ) -> Result<impl web::Responder, web::Error> {
+    let pet = app_state
+        .repo
+        .get_pet_by_external_id(path.pet_external_id)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "function get_pet_by_external_id raised an error: {e}"
+            ))
+        })?;
+    let pet_name = pet.pet_name;
+
     let context = tera::Context::from_value(json!({
         "can_edit": &can_edit,
+        "pet_name": &pet_name,
         "record_type": &path.record_type,
         "pet_external_id": &path.pet_external_id,
+        "show_menu": user_id.is_some(),
         "health_records": api::pet::get_pet_health_records(
             path.pet_external_id,
             &path.record_type,
