@@ -128,6 +128,16 @@ impl AppRepo for SqlxSqliteRepo {
             .await?)
     }
 
+    async fn get_user_app_by_id(
+        &self,
+        user_id: i64,
+    ) -> anyhow::Result<Option<models::user_app::User>> {
+        Ok(sqlx::query_as(sqlite_queries::QUERY_GET_USER_APP_BY_ID)
+            .bind(user_id)
+            .fetch_optional(&self.db_pool)
+            .await?)
+    }
+
     async fn insert_verified_phone_to_user_app(
         &self,
         user_app_id: i64,

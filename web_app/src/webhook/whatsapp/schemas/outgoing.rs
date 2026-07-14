@@ -292,3 +292,73 @@ pub struct WhatsAppMessageStatus {
     /// Message ID
     pub id: String,
 }
+
+/// Interactive CTA URL message to send to WhatsApp
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutgoingCtaUrlMessage {
+    /// Messaging product, always "whatsapp"
+    pub messaging_product: String,
+    /// Recipient's WhatsApp ID (phone number)
+    pub to: String,
+    /// Message type, "interactive"
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    /// Interactive content
+    pub interactive: CtaUrlInteractiveContent,
+}
+
+/// Interactive CTA URL content structure
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CtaUrlInteractiveContent {
+    /// Type of interactive message, "cta_url"
+    #[serde(rename = "type")]
+    pub interactive_type: String,
+    /// Body text
+    pub body: CtaUrlInteractiveBody,
+    /// Action
+    pub action: CtaUrlInteractiveAction,
+}
+
+/// Interactive CTA URL message body
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CtaUrlInteractiveBody {
+    /// Body text
+    pub text: String,
+}
+
+/// Interactive CTA URL action
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CtaUrlInteractiveAction {
+    /// Name, must be "cta_url"
+    pub name: String,
+    /// Parameters
+    pub parameters: CtaUrlParameters,
+}
+
+/// Interactive CTA URL parameters
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CtaUrlParameters {
+    /// Display text on the button
+    pub display_text: String,
+    /// The target URL
+    pub url: String,
+}
+
+impl OutgoingCtaUrlMessage {
+    /// Creates a new interactive Call-to-Action (CTA) URL button message
+    pub fn new(to: String, body_text: String, display_text: String, url: String) -> Self {
+        Self {
+            messaging_product: "whatsapp".to_string(),
+            to,
+            msg_type: "interactive".to_string(),
+            interactive: CtaUrlInteractiveContent {
+                interactive_type: "cta_url".to_string(),
+                body: CtaUrlInteractiveBody { text: body_text },
+                action: CtaUrlInteractiveAction {
+                    name: "cta_url".to_string(),
+                    parameters: CtaUrlParameters { display_text, url },
+                },
+            },
+        }
+    }
+}

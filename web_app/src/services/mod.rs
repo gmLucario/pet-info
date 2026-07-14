@@ -1,3 +1,4 @@
+pub mod magic_link;
 pub mod notification;
 pub mod storage;
 

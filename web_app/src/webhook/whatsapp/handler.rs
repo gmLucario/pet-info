@@ -10,7 +10,7 @@ use super::{
         WebhookPayload,
     },
 };
-use crate::{repo, services};
+use crate::{consts, repo, services};
 use anyhow::{Context, Result};
 
 /// Processes incoming WhatsApp webhook messages
@@ -247,6 +247,26 @@ async fn handle_interactive_response(
     Ok(())
 }
 
+async fn build_magic_login_link(
+    user_id: &i64,
+    magic_link_service: &services::magic_link::MagicLinkService,
+) -> anyhow::Result<String> {
+    let token = uuid::Uuid::new_v4().to_string();
+
+    magic_link_service
+        .create_token(&token, *user_id, consts::TIMETOLIVE_MAGICLINK_TOKEN)
+        .await?;
+    let app_config = crate::config::APP_CONFIG
+        .get()
+        .context("failed to get app config")?;
+
+    Ok(format!(
+        "{}/magic-login?token={}",
+        app_config.base_url(),
+        &token
+    ))
+}
+
 /// Handles incoming messages from users
 ///
 /// This function processes each message and determines the appropriate response.
@@ -267,24 +287,48 @@ pub async fn handle_user_message(
     client: &WhatsAppClient,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
+    magic_link_service: &services::magic_link::MagicLinkService,
 ) -> Result<()> {
+    // Show typing indicator
+    client.send_typing_on(message.id.clone()).await.ok();
+
     match message.msg_type.as_str() {
         "text" if message.text.is_some() => {
-            // Show typing indicator while looking up user
-            client.send_typing_on(message.id.clone()).await.ok();
+            match repo.get_user_app_by_phone(&message.from).await? {
+                Some(user)
+                    if message
+                        .text
+                        .as_ref()
+                        .map(|m| m.body.trim().starts_with("/login"))
+                        .unwrap_or_default() =>
+                {
+                    let login_link = build_magic_login_link(&user.id, magic_link_service).await?;
 
-            let user = repo.get_user_app_by_phone(&message.from).await?;
-            if let Some(user) = user {
-                send_pet_info_to_user(client, &message.from, user.id, repo, &message.id).await?;
-                return Ok(());
+                    client
+                        .send_url_btn_message(
+                            message.from.clone(),
+                            format!(
+                                "Inicia sesión en tu cuenta de *Pet-Info* (válido por {time_live} segundos).",
+                                time_live=consts::TIMETOLIVE_MAGICLINK_TOKEN.as_seconds_f64(),
+                            ),
+                            "Iniciar Sesión".to_string(),
+                            login_link,
+                        )
+                        .await?;
+                }
+                Some(user) => {
+                    send_pet_info_to_user(client, &message.from, user.id, repo, &message.id)
+                        .await?;
+                }
+                _ => {
+                    client
+                        .send_text_message(
+                            message.from.clone(),
+                            "No se encontró una cuenta asociada a este número de teléfono. Regístrala en https://pet-info.link".to_string(),
+                        )
+                        .await?;
+                }
             }
-
-            // User not found, send message with typing indicator already active
-            client
-            .send_text_message(
-                message.from.clone(),
-                "No se encontró una cuenta asociada a este número de teléfono. Regístrala en https://pet-info.link".to_string()
-            ).await?;
         }
         "interactive" => {
             handle_interactive_response(client, message, repo, storage_service).await?;
@@ -309,23 +353,6 @@ pub async fn handle_user_message(
     Ok(())
 }
 
-/// Handles status updates for sent messages
-///
-/// This function processes status updates to track message delivery.
-///
-/// # Arguments
-///
-/// * `status` - The status update to handle
-///
-/// # Returns
-///
-/// Result indicating success or failure
-pub async fn handle_message_status(_status: &Status) -> Result<()> {
-    // TODO: Update your database with delivery status if needed
-
-    Ok(())
-}
-
 /// Main webhook processor
 ///
 /// Processes the complete webhook payload, handling both messages and statuses.
@@ -345,20 +372,15 @@ pub async fn process_webhook(
     client: &WhatsAppClient,
     repo: &repo::ImplAppRepo,
     storage_service: &services::ImplStorageService,
+    magic_link_service: &services::magic_link::MagicLinkService,
 ) -> Result<()> {
     // Process incoming messages
     let messages = process_webhook_messages(&payload);
     for message in messages {
-        if let Err(e) = handle_user_message(message, client, repo, storage_service).await {
+        if let Err(e) =
+            handle_user_message(message, client, repo, storage_service, magic_link_service).await
+        {
             logfire::error!("Failed to handle message: {error}", error = e.to_string());
-        }
-    }
-
-    // Process status updates
-    let statuses = process_webhook_statuses(&payload);
-    for status in statuses {
-        if let Err(e) = handle_message_status(status).await {
-            logfire::error!("Failed to handle status: {error}", error = e.to_string());
         }
     }
 

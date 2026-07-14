@@ -4,8 +4,8 @@
 //! It handles authentication and message sending for text, interactive, and document messages.
 
 use super::schemas::{
-    OutgoingDocumentMessage, OutgoingImageMessage, OutgoingInteractiveMessage, OutgoingTextMessage,
-    WhatsAppMessageResponse,
+    OutgoingCtaUrlMessage, OutgoingDocumentMessage, OutgoingImageMessage,
+    OutgoingInteractiveMessage, OutgoingTextMessage, WhatsAppMessageResponse,
 };
 use crate::config;
 use anyhow::{Context, Result};
@@ -75,6 +75,27 @@ impl WhatsAppClient {
         body: String,
     ) -> Result<WhatsAppMessageResponse> {
         let message = OutgoingTextMessage::new(to, body);
+        self.send_message(&message).await
+    }
+
+    /// Sends an interactive Call-to-Action (CTA) URL button message
+    ///
+    /// # Arguments
+    /// * `to` - Recipient's WhatsApp ID (phone number)
+    /// * `body` - Message body text
+    /// * `btn_text` - Display text on the button
+    /// * `url` - Target URL the button links to
+    ///
+    /// # Returns
+    /// * `Result<WhatsAppMessageResponse>` - Response from WhatsApp API
+    pub async fn send_url_btn_message(
+        &self,
+        to: String,
+        body: String,
+        btn_text: String,
+        url: String,
+    ) -> Result<WhatsAppMessageResponse> {
+        let message = OutgoingCtaUrlMessage::new(to, body, btn_text, url);
         self.send_message(&message).await
     }
 

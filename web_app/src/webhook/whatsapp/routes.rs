@@ -160,6 +160,7 @@ pub async fn receive(
         &app_state.whatsapp_client,
         &app_state.repo,
         &app_state.storage_service,
+        &app_state.magic_link_service,
     )
     .await
     {

@@ -60,15 +60,17 @@ async fn get_reactivate_account_view(
 ) -> Result<impl web::Responder, web::Error> {
     let context = tera::Context::new();
 
-    Ok(web::HttpResponse::Ok().body(
-        templates::WEB_TEMPLATES
-            .render("reactivate_account.html", &context)
-            .map_err(|e| {
-                errors::ServerError::TemplateError(format!(
-                    "at /reactivate-account endpoint the template couldnt be rendered: {e}"
-                ))
-            })?,
-    ))
+    Ok(web::HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(
+            templates::WEB_TEMPLATES
+                .render("reactivate_account.html", &context)
+                .map_err(|e| {
+                    errors::ServerError::TemplateError(format!(
+                        "at /reactivate-account endpoint the template couldnt be rendered: {e}"
+                    ))
+                })?,
+        ))
 }
 
 /// Endpoint handles the request to reactivate an account.

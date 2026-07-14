@@ -127,3 +127,84 @@ async fn google_callback(
 
     utils::redirect_to("/pet")
 }
+
+#[derive(Deserialize, Debug)]
+pub struct MagicLoginQuery {
+    pub token: String,
+}
+
+#[web::get("/magic-login")]
+pub async fn magic_login(
+    q: web::types::Query<MagicLoginQuery>,
+    app_state: web::types::State<AppState>,
+    identity: Identity,
+    cookie: ntex_session::Session,
+) -> Result<impl web::Responder, web::Error> {
+    let user_id = app_state
+        .magic_link_service
+        .verify_token(&q.token)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "failed to verify magic login token: {e}"
+            ))
+        })?;
+
+    let Some(user_id) = user_id else {
+        return Err(errors::UserError::Unauthorized.into());
+    };
+
+    let user = app_state
+        .repo
+        .get_user_app_by_id(user_id)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "failed to retrieve user for magic link login: {e}"
+            ))
+        })?;
+
+    let Some(user) = user else {
+        return Err(errors::UserError::Unauthorized.into());
+    };
+
+    let (csrf_token, csrf_cookie) = app_state
+        .csrf_protec
+        .generate_token_pair(None, consts::MAX_AGE_COOKIES)
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("cant set token csrf protection: {e}"))
+        })?;
+
+    cookie.set(
+        consts::CSRF_TOKEN_COOKIE_NAME,
+        serde_json::to_string(&middleware::csrf_token::CsrfToken {
+            token_base64: csrf_token.b64_string(),
+            cookie_base64: csrf_cookie.b64_string(),
+        })?,
+    )?;
+
+    let is_user_enabled = user.is_enabled;
+    let user_id = user.id;
+
+    identity.remember(serde_json::to_string(&session::WebAppSession {
+        user,
+        add_pet_balance: api::user::get_user_add_pet_balance(&app_state.repo, user_id)
+            .await
+            .map_err(|e| {
+                errors::ServerError::InternalServerError(format!(
+                    "cant get user add pet balance {e}"
+                ))
+            })?,
+    })?);
+
+    if !is_user_enabled {
+        return utils::redirect_to("/reactivate-account");
+    }
+
+    if let Ok(Some(redirect_to)) = cookie.get::<String>(consts::REDIRECT_TO_COOKIE_NAME) {
+        cookie.remove(consts::REDIRECT_TO_COOKIE_NAME);
+        return utils::redirect_to(&redirect_to);
+    }
+
+    utils::redirect_to("/pet")
+}

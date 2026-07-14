@@ -26,4 +26,5 @@ pub struct AppState {
     pub storage_service: services::ImplStorageService,
     pub notification_service: services::ImplNotificationService,
     pub whatsapp_client: webhook::whatsapp::client::WhatsAppClient,
+    pub magic_link_service: services::magic_link::MagicLinkService,
 }

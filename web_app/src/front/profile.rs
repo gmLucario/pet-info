@@ -162,7 +162,9 @@ async fn delete_user_data(
             ))
         })?;
 
-    Ok(web::HttpResponse::Ok().body(content))
+    Ok(web::HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(content))
 }
 
 #[web::delete("/close-session")]

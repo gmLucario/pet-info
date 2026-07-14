@@ -89,6 +89,7 @@ fn create_app_state(
     sqlite_repo: repo::sqlite::SqlxSqliteRepo,
     storage_service: services::storage::StorageHandler,
     notification_service: services::notification::NotificationHandler,
+    magic_link_service: services::magic_link::MagicLinkService,
 ) -> anyhow::Result<front::AppState> {
     let whatsapp_client = webhook::whatsapp::client::WhatsAppClient::new()?;
 
@@ -98,6 +99,7 @@ fn create_app_state(
         storage_service: Box::new(storage_service),
         notification_service: Box::new(notification_service),
         whatsapp_client,
+        magic_link_service,
     })
 }
 
@@ -120,7 +122,10 @@ async fn configure_and_run_server(
     // Nginx reverse proxy handles HTTPS/TLS/mTLS on port 443
     let server_addr = ("127.0.0.1", 8080);
 
+    let (magic_link_service, _) = services::magic_link::MagicLinkActor::spawn();
+
     let server = web::server(move || {
+        let magic_link_service = magic_link_service.clone();
         web::App::new()
             .wrap(
                 Cors::new()
@@ -157,6 +162,7 @@ async fn configure_and_run_server(
                     sqlite_repo.clone(),
                     storage_service.clone(),
                     notification_service.clone(),
+                    magic_link_service,
                 )
                 .expect("Failed to create app state"),
             )
@@ -172,6 +178,7 @@ async fn configure_and_run_server(
                 front::server::serve_favicon,
                 front::server::index,
                 front::auth::google_callback,
+                front::auth::magic_login,
                 front::server::get_reactivate_account_view,
                 front::server::reactivate_account,
             ))

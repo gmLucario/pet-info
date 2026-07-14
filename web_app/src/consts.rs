@@ -9,6 +9,7 @@ pub const GOOGLE_ENDPOINT_USER_INFO: &str = "https://openidconnect.googleapis.co
 pub const GOOGLE_ENDPOINT_REVOKE_TOKEN: &str = "https://oauth2.googleapis.com/revoke";
 pub const ADD_PET_PRICE: Decimal = dec!(100.00);
 pub const PIC_PET_MAX_SIZE_BYTES: usize = 6_000_000;
+pub const TIMETOLIVE_MAGICLINK_TOKEN: chrono::TimeDelta = chrono::Duration::minutes(3);
 
 /// Apple Wallet pass thumbnail dimensions for @2x Retina displays.
 /// Based on Apple's specification: 90x90 points = 180x180 pixels at @2x.
