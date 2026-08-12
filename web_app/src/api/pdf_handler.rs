@@ -3,10 +3,10 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use typst::{
-    Library, World,
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
-    foundations::{Bytes, Datetime},
-    syntax::{FileId, Source},
+    foundations::{Bytes, Datetime, Duration},
+    syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot},
     text::{Font, FontBook},
     utils::LazyHash,
 };
@@ -44,7 +44,10 @@ impl TypstWorld {
         let mut world = Self::new(text)?;
 
         for (image_bytes, image_name) in images {
-            let image_id = FileId::new(None, typst::syntax::VirtualPath::new(image_name));
+            let image_id = FileId::new(RootedPath::new(
+                VirtualRoot::Project,
+                VirtualPath::new(image_name)?,
+            ));
             world.files.insert(image_id, Bytes::new(image_bytes));
         }
 
@@ -70,21 +73,21 @@ impl World for TypstWorld {
             return Ok(self.source.clone());
         }
 
-        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+        Err(FileError::NotFound(id.vpath().get_without_slash().into()))
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
         self.files
             .get(&id)
             .cloned()
-            .ok_or_else(|| FileError::NotFound(id.vpath().as_rootless_path().into()))
+            .ok_or_else(|| FileError::NotFound(id.vpath().get_without_slash().into()))
     }
 
     fn font(&self, _: usize) -> Option<Font> {
         Some(self.font.clone())
     }
 
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _: Option<Duration>) -> Option<Datetime> {
         None
     }
 }

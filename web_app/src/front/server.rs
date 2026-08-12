@@ -3,7 +3,7 @@
 use ntex::web;
 use ntex_files::NamedFile;
 use ntex_identity::Identity;
-use serde_json::json;
+use tera::context;
 
 use crate::{
     api, consts,
@@ -34,11 +34,10 @@ async fn index(cookie: ntex_session::Session) -> Result<impl web::Responder, web
             ))
         })?;
 
-    let context = tera::Context::from_value(json!({
-        "google_outh_auth_url": &auth_url,
-        "service_price": &format!("{:.2}", consts::ADD_PET_PRICE),
-    }))
-    .unwrap_or_default();
+    let context = context! {
+        google_outh_auth_url => &auth_url,
+        service_price => &format!("{:.2}", consts::ADD_PET_PRICE),
+    };
 
     Ok(web::HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")

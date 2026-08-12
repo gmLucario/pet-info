@@ -25,7 +25,7 @@ pub async fn send_verification(
     whatsapp_client: &webhook::whatsapp::client::WhatsAppClient,
     phone_number: &str,
 ) -> anyhow::Result<()> {
-    let otp = utils::TOTP_CLIENT.generate_current()?;
+    let otp = utils::TOTP_CLIENT.generate_current().to_string();
 
     let payload = create_whatsapp_verification_payload(phone_number, &otp);
 
@@ -71,7 +71,7 @@ fn create_whatsapp_verification_payload(phone_number: &str, otp: &str) -> serde_
 /// # Returns
 /// * `bool` - True if OTP is valid, false otherwise
 pub fn validate_otp(otp: &str) -> bool {
-    utils::TOTP_CLIENT.check_current(otp).unwrap_or(false)
+    utils::TOTP_CLIENT.check_current(otp).is_some()
 }
 
 /// Adds a verified phone number to a user's account.

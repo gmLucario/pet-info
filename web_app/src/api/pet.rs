@@ -10,6 +10,7 @@ use chrono::{NaiveDate, NaiveDateTime, Utc};
 use derive_more::Display;
 use serde::Serialize;
 use std::path::Path;
+use tera::context;
 use uuid::Uuid;
 
 /// Updates an existing pet or creates a new one based on the insert flag.
@@ -834,21 +835,20 @@ pub async fn generate_pdf_report_bytes(
 
     let content = front::templates::PDF_REPORT_TEMPLATES.render(
         "pet_default.typ",
-        &tera::Context::from_value(serde_json::json!({
-            "pet_name": pet_full_info.pet.pet_name,
-            "birthday": pet_full_info.pet.birthday,
-            "age": front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
-            "breed": pet_full_info.pet.breed,
-            "is_female": pet_full_info.pet.is_female,
-            "is_spaying_neutering": pet_full_info.pet.is_spaying_neutering,
-            "pet_link": pet_link,
-            "vaccines": pet_full_info.vaccines,
-            "deworms": pet_full_info.deworms,
-            "weights": weights,
-            "notes": notes,
-            "image_filename": image_filename.as_deref().unwrap_or("NO_PIC"),
-        }))
-        .unwrap_or_default(),
+        &context! {
+            pet_name => &pet_full_info.pet.pet_name,
+            birthday => &pet_full_info.pet.birthday,
+            age => &front::utils::fmt_dates_difference(pet_full_info.pet.birthday, now),
+            breed => &pet_full_info.pet.breed,
+            is_female => &pet_full_info.pet.is_female,
+            is_spaying_neutering => &pet_full_info.pet.is_spaying_neutering,
+            pet_link => &pet_link,
+            vaccines => &pet_full_info.vaccines,
+            deworms => &pet_full_info.deworms,
+            weights => &weights,
+            notes => &notes,
+            image_filename => &image_filename.as_deref().unwrap_or("NO_PIC"),
+        },
     )?;
 
     let mut images = vec![(qr_code_data, "qr.png")];

@@ -10,7 +10,7 @@ use crate::{
     models,
 };
 use ntex::web;
-use serde_json::json;
+use tera::context;
 
 #[derive(serde::Deserialize)]
 struct HealthPath {
@@ -35,13 +35,13 @@ async fn get_pet_health_view(
         })?;
     let pet_name = pet.pet_name;
 
-    let context = tera::Context::from_value(json!({
-        "can_edit": &can_edit,
-        "pet_name": &pet_name,
-        "record_type": &path.record_type,
-        "pet_external_id": &path.pet_external_id,
-        "show_menu": user_id.is_some(),
-        "health_records": api::pet::get_pet_health_records(
+    let context = context! {
+        can_edit => &can_edit,
+        pet_name => &pet_name,
+        record_type => &path.record_type,
+        pet_external_id => &path.pet_external_id,
+        show_menu => &user_id.is_some(),
+        health_records => &api::pet::get_pet_health_records(
             path.pet_external_id,
             &path.record_type,
             user_id,
@@ -53,8 +53,7 @@ async fn get_pet_health_view(
                 "function get_pet_health_records raised an error: {e}"
             ))
         })?,
-    }))
-    .unwrap_or_default();
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("health_record.html", &context)
@@ -76,11 +75,11 @@ async fn pet_health_records(
     app_state: web::types::State<AppState>,
     path: web::types::Path<HealthPath>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "can_edit": &can_edit,
-        "record_type": &path.record_type,
-        "pet_external_id": &path.pet_external_id,
-        "health_records": api::pet::get_pet_health_records(
+    let context = context! {
+        can_edit => &can_edit,
+        record_type => &path.record_type,
+        pet_external_id => &path.pet_external_id,
+        health_records => &api::pet::get_pet_health_records(
             path.pet_external_id,
             &path.record_type,
             user_id,
@@ -92,8 +91,7 @@ async fn pet_health_records(
                 "function get_pet_health_records raised an error: {e}"
             ))
         })?,
-    }))
-    .unwrap_or_default();
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/tbody_health_record.html", &context)

@@ -131,11 +131,12 @@ pub async fn receive(
             }
         };
 
-        // Verify the CN matches Meta's webhook certificate
-        if !cert_dn.contains("CN=client.webhooks.fbclientcerts.com") {
+        // Verify the CN matches Meta's webhook certificate (case-insensitive for robustness)
+        let cert_dn_lower = cert_dn.to_lowercase();
+        if !cert_dn_lower.contains("cn=client.webhooks.fbclientcerts.com") {
             let dn = cert_dn.to_string();
             logfire::warn!(
-                "Client certificate CN verification failed. Expected 'CN=client.webhooks.fbclientcerts.com', got: {dn}",
+                "Client certificate CN verification failed. Expected 'cn=client.webhooks.fbclientcerts.com' (case-insensitive), got: {dn}",
                 dn = dn
             );
             return Err(errors::UserError::Unauthorized.into());

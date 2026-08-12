@@ -23,8 +23,8 @@
 use anyhow::{Context, bail};
 use futures::{TryStreamExt, future::ok, stream::once};
 use ntex::{util::Bytes, web};
-use serde_json::json;
 use std::str::FromStr;
+use tera::context;
 use uuid::Uuid;
 
 use crate::{
@@ -53,7 +53,10 @@ fn get_header_str_value(headers: &ntex::http::HeaderMap, key: &str) -> String {
 
 /// Checks if the field contains an image for pet picture upload
 fn is_image_field(field: &ntex_multipart::Field, content_disposition: &str) -> bool {
-    field.content_type().essence_str().contains("image") && content_disposition.contains("pet_pic")
+    field
+        .content_type()
+        .is_some_and(|content_type| content_type.essence_str().contains("image"))
+        && content_disposition.contains("pet_pic")
 }
 
 /// Processes an image field, validating size and extracting file data
@@ -159,17 +162,16 @@ async fn get_pet_view(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "pets": api::pet::get_user_pets_cards(user.id, &app_state.repo)
+    let context = context! {
+        pets => &api::pet::get_user_pets_cards(user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
                 "function get_user_pets_cards raised an error: {e}"
             ))
         })?,
-        "show_menu": true,
-    }))
-    .unwrap_or_default();
+        show_menu => &true,
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("pet.html", &context)
@@ -200,16 +202,15 @@ async fn user_pets_list(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "pets": api::pet::get_user_pets_cards(user.id, &app_state.repo)
+    let context = context! {
+        pets => &api::pet::get_user_pets_cards(user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
                 "function get_user_pets_cards raised an error: {e}"
             ))
         })?,
-    }))
-    .unwrap_or_default();
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/pets.html", &context)
@@ -250,12 +251,11 @@ async fn render_pet_details_form(
     let content = templates::WEB_TEMPLATES
         .render(
             "pet_details.html",
-            &tera::Context::from_value(json!({
-                "PIC_PET_MAX_SIZE_BYTES": consts::PIC_PET_MAX_SIZE_BYTES,
-                "ACCEPTED_IMAGE_EXTENSIONS": consts::ACCEPTED_IMAGE_EXTENSIONS,
-                "pet_external_id": q.pet_external_id,
-            }))
-            .unwrap_or_default(),
+            &context! {
+                PIC_PET_MAX_SIZE_BYTES => &consts::PIC_PET_MAX_SIZE_BYTES,
+                ACCEPTED_IMAGE_EXTENSIONS => &consts::ACCEPTED_IMAGE_EXTENSIONS,
+                pet_external_id => &q.pet_external_id,
+            },
         )
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
@@ -524,10 +524,7 @@ async fn serve_webmanifest(
     path: web::types::Path<(Uuid,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let body = templates::WEB_MANIFESTS
-        .render(
-            "site.webmanifest",
-            &tera::Context::from_value(json!({"external_id": path.0})).unwrap_or_default(),
-        )
+        .render("site.webmanifest", &context! {external_id => &path.0})
         .map_err(|e| {
             errors::ServerError::TemplateError(format!(
                 "at /pet/site.webmanifest endpoint the template couldnt be rendered: {e}"
@@ -624,19 +621,18 @@ async fn get_pet_details_form(
     path: web::types::Path<(i64,)>,
 ) -> Result<impl web::Responder, web::Error> {
     let pet_id = path.0;
-    let context = tera::Context::from_value(json!({
-        "pet": api::pet::get_pet_user_to_edit(pet_id, user.id,&app_state.repo)
+    let context = context! {
+        pet => &api::pet::get_pet_user_to_edit(pet_id, user.id,&app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
                 "at /pet/details/pet_id endpoint pet info [get_pet_user_to_edit] couldnt be retrieved: {e}"
             ))
         })?,
-        "PIC_PET_MAX_SIZE_BYTES": consts::PIC_PET_MAX_SIZE_BYTES,
-        "ACCEPTED_IMAGE_EXTENSIONS": consts::ACCEPTED_IMAGE_EXTENSIONS,
-        "show_menu": true,
-    }))
-    .unwrap_or_default();
+        PIC_PET_MAX_SIZE_BYTES => &consts::PIC_PET_MAX_SIZE_BYTES,
+        ACCEPTED_IMAGE_EXTENSIONS => &consts::ACCEPTED_IMAGE_EXTENSIONS,
+        show_menu => &true,
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("pet_details.html", &context)

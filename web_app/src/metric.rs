@@ -2,7 +2,8 @@ use opentelemetry::{KeyValue, metrics::UpDownCounter};
 use std::sync::LazyLock;
 
 static STATDS: LazyLock<UpDownCounter<i64>> = LazyLock::new(|| {
-    logfire::i64_up_down_counter("pet_info_statds")
+    opentelemetry::global::meter("pet-info")
+        .i64_up_down_counter("pet_info_statds")
         .with_description("Pet info app statistics")
         .with_unit("attempt")
         .build()

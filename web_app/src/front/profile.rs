@@ -5,7 +5,7 @@ use crate::{
 use ntex::web;
 use ntex_identity::Identity;
 use ntex_session::Session;
-use serde_json::json;
+use tera::context;
 
 /// Renders user profile app section
 #[web::get("")]
@@ -15,29 +15,28 @@ async fn get_profile_view(
 ) -> Result<impl web::Responder, web::Error> {
     let user_can_access_service = user.can_access_service();
 
-    let context = tera::Context::from_value(json!({
-        "can_edit": user_can_access_service,
-        "owner_contacts": &api::user::get_owner_contacts(user.id, None, &app_state.repo)
+    let context = context! {
+        can_edit => &user_can_access_service,
+        owner_contacts => &api::user::get_owner_contacts(user.id, None, &app_state.repo)
             .await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
                     "function get_owner_contacts raised an error: {e}"
                 ))
             })?,
-        "payments": &api::user::get_payments(user.id, &app_state.repo)
+        payments => &api::user::get_payments(user.id, &app_state.repo)
         .await
         .map_err(|e| {
             errors::ServerError::InternalServerError(format!(
                 "function get_payments raised an error: {e}"
             ))
         })?,
-        "otp_step": if user.phone_reminder.is_some() {"OTP_SUCCESS"} else {"OTP_START"},
-        "phone_reminder": user.phone_reminder,
-        "service_price": &format!("{:.2}", consts::ADD_PET_PRICE),
-        "can_access_service": user_can_access_service,
-        "show_menu": true,
-    }))
-    .unwrap_or_default();
+        otp_step => &(if user.phone_reminder.is_some() {"OTP_SUCCESS"} else {"OTP_START"}),
+        phone_reminder => &user.phone_reminder,
+        service_price => &format!("{:.2}", consts::ADD_PET_PRICE),
+        can_access_service => &user_can_access_service,
+        show_menu => &true,
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("profile.html", &context)
@@ -88,17 +87,16 @@ async fn get_owner_contacts(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "can_edit": &user.can_access_service(),
-        "owner_contacts": &api::user::get_owner_contacts(user.id, None, &app_state.repo)
+    let context = context! {
+        can_edit => &user.can_access_service(),
+        owner_contacts => &api::user::get_owner_contacts(user.id, None, &app_state.repo)
             .await
             .map_err(|e| {
                 errors::ServerError::InternalServerError(format!(
                     "function get_owner_contacts raised an error: {e}"
                 ))
             })?,
-    }))
-    .unwrap_or_default();
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/owner_contact_list.html", &context)

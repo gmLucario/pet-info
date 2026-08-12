@@ -14,7 +14,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
 use std::{str::FromStr, sync::LazyLock};
-use totp_rs::{Algorithm, Secret, TOTP};
+use totp_rs::{Algorithm, Builder, Secret, Totp};
 use uuid::Uuid;
 
 /// Detects image format from magic bytes.
@@ -236,17 +236,17 @@ const TOTP_TIME_STEP_SECONDS: u64 = 60;
 /// - The secret is regenerated on each application restart for security
 /// - Codes are valid for 60 seconds with ±1 step tolerance (total 3 minutes)
 /// - Uses the `totp-rs` crate for RFC 6238 compliance
-pub static TOTP_CLIENT: LazyLock<TOTP> = LazyLock::new(|| {
-    TOTP::new(
-        TOTP_HASH_ALGORITHM,
-        TOTP_CODE_DIGITS,
-        TOTP_VALIDATION_SKEW,
-        TOTP_TIME_STEP_SECONDS,
-        Secret::Raw(config::OTP_SECRET.as_bytes().to_vec())
-            .to_bytes()
-            .unwrap(),
-    )
-    .unwrap()
+pub static TOTP_CLIENT: LazyLock<Totp> = LazyLock::new(|| {
+    Builder::new()
+        .with_algorithm(TOTP_HASH_ALGORITHM)
+        .with_digits(TOTP_CODE_DIGITS as u8)
+        .with_skew(TOTP_VALIDATION_SKEW.into())
+        .with_step_duration(TOTP_TIME_STEP_SECONDS)
+        .with_secret(Secret::new(
+            config::OTP_SECRET.as_bytes().to_vec().into_boxed_slice(),
+        ))
+        .build()
+        .unwrap()
 });
 
 #[cfg(test)]

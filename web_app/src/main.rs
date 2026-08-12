@@ -37,7 +37,6 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize logging and metrics
     let shutdown_handler = logfire::configure()
-        .install_panic_handler()
         .with_metrics(Some(MetricsOptions::default()))
         .send_to_logfire(logfire::config::SendToLogfire::Yes)
         .with_token(&app_config.logfire_token)
@@ -126,67 +125,72 @@ async fn configure_and_run_server(
 
     let server = web::server(move || {
         let magic_link_service = magic_link_service.clone();
-        web::App::new()
-            .wrap(
-                Cors::new()
-                    .allowed_methods(vec![
-                        "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
-                    ])
-                    .allowed_origin("http://localhost:8080")
-                    .allowed_origin("https://openidconnect.googleapis.com")
-                    .allowed_origin("https://pet-info.link")
-                    .allowed_origin("https://oauth2.googleapis.com")
-                    .allowed_origin("https://www.googleapis.com")
-                    .allowed_origin("https://accounts.google.com")
-                    .allowed_origin("https://graph.facebook.com")
-                    .allowed_origin("https://api.mercadopago.com")
-                    .finish(),
-            )
-            .wrap(
-                CookieSession::private(&session_key)
-                    .secure(app_config.is_prod())
-                    .max_age(consts::MAX_AGE_COOKIES)
-                    .name("pet-info-session"),
-            )
-            .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&identity_key)
-                    .name("user_id")
-                    .max_age(consts::MAX_AGE_COOKIES)
-                    .secure(app_config.is_prod()),
-            ))
-            .wrap(web::middleware::Logger::default())
-            .wrap(web::middleware::Compress::default())
-            .state(
-                create_app_state(
-                    csrf_key,
-                    sqlite_repo.clone(),
-                    storage_service.clone(),
-                    notification_service.clone(),
-                    magic_link_service,
+        let sqlite_repo = sqlite_repo.clone();
+        let storage_service = storage_service.clone();
+        let notification_service = notification_service.clone();
+        async move {
+            web::App::new()
+                .wrap(
+                    Cors::new()
+                        .allowed_methods(vec![
+                            "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
+                        ])
+                        .allowed_origin("http://localhost:8080")
+                        .allowed_origin("https://openidconnect.googleapis.com")
+                        .allowed_origin("https://pet-info.link")
+                        .allowed_origin("https://oauth2.googleapis.com")
+                        .allowed_origin("https://www.googleapis.com")
+                        .allowed_origin("https://accounts.google.com")
+                        .allowed_origin("https://graph.facebook.com")
+                        .allowed_origin("https://api.mercadopago.com")
+                        .finish(),
                 )
-                .expect("Failed to create app state"),
-            )
-            .configure(front::routes::pet_public_profile)
-            .configure(front::routes::pet)
-            .configure(front::routes::user_profile)
-            .configure(front::routes::checkout)
-            .configure(front::routes::blog)
-            .configure(front::routes::reminders)
-            .configure(webhook::routes::whatsapp)
-            .service((
-                ntex_files::Files::new("/static", "web/static/"),
-                front::server::serve_favicon,
-                front::server::index,
-                front::auth::google_callback,
-                front::auth::magic_login,
-                front::server::get_reactivate_account_view,
-                front::server::reactivate_account,
-            ))
-            .default_service(
-                web::route()
-                    .guard(web::guard::Not(web::guard::Get()))
-                    .to(front::server::serve_not_found),
-            )
+                .wrap(
+                    CookieSession::private(&session_key)
+                        .secure(app_config.is_prod())
+                        .max_age(consts::MAX_AGE_COOKIES)
+                        .name("pet-info-session"),
+                )
+                .wrap(IdentityService::new(
+                    CookieIdentityPolicy::new(&identity_key)
+                        .name("user_id")
+                        .max_age(consts::MAX_AGE_COOKIES)
+                        .secure(app_config.is_prod()),
+                ))
+                .wrap(web::middleware::Logger::default())
+                .wrap(web::middleware::Compress::default())
+                .state(
+                    create_app_state(
+                        csrf_key,
+                        sqlite_repo.clone(),
+                        storage_service.clone(),
+                        notification_service.clone(),
+                        magic_link_service,
+                    )
+                    .expect("Failed to create app state"),
+                )
+                .configure(front::routes::pet_public_profile)
+                .configure(front::routes::pet)
+                .configure(front::routes::user_profile)
+                .configure(front::routes::checkout)
+                .configure(front::routes::blog)
+                .configure(front::routes::reminders)
+                .configure(webhook::routes::whatsapp)
+                .service((
+                    ntex_files::Files::new("/static", "web/static/"),
+                    front::server::serve_favicon,
+                    front::server::index,
+                    front::auth::google_callback,
+                    front::auth::magic_login,
+                    front::server::get_reactivate_account_view,
+                    front::server::reactivate_account,
+                ))
+                .default_service(
+                    web::route()
+                        .guard(web::guard::Not(web::guard::Get()))
+                        .to(front::server::serve_not_found),
+                )
+        }
     });
 
     server

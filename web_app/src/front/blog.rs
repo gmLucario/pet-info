@@ -1,5 +1,5 @@
 use ntex::web;
-use serde_json::json;
+use tera::context;
 
 use crate::front::{errors, templates};
 use pulldown_cmark::{Options, Parser};
@@ -26,14 +26,13 @@ async fn get_blog_entry(
         Parser::new_ext(&markdown_input, Options::empty()),
     );
 
-    let context = tera::Context::from_value(json!({
-        "blog": Blog {
+    let context = context! {
+        blog =>  &Blog {
             title: blog_name,
             content: html_output,
         },
-        "show_menu": true,
-    }))
-    .unwrap_or_default();
+        show_menu => &true,
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("blog.html", &context)

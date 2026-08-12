@@ -263,7 +263,7 @@ async fn build_magic_login_link(
     Ok(format!(
         "{}/magic-login?token={}",
         app_config.base_url(),
-        &token
+        token
     ))
 }
 

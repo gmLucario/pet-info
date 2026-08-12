@@ -10,7 +10,7 @@ use chrono_tz::Tz;
 use ntex::web;
 use ntex_identity::Identity;
 use ntex_session::Session;
-use serde_json::json;
+use tera::context;
 
 /// Renders the reminder view section
 #[web::get("")]
@@ -18,11 +18,11 @@ async fn get_reminder_view(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "reminders": api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
-        "can_schedule_reminder": user.phone_reminder.is_some() && user.can_access_service(),
-        "show_menu": true,
-    })).unwrap_or_default();
+    let context = context! {
+        reminders => &api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
+        can_schedule_reminder => &(user.phone_reminder.is_some() && user.can_access_service()),
+        show_menu => &true,
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("reminders.html", &context)
@@ -44,9 +44,9 @@ async fn get_reminder_records(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "reminders": api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
-    })).unwrap_or_default();
+    let context = context! {
+        reminders => &api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/tbody_reminder.html", &context)
@@ -65,10 +65,9 @@ async fn get_reminder_records(
 async fn start_verification_code_to_reminder_phone(
     _: CheckUserCanAccessService,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "otp_step": "OTP_START",
-    }))
-    .unwrap_or_default();
+    let context = context! {
+        otp_step => "OTP_START",
+    };
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/otp.html", &context)
@@ -87,10 +86,9 @@ async fn send_verification_code_to_reminder_phone(
     app_state: web::types::State<AppState>,
     _: CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = tera::Context::from_value(json!({
-        "otp_step": "OTP_VERIFICATION",
-    }))
-    .unwrap_or_default();
+    let context = context! {
+        otp_step => "OTP_VERIFICATION",
+    };
 
     let phone_number = format!(
         "{country_code}{phone}",
@@ -129,10 +127,9 @@ async fn verify_reminder_phone(
     identity: Identity,
     _: CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
-    let mut context = tera::Context::from_value(json!({
-        "otp_step": "OTP_FAILURE",
-    }))
-    .unwrap_or_default();
+    let mut context = context! {
+        otp_step => "OTP_FAILURE",
+    };
 
     if api::reminder::validate_otp(&form.otp_value)
         && let Ok(Some(phone_number)) = cookie.get::<String>(consts::OTP_PHONE_COOKIE_NAME)
@@ -172,11 +169,10 @@ async fn remove_verified_phone(
     identity: Identity,
     _: CsrfToken,
 ) -> Result<impl web::Responder, web::Error> {
-    let mut context = tera::Context::from_value(json!({
-        "otp_step": "OTP_SUCCESS",
-        "phone_reminder": user_session.user.phone_reminder.unwrap(),
-    }))
-    .unwrap_or_default();
+    let mut context = context! {
+        otp_step => "OTP_SUCCESS",
+        phone_reminder => &user_session.user.phone_reminder.unwrap(),
+    };
 
     if api::reminder::remove_verified_phone_to_user(user_session.user.id, &app_state.repo)
         .await
