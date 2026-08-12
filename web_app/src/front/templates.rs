@@ -53,6 +53,14 @@ pub static WEB_TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
     let mut tera = Tera::default();
     tera.register_filter("date", date);
     tera.register_filter("filesizeformat", filesizeformat);
+    tera.global_context().insert(
+        "PIC_PET_MAX_SIZE_BYTES",
+        &crate::consts::PIC_PET_MAX_SIZE_BYTES,
+    );
+    tera.global_context().insert(
+        "ACCEPTED_IMAGE_EXTENSIONS",
+        &crate::consts::ACCEPTED_IMAGE_EXTENSIONS,
+    );
     tera.load_from_glob("web/templates/**/*.html").unwrap();
     tera
 });
@@ -139,5 +147,105 @@ mod tests {
         assert!(template_names.contains(&"errors/url_not_found.html"));
         assert!(template_names.contains(&"widgets/add_pet_form.html"));
         assert!(template_names.contains(&"widgets/pets.html"));
+    }
+
+    #[test]
+    fn test_empty_reminders_render_an_explicit_empty_state() {
+        let context = tera::Context::from_serialize(&serde_json::json!({
+            "reminders": [],
+            "can_schedule_reminder": false,
+            "show_menu": true,
+        }))
+        .unwrap();
+
+        let rendered = WEB_TEMPLATES.render("reminders.html", &context).unwrap();
+
+        assert!(rendered.contains("No hay recordatorios programados."));
+    }
+
+    #[test]
+    fn test_reminder_row_passes_delete_url_to_typed_component() {
+        let context = tera::Context::from_serialize(&serde_json::json!({
+            "reminders": [{
+                "id": 42,
+                "body": "Vacuna",
+                "notification_type": "whatsapp",
+                "send_at": "2026-08-12T18:00:00Z",
+                "user_timezone": "America/Mexico_City"
+            }]
+        }))
+        .unwrap();
+
+        let rendered = WEB_TEMPLATES
+            .render("widgets/tbody_reminder.html", &context)
+            .unwrap();
+
+        assert!(rendered.contains("hx-delete=\"/reminder/42\""));
+        assert!(rendered.contains("Vacuna"));
+    }
+
+    #[test]
+    fn test_owner_contacts_widget_still_supports_direct_htmx_rendering() {
+        let context = tera::Context::from_serialize(&serde_json::json!({
+            "owner_contacts": [{
+                "id": 7,
+                "full_name": "ana pérez",
+                "contact_value": "5551234567"
+            }],
+            "can_edit": true
+        }))
+        .unwrap();
+
+        let rendered = WEB_TEMPLATES
+            .render("widgets/owner_contact_list.html", &context)
+            .unwrap();
+
+        assert!(rendered.contains("Ana Pérez"));
+        assert!(rendered.contains("hx-delete=\"/profile/contact/7\""));
+    }
+
+    #[test]
+    fn test_pet_html_for_javascript_is_kept_in_an_html_attribute() {
+        let dangerous_html = "<p>La mascota de O'Reilly</p><script>alert('x')</script>";
+        let context = tera::Context::from_serialize(&serde_json::json!({
+            "pet": {
+                "id": 1,
+                "pet_full_name": "Michi",
+                "pet_birthday": "2020-01-02",
+                "pet_breed": "mestizo",
+                "is_lost": false,
+                "is_spaying_neutering": true,
+                "is_female": true,
+                "about_pet": dangerous_html,
+                "pet_external_id": "f56c96b6-0f85-4b36-9197-66e382b91c1f"
+            },
+            "show_menu": true,
+        }))
+        .unwrap();
+
+        let rendered = WEB_TEMPLATES.render("pet_details.html", &context).unwrap();
+
+        assert!(!rendered.contains("quill.root.innerHTML = '"));
+        assert!(rendered.contains("data-initial-html="));
+        assert!(rendered.contains("&lt;script&gt;"));
+        assert!(!rendered.contains("<script>alert('x')</script>"));
+    }
+
+    #[test]
+    fn test_checkout_data_is_not_interpolated_into_javascript() {
+        let context = tera::Context::from_serialize(&serde_json::json!({
+            "service_price": "123.00",
+            "email": "o'reilly@example.com",
+            "mercado_pago_public_key": "key'with-quote",
+            "back_url": "https://example.com/pet?next='x'",
+            "show_menu": true,
+        }))
+        .unwrap();
+
+        let rendered = WEB_TEMPLATES.render("checkout.html", &context).unwrap();
+
+        assert!(rendered.contains("data-public-key="));
+        assert!(rendered.contains("checkoutData.publicKey"));
+        assert!(!rendered.contains("new MercadoPago('key'with-quote'"));
     }
 }

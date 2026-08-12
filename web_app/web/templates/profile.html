@@ -8,8 +8,6 @@ perfil
 datos del perfil
 {% endblock meta_desc %}
 
-{% block mid_nav_summary %}Perfil{% endblock mid_nav_summary %}
-
 {% block extra_css %}
 <style>
     .otp-inputs {
@@ -59,11 +57,13 @@ datos del perfil
             </tr>
         </thead>
         <tbody>
-            {% for payment in payments | default(value=[]) %}
+            {% for payment in payments %}
             <tr>
-                <td>{{ payment.created_at | date(format="%v", locale="es_MX") }}</td>
+                <td>{{ payment.created_at | date(format="%v") }}</td>
                 <td>{{ payment.status }}</td>
             </tr>
+            {% else %}
+            <tr><td colspan="2">No hay pagos registrados.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -80,7 +80,7 @@ datos del perfil
     </header>
     <div id="owner_contacts">
         <ul hx-get="/profile/contact" hx-trigger="ownerContactRecordUpdated from:body">
-            {% include "widgets/owner_contact_list.html" %}
+            {{<ui.owner_contacts owner_contacts can_edit />}}
         </ul>
     </div>
     <footer>

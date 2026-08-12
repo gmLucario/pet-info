@@ -8,13 +8,11 @@ reminders
 Recordatorios
 {% endblock meta_desc %}
 
-{% block mid_nav_summary %}Recordatorios{% endblock mid_nav_summary %}
-
 {% block content %}
 
 {% set modal_id = "reminder_modal" %}
 {% if can_schedule_reminder %}
-{% include "widgets/btn_open_modal.html" %}
+{{<ui.floating_button modal_id={modal_id} title="Añadir Recordatorio" />}}
 {% else %}
 <nav style="padding: 1em;">
     <ul></ul>

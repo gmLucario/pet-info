@@ -1,0 +1,13 @@
+{% component ui.floating_button(href: string = "", modal_id: string = "", title: string = "Añadir") %}
+{% if href %}
+<a href="{{ href }}" class="fab" title="{{ title }}" aria-label="{{ title }}"
+    style="position: fixed; right: 2rem; bottom: 2rem; z-index: 1000; display: flex; width: 3.5rem; min-width: 3.5rem; height: 3.5rem; margin: 0; padding: 0; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: var(--pico-primary-background); color: var(--pico-primary-inverse); text-decoration: none;">
+    <span aria-hidden="true">+</span>
+</a>
+{% else %}
+<button type="button" class="fab" popovertarget="{{ modal_id }}" title="{{ title }}" aria-label="{{ title }}"
+    style="position: fixed; right: 2rem; bottom: 2rem; z-index: 1000; display: flex; width: 3.5rem; min-width: 3.5rem; height: 3.5rem; margin: 0; padding: 0; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: var(--pico-primary-background); color: var(--pico-primary-inverse); text-decoration: none;">
+    <span aria-hidden="true">+</span>
+</button>
+{% endif %}
+{% endcomponent ui.floating_button %}

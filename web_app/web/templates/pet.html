@@ -20,7 +20,7 @@ Lista de tus mascotas registradas en Pet-Info
       vertical-align: middle;
       display: inline-block;
   }
- 
+
   /* Public Link Box */
   .public-link-area {
       display: flex;
@@ -79,45 +79,9 @@ Lista de tus mascotas registradas en Pet-Info
       letter-spacing: 0.02em;
   }
 
-  /* Floating Action Button */
-  .fab {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      width: 3.5rem;
-      height: 3.5rem;
-      border-radius: 50%;
-      background-color: var(--pico-primary);
-      color: var(--pico-primary-inverse);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 1000;
-      transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
-      border: none;
-      text-decoration: none;
-  }
-
-  .fab:hover {
-      transform: scale(1.1);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-      color: var(--pico-primary-inverse);
-      text-decoration: none;
-      background-color: var(--pico-primary-hover);
-  }
-
-  .fab:active {
-      transform: scale(0.95);
-  }
-
-  .fab span {
-      font-size: 1.75rem;
-  }
 </style>
 {% endblock extra_css %}
 
-{% block mid_nav_summary %}Mascotas{% endblock mid_nav_summary %}
 
 {% block content %}
 
@@ -130,10 +94,7 @@ Lista de tus mascotas registradas en Pet-Info
   {% include "widgets/pets.html" %}
 {% endif %}
 
-<!-- Floating Action Button -->
-<a href="/checkout" class="fab" title="Añadir Mascota">
-  <span class="material-symbols-outlined">add</span>
-</a>
+{{<ui.floating_button href="/checkout" title="Añadir Mascota" />}}
 {% endblock content %}
 
 {% block extra_js %}

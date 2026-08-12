@@ -2,7 +2,7 @@
 {% include "widgets/otp_verification.html" %}
 {% elif otp_step == 'OTP_SUCCESS' %}
 {% set delete_url = "/reminder/verified-phone" %}
-<p hx-target="this" hx-swap="outerHTML">{% include "widgets/trash_icon.html" %} {{phone_reminder}}
+<p hx-target="this" hx-swap="outerHTML">{{<ui.trash_icon delete_url />}} {{phone_reminder}}
     <mark>verificado</mark>
 </p>
 {% elif otp_step == 'OTP_FAILURE' %}

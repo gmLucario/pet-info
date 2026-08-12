@@ -7,6 +7,8 @@ use chrono::NaiveDate;
 use chrono_tz::Tz;
 use futures::StreamExt;
 
+use crate::consts;
+
 /// Creates an HTTP redirect response to the specified URL.
 ///
 /// # Arguments
@@ -23,6 +25,19 @@ pub fn redirect_to(url: &str) -> Result<ntex::web::HttpResponse, ntex::web::Erro
     Ok(ntex::web::HttpResponse::Found()
         .header("location", url)
         .finish())
+}
+
+/// Redirects to the destination saved before login, or to the pets page.
+/// The saved destination is consumed so it cannot affect later requests.
+pub fn redirect_to_saved_destination(
+    session: &ntex_session::Session,
+) -> Result<ntex::web::HttpResponse, ntex::web::Error> {
+    if let Ok(Some(destination)) = session.get::<String>(consts::REDIRECT_TO_COOKIE_NAME) {
+        session.remove(consts::REDIRECT_TO_COOKIE_NAME);
+        return redirect_to(&destination);
+    }
+
+    redirect_to("/pet")
 }
 
 /// Extracts and concatenates all bytes from a multipart field.
@@ -61,11 +76,8 @@ pub async fn get_bytes_value(field: ntex_multipart::Field) -> Vec<u8> {
 async fn get_bytes_as_str(
     x: Result<ntex::util::Bytes, ntex_multipart::MultipartError>,
 ) -> Option<String> {
-    if let Ok(bytes) = x {
-        return std::str::from_utf8(&bytes).ok().map(String::from);
-    }
-
-    None
+    x.ok()
+        .and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
 }
 
 /// Extracts and concatenates all UTF-8 string values from a multipart field.
@@ -387,6 +399,17 @@ mod tests {
         let result1 = fmt_dates_difference(date1, date2);
         let result2 = fmt_dates_difference(date2, date1);
         assert_eq!(result1, result2);
+
+        // Exact boundaries for each displayed unit
+        let start = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        assert_eq!(
+            fmt_dates_difference(start, start + chrono::Duration::days(30)),
+            "1 meses"
+        );
+        assert_eq!(
+            fmt_dates_difference(start, start + chrono::Duration::days(396)),
+            "1 años 1 meses 1 días"
+        );
     }
 
     /// Tests UTC datetime with default time functionality.

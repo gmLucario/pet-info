@@ -17,9 +17,9 @@ notas de tu mascota
   <h1 style="color: var(--pico-primary); margin-bottom: 0.5rem;">{{ pet_name | default(value="Mascota") | title }}</h1>
   <p style="color: var(--pico-muted-color); font-size: 1.2rem;">Notas</p>
 </div>
-{% if can_edit | default(value=false) %}
+{% if can_edit %}
 {% set modal_id = "note_modal" %}
-{% include "widgets/btn_open_modal.html" %}
+{{<ui.floating_button modal_id={modal_id} title="Añadir Nota" />}}
 <div popover id="{{modal_id}}">
     <form method="dialog" style="padding: 2rem;" hx-post='/pet/note/{{pet_id}}' hx-swap="none"
         hx-on::after-request="this.reset()">
@@ -42,7 +42,7 @@ notas de tu mascota
 {% endblock content %}
 
 {% block extra_js %}
-{% if can_edit | default(value=false) %}
+{% if can_edit %}
 <script>
     const quill = new Quill('#note_content', {
         theme: 'snow',

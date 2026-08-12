@@ -8,7 +8,14 @@ use crate::{
 use anyhow::Context;
 use ntex::web;
 use ntex_identity::Identity;
-use tera::context;
+#[derive(serde::Serialize)]
+struct CheckoutView<'a> {
+    service_price: String,
+    email: &'a str,
+    mercado_pago_public_key: &'a str,
+    back_url: String,
+    show_menu: bool,
+}
 
 /// Endpoint to render the checkout to pay the PetInfo id tag.
 /// If the user payed without finish the id tag register, the user
@@ -26,13 +33,18 @@ async fn get_checkout_view(
         .context("failed to get app config")
         .map_err(web::error::ErrorInternalServerError)?;
 
-    let context = context! {
-        service_price => &format!("{:.2}", consts::ADD_PET_PRICE),
-        email => &user_session.user.email,
-        mercado_pago_public_key => &&app_config.mercado_pago_public_key,
-        back_url => &format!("{}/pet", app_config.base_url()),
-        show_menu => &true,
-    };
+    let context = tera::Context::from_serialize(&CheckoutView {
+        service_price: format!("{:.2}", consts::ADD_PET_PRICE),
+        email: &user_session.user.email,
+        mercado_pago_public_key: &app_config.mercado_pago_public_key,
+        back_url: format!("{}/pet", app_config.base_url()),
+        show_menu: true,
+    })
+    .map_err(|e| {
+        errors::ServerError::TemplateError(format!(
+            "could not serialize checkout template data: {e}"
+        ))
+    })?;
 
     let content = templates::WEB_TEMPLATES
         .render("checkout.html", &context)

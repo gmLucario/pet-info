@@ -23,6 +23,47 @@ pub struct UserProfile {
     email: String,
 }
 
+async fn finish_login(
+    user: crate::models::user_app::User,
+    app_state: &AppState,
+    identity: &Identity,
+    cookie: &ntex_session::Session,
+) -> Result<ntex::web::HttpResponse, web::Error> {
+    let (csrf_token, csrf_cookie) = app_state
+        .csrf_protec
+        .generate_token_pair(None, consts::MAX_AGE_COOKIES)
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("cant set token csrf protection: {e}"))
+        })?;
+
+    cookie.set(
+        consts::CSRF_TOKEN_COOKIE_NAME,
+        serde_json::to_string(&middleware::csrf_token::CsrfToken {
+            token_base64: csrf_token.b64_string(),
+            cookie_base64: csrf_cookie.b64_string(),
+        })?,
+    )?;
+
+    let is_user_enabled = user.is_enabled;
+    let user_id = user.id;
+    let add_pet_balance = api::user::get_user_add_pet_balance(&app_state.repo, user_id)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!("cant get user add pet balance {e}"))
+        })?;
+
+    identity.remember(serde_json::to_string(&session::WebAppSession {
+        user,
+        add_pet_balance,
+    })?);
+
+    if !is_user_enabled {
+        return utils::redirect_to("/reactivate-account");
+    }
+
+    utils::redirect_to_saved_destination(cookie)
+}
+
 /// Endpoint handles the google oauth callback login from index login
 #[web::get("/google_callback")]
 async fn google_callback(
@@ -79,21 +120,6 @@ async fn google_callback(
             errors::ServerError::ExternalServiceError(format!("at get google user info: {}", e))
         })?;
 
-    let (csrf_token, csrf_cookie) = app_state
-        .csrf_protec
-        .generate_token_pair(None, consts::MAX_AGE_COOKIES)
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!("cant set token csrf protection: {e}"))
-        })?;
-
-    cookie.set(
-        consts::CSRF_TOKEN_COOKIE_NAME,
-        serde_json::to_string(&middleware::csrf_token::CsrfToken {
-            token_base64: csrf_token.b64_string(),
-            cookie_base64: csrf_cookie.b64_string(),
-        })?,
-    )?;
-
     let user = api::user::get_or_create_app_user_by_email(&app_state.repo, &profile.email)
         .await
         .map_err(|e| {
@@ -102,30 +128,7 @@ async fn google_callback(
             ))
         })?;
 
-    let is_user_enabled = user.is_enabled;
-    let user_id = user.id;
-
-    identity.remember(serde_json::to_string(&session::WebAppSession {
-        user,
-        add_pet_balance: api::user::get_user_add_pet_balance(&app_state.repo, user_id)
-            .await
-            .map_err(|e| {
-                errors::ServerError::InternalServerError(format!(
-                    "cant get user add pet balance {e}"
-                ))
-            })?,
-    })?);
-
-    if !is_user_enabled {
-        return utils::redirect_to("/reactivate-account");
-    }
-
-    if let Ok(Some(redirect_to)) = cookie.get::<String>(consts::REDIRECT_TO_COOKIE_NAME) {
-        cookie.remove(consts::REDIRECT_TO_COOKIE_NAME);
-        return utils::redirect_to(&redirect_to);
-    }
-
-    utils::redirect_to("/pet")
+    finish_login(user, &app_state, &identity, &cookie).await
 }
 
 #[derive(Deserialize, Debug)]
@@ -168,43 +171,5 @@ pub async fn magic_login(
         return Err(errors::UserError::Unauthorized.into());
     };
 
-    let (csrf_token, csrf_cookie) = app_state
-        .csrf_protec
-        .generate_token_pair(None, consts::MAX_AGE_COOKIES)
-        .map_err(|e| {
-            errors::ServerError::InternalServerError(format!("cant set token csrf protection: {e}"))
-        })?;
-
-    cookie.set(
-        consts::CSRF_TOKEN_COOKIE_NAME,
-        serde_json::to_string(&middleware::csrf_token::CsrfToken {
-            token_base64: csrf_token.b64_string(),
-            cookie_base64: csrf_cookie.b64_string(),
-        })?,
-    )?;
-
-    let is_user_enabled = user.is_enabled;
-    let user_id = user.id;
-
-    identity.remember(serde_json::to_string(&session::WebAppSession {
-        user,
-        add_pet_balance: api::user::get_user_add_pet_balance(&app_state.repo, user_id)
-            .await
-            .map_err(|e| {
-                errors::ServerError::InternalServerError(format!(
-                    "cant get user add pet balance {e}"
-                ))
-            })?,
-    })?);
-
-    if !is_user_enabled {
-        return utils::redirect_to("/reactivate-account");
-    }
-
-    if let Ok(Some(redirect_to)) = cookie.get::<String>(consts::REDIRECT_TO_COOKIE_NAME) {
-        cookie.remove(consts::REDIRECT_TO_COOKIE_NAME);
-        return utils::redirect_to(&redirect_to);
-    }
-
-    utils::redirect_to("/pet")
+    finish_login(user, &app_state, &identity, &cookie).await
 }

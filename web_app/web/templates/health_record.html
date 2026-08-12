@@ -25,7 +25,7 @@ health record table
 </div>
 {% if can_edit %}
 {% set modal_id = "health_modal" %}
-{% include "widgets/btn_open_modal.html" %}
+{{<ui.floating_button modal_id={modal_id} title="Añadir Registro" />}}
 <div popover id="{{modal_id}}">
   <form method="dialog" style="padding: 2rem;" hx-post='/pet/health/{{pet_external_id}}/{{record_type}}/add'
     hx-swap="none" hx-on::after-request="this.reset()">

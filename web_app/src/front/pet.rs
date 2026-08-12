@@ -252,8 +252,6 @@ async fn render_pet_details_form(
         .render(
             "pet_details.html",
             &context! {
-                PIC_PET_MAX_SIZE_BYTES => &consts::PIC_PET_MAX_SIZE_BYTES,
-                ACCEPTED_IMAGE_EXTENSIONS => &consts::ACCEPTED_IMAGE_EXTENSIONS,
                 pet_external_id => &q.pet_external_id,
             },
         )
@@ -629,8 +627,6 @@ async fn get_pet_details_form(
                 "at /pet/details/pet_id endpoint pet info [get_pet_user_to_edit] couldnt be retrieved: {e}"
             ))
         })?,
-        PIC_PET_MAX_SIZE_BYTES => &consts::PIC_PET_MAX_SIZE_BYTES,
-        ACCEPTED_IMAGE_EXTENSIONS => &consts::ACCEPTED_IMAGE_EXTENSIONS,
         show_menu => &true,
     };
 

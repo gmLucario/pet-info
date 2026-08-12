@@ -130,7 +130,7 @@ async fn configure_and_run_server(
         let notification_service = notification_service.clone();
         async move {
             web::App::new()
-                .wrap(
+                .middleware(
                     Cors::new()
                         .allowed_methods(vec![
                             "GET", "HEAD", "POST", "OPTIONS", "PUT", "PATCH", "DELETE",
@@ -145,20 +145,20 @@ async fn configure_and_run_server(
                         .allowed_origin("https://api.mercadopago.com")
                         .finish(),
                 )
-                .wrap(
+                .middleware(
                     CookieSession::private(&session_key)
                         .secure(app_config.is_prod())
                         .max_age(consts::MAX_AGE_COOKIES)
                         .name("pet-info-session"),
                 )
-                .wrap(IdentityService::new(
+                .middleware(IdentityService::new(
                     CookieIdentityPolicy::new(&identity_key)
                         .name("user_id")
                         .max_age(consts::MAX_AGE_COOKIES)
                         .secure(app_config.is_prod()),
                 ))
-                .wrap(web::middleware::Logger::default())
-                .wrap(web::middleware::Compress::default())
+                .middleware(web::middleware::Logger::default())
+                .middleware(web::middleware::Compress::default())
                 .state(
                     create_app_state(
                         csrf_key,

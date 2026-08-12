@@ -1,9 +1,17 @@
-{% for contact in owner_contacts | default(value=[]) %}
+{% component ui.owner_contacts(owner_contacts: array, can_edit: bool = false) %}
+{% for contact in owner_contacts %}
 <li>
-    {% if can_edit | default(value=false) %}
-        {% set delete_url = "/profile/contact/" ~ contact.id %}
-        {% include "widgets/trash_icon.html" %}
+    {% if can_edit %}
+        {{<ui.trash_icon delete_url={"/profile/contact/" ~ contact.id} />}}
     {% endif %}
     {{ contact.full_name | title }}: {{contact.contact_value}}
 </li>
+{% else %}
+<li>No hay contactos registrados.</li>
 {% endfor %}
+{% endcomponent ui.owner_contacts %}
+
+{# This template is also rendered directly by the HTMX contact-list endpoint. #}
+{% if owner_contacts is defined %}
+{{<ui.owner_contacts owner_contacts can_edit={can_edit | default(value=false)} />}}
+{% endif %}

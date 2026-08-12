@@ -295,6 +295,17 @@ mod tests {
         heic_data[11] = b'c';
         assert_eq!(detect_image_format(&heic_data), "heic");
 
+        for brand in [b"ftypheix", b"ftypheim", b"ftypmsf1"] {
+            let mut data = vec![0; 12];
+            data[4..12].copy_from_slice(brand);
+            assert_eq!(detect_image_format(&data), "heic");
+        }
+
+        // RIFF alone is not enough to classify a file as WebP.
+        let mut riff_data = vec![0; 12];
+        riff_data[..4].copy_from_slice(b"RIFF");
+        assert_eq!(detect_image_format(&riff_data), "jpg");
+
         // Fallback
         assert_eq!(detect_image_format(&[0x00, 0x00, 0x00, 0x00]), "jpg");
         assert_eq!(detect_image_format(&[]), "jpg");

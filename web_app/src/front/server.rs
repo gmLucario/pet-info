@@ -94,10 +94,5 @@ async fn reactivate_account(
     //unwrap cause its safe, it comes internally
     identity.remember(serde_json::to_string(&user_session).unwrap());
 
-    if let Ok(Some(redirect_to)) = cookie.get::<String>(consts::REDIRECT_TO_COOKIE_NAME) {
-        cookie.remove(consts::REDIRECT_TO_COOKIE_NAME);
-        return utils::redirect_to(&redirect_to);
-    }
-
-    utils::redirect_to("/pet")
+    utils::redirect_to_saved_destination(&cookie)
 }

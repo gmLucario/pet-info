@@ -15,9 +15,6 @@ perfil de ...
 <link rel="manifest" href="/pet/site.webmanifest/{{pet.external_id}}"/>
 {% endblock extra_meta %}
 
-{% block mid_nav_content %}
-{% endblock mid_nav_content %}
-
 {% block extra_css %}
 <style>
     img {
@@ -92,7 +89,7 @@ perfil de ...
     <details>
         <summary>Contacto</summary>
         <ul>
-            {% include "widgets/owner_contact_list.html" %}
+            {{<ui.owner_contacts owner_contacts />}}
         </ul>
     </details>
 

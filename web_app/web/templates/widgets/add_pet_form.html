@@ -73,7 +73,7 @@
                 <label htmlFor="male-sex">Macho</label>
             </fieldset>
         </fieldset>
-        <div id="editor" style="font-size: 18px;"> </div>
+        <div id="editor" style="font-size: 18px;"{% if pet %} data-initial-html="{{ pet.about_pet }}"{% endif %}> </div>
         {% if pet %} <input type="hidden" name="pet_external_id" value="{{pet.pet_external_id}}"> {% endif %}
     </fieldset>
     <footer style="text-align: center;">

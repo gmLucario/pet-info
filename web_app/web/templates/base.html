@@ -51,7 +51,7 @@
         <div class="container">
             <nav>
                 {% if show_menu | default(value=false) %}
-                <div class="container" style="text-align: center;">
+                <div class="container breadcrumb-navigation" style="text-align: center;">
                     <nav aria-label="breadcrumb" style="--pico-nav-breadcrumb-divider: '🐶';">
                         <ul>
                             <li><a href="/profile">Perfil</a></li>
@@ -60,9 +60,6 @@
                         </ul>
                     </nav>
                 </div>
-                {% else %}
-                    {% block mid_nav_content %}
-                    {% endblock mid_nav_content %}
                 {% endif %}
                 <ul style="margin-left: auto;">
                     <li>

@@ -106,16 +106,7 @@ impl OwnerContactRequest {
     /// # Returns
     /// * `bool` - True if both fields are valid, false otherwise
     pub fn fields_are_valid(&self) -> bool {
-        !self
-            .contact_name
-            .split_whitespace()
-            .collect::<String>()
-            .is_empty()
-            && !self
-                .contact_value
-                .split_whitespace()
-                .collect::<String>()
-                .is_empty()
+        !self.contact_name.trim().is_empty() && !self.contact_value.trim().is_empty()
     }
 }
 
@@ -407,6 +398,18 @@ mod tests {
             contact_value: "".into(),
         };
         assert!(!invalid_request_empty_value.fields_are_valid());
+
+        let invalid_request_whitespace_value = OwnerContactRequest {
+            contact_name: "Phone".into(),
+            contact_value: " \t\n".into(),
+        };
+        assert!(!invalid_request_whitespace_value.fields_are_valid());
+
+        let valid_request_with_spaces = OwnerContactRequest {
+            contact_name: " Emergency contact ".into(),
+            contact_value: " +52 55 1234 5678 ".into(),
+        };
+        assert!(valid_request_with_spaces.fields_are_valid());
     }
 
     #[ntex::test]

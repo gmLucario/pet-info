@@ -1,10 +1,11 @@
-{% for reminder in reminders | default(value=[]) %}
+{% for reminder in reminders %}
 <tr hx-swap="outerHTML swap:1s">
     <td>
-        {% set delete_url = "/reminder" ~ "/" ~ reminder.id %}
-        {% include "widgets/trash_icon.html" %}
+        {{<ui.trash_icon delete_url={"/reminder/" ~ reminder.id} />}}
     </td>
-    <td>{{ reminder.send_at | date(format="%v, %R", timezone=reminder.user_timezone, locale="es_MX") }}</td>
+    <td>{{ reminder.send_at | date(format="%v, %R", timezone=reminder.user_timezone) }}</td>
     <td data-tooltip="vía: {{reminder.notification_type}}">{{ reminder.body }}</td>
 </tr>
+{% else %}
+<tr><td colspan="3">No hay recordatorios programados.</td></tr>
 {% endfor %}

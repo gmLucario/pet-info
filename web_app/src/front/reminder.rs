@@ -12,17 +12,41 @@ use ntex_identity::Identity;
 use ntex_session::Session;
 use tera::context;
 
+#[derive(serde::Serialize)]
+struct RemindersView<'a> {
+    reminders: &'a [crate::models::reminder::Reminder],
+    can_schedule_reminder: bool,
+    show_menu: bool,
+}
+
+#[derive(serde::Serialize)]
+struct ReminderRowsView<'a> {
+    reminders: &'a [crate::models::reminder::Reminder],
+}
+
 /// Renders the reminder view section
 #[web::get("")]
 async fn get_reminder_view(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = context! {
-        reminders => &api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
-        can_schedule_reminder => &(user.phone_reminder.is_some() && user.can_access_service()),
-        show_menu => &true,
-    };
+    let reminders = api::reminder::get_scheduled_reminders(user.id, &app_state.repo)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "function get_scheduled_reminders raised an error: {e}"
+            ))
+        })?;
+    let context = tera::Context::from_serialize(&RemindersView {
+        reminders: &reminders,
+        can_schedule_reminder: user.phone_reminder.is_some() && user.can_access_service(),
+        show_menu: true,
+    })
+    .map_err(|e| {
+        errors::ServerError::TemplateError(format!(
+            "could not serialize reminders template data: {e}"
+        ))
+    })?;
 
     let content = templates::WEB_TEMPLATES
         .render("reminders.html", &context)
@@ -44,9 +68,21 @@ async fn get_reminder_records(
     session::WebAppSession { user, .. }: session::WebAppSession,
     app_state: web::types::State<AppState>,
 ) -> Result<impl web::Responder, web::Error> {
-    let context = context! {
-        reminders => &api::reminder::get_scheduled_reminders(user.id, &app_state.repo).await.unwrap_or_default(),
-    };
+    let reminders = api::reminder::get_scheduled_reminders(user.id, &app_state.repo)
+        .await
+        .map_err(|e| {
+            errors::ServerError::InternalServerError(format!(
+                "function get_scheduled_reminders raised an error: {e}"
+            ))
+        })?;
+    let context = tera::Context::from_serialize(&ReminderRowsView {
+        reminders: &reminders,
+    })
+    .map_err(|e| {
+        errors::ServerError::WidgetTemplateError(format!(
+            "could not serialize reminder rows template data: {e}"
+        ))
+    })?;
 
     let content = templates::WEB_TEMPLATES
         .render("widgets/tbody_reminder.html", &context)

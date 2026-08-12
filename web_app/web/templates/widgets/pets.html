@@ -1,5 +1,5 @@
 <div hx-get="/pet/list" hx-trigger="petRecordUpdated from:body">
-    {% for pet in pets | default(value=[]) %}
+    {% for pet in pets %}
     <article hx-target="this" hx-swap="outerHTML">
         <header>
             <nav>
@@ -55,5 +55,7 @@
             </a>
         </footer>
     </article>
+    {% else %}
+    <p>No hay mascotas registradas.</p>
     {% endfor %}
 </div>

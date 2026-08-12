@@ -28,9 +28,6 @@ datos de tu mascota
 </style>
 {% endblock extra_css %}
 
-{% block mid_nav_content %}
-{% endblock mid_nav_content %}
-
 {% block content %}
 {% include "widgets/add_pet_form.html" %}
 {% endblock content %}
@@ -118,7 +115,8 @@ datos de tu mascota
     const input = document.getElementById('pet-pic-input');
     input.addEventListener("change", previewPhoto);
 
-    const quill = new Quill('#editor', {
+    const editor = document.getElementById('editor');
+    const quill = new Quill(editor, {
         theme: 'snow',
         modules: {
             toolbar: [
@@ -129,9 +127,7 @@ datos de tu mascota
         }
     });
     const form = document.querySelector('form');
-    {% if pet %}
-    quill.root.innerHTML = '{{pet.about_pet | safe}}';
-    {% endif %}
+    quill.root.innerHTML = editor.dataset.initialHtml || '';
 
     form.addEventListener('formdata', (event) => {
         event.formData.append('about_pet', quill.root.innerHTML);

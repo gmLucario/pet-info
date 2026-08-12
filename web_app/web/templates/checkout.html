@@ -18,7 +18,11 @@
         <p>Error al procesar su pago. Intente mas tarde.</p>
         <p><a href="/profile">Regresar a su perfil</a></p>
     </article>
-    <div class="grid" id="checkout">
+    <div class="grid" id="checkout"
+        data-public-key="{{ mercado_pago_public_key }}"
+        data-back-url="{{ back_url }}"
+        data-service-price="{{ service_price }}"
+        data-email="{{ email }}">
         <article style="display: flex; align-items: center;">
             <hgroup>
                 <h2>Pago para registrar mascota en Pet-Info</h2>
@@ -32,7 +36,9 @@
     <div id="statusScreenBrick_container"></div>
 
     <script>
-        const mp = new MercadoPago('{{mercado_pago_public_key}}', { locale: 'es-MX' });
+        const checkout = document.getElementById('checkout');
+        const checkoutData = checkout.dataset;
+        const mp = new MercadoPago(checkoutData.publicKey, { locale: 'es-MX' });
 
         const renderStatusScreenBrick = async (bricksBuilder, payment_id) => {
             if (window.statusScreenBrickController) window.statusScreenBrickController.unmount();
@@ -55,8 +61,8 @@
                             }
                         },
                         backUrls: {
-                            'error': '{{back_url | safe}}',
-                            'return': '{{back_url | safe}}'
+                            'error': checkoutData.backUrl,
+                            'return': checkoutData.backUrl
                         }
                     },
                     callbacks: {
@@ -77,9 +83,9 @@
                 'cardPaymentBrick_container',
                 {
                     initialization: {
-                        amount: "{{service_price}}",
+                        amount: checkoutData.servicePrice,
                         payer: {
-                            email: "{{email}}",
+                            email: checkoutData.email,
                         },
                     },
                     customization: {

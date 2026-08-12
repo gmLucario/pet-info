@@ -1,12 +1,13 @@
-{% for record in health_records | default(value=[]) %}
+{% for record in health_records %}
 <tr hx-swap="outerHTML swap:1s">
     {% if can_edit %}
     <td>
-        {% set delete_url = "/pet/health/" ~ pet_external_id ~ "/" ~ record_type ~ "/" ~ record.id %}
-        {% include "widgets/trash_icon.html" %}
+        {{<ui.trash_icon delete_url={"/pet/health/" ~ pet_external_id ~ "/" ~ record_type ~ "/" ~ record.id} />}}
     </td>
     {% endif %}
     <td>{{ record.value }}</td>
-    <td>{{ record.date | date(format="%v", locale="es_MX") }}</td>
+    <td>{{ record.date | date(format="%v") }}</td>
 </tr>
+{% else %}
+<tr><td colspan="3">No hay registros.</td></tr>
 {% endfor %}
