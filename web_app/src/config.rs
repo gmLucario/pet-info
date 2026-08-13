@@ -132,6 +132,12 @@ pub struct AppConfig {
     /// This token must match the value configured in WhatsApp Business API dashboard
     pub whatsapp_verify_token: String,
 
+    /// 🔒 SENSITIVE: Meta application secret used to authenticate webhook bodies.
+    /// This is the App Secret from Meta's app settings, not the verify token.
+    #[envconfig(default = "")]
+    #[serde(default)]
+    pub whatsapp_app_secret: String,
+
     /// AWS Step Functions ARN for notifications (SEMI-SENSITIVE)
     /// Security: Contains account information, restrict access
     /// Example: "arn:aws:states:us-east-1:123456789012:stateMachine:notifications"

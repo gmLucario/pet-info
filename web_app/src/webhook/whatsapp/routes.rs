@@ -5,17 +5,40 @@
 //!
 //! # Security
 //!
-//! The POST endpoint verifies webhook authenticity using mTLS client certificates.
-//! Nginx reverse proxy handles the TLS layer verification and passes headers to this application.
-//! This ensures that requests actually originate from Meta/Facebook.
+//! Webhook verification GET requests are authenticated with the configured
+//! verification token. POST bodies are authenticated with Meta's
+//! `X-Hub-Signature-256` HMAC in addition to Nginx mTLS enforcement.
 
 use super::{handler, schemas};
 use crate::{
     config,
     front::{AppState, errors},
 };
+use hmac::{Hmac, Mac};
 use ntex::{util::Bytes, web};
 use serde::Deserialize;
+use sha2::Sha256;
+
+type HmacSha256 = Hmac<Sha256>;
+
+fn has_valid_meta_signature(signature: Option<&str>, body: &[u8], secret: &str) -> bool {
+    let Some(hex_signature) = signature.and_then(|value| value.strip_prefix("sha256=")) else {
+        return false;
+    };
+
+    if secret.is_empty() || hex_signature.len() != 64 {
+        return false;
+    }
+
+    let Ok(signature_bytes) = hex::decode(hex_signature) else {
+        return false;
+    };
+
+    HmacSha256::new_from_slice(secret.as_bytes()).is_ok_and(|mut mac| {
+        mac.update(body);
+        mac.verify_slice(&signature_bytes).is_ok()
+    })
+}
 
 /// Query parameters for webhook verification
 #[derive(Debug, Deserialize)]
@@ -89,61 +112,17 @@ pub async fn receive(
     let app_config = config::APP_CONFIG
         .get()
         .expect("APP_CONFIG should be initialized before starting web server");
+    let signature = req
+        .headers()
+        .get("X-Hub-Signature-256")
+        .and_then(|value| value.to_str().ok());
 
-    // Verify mTLS client certificate via Nginx headers (production only)
-    if app_config.is_prod() {
-        // Step 1: Check X-Client-Cert-Verified header
-        let cert_verified = match req.headers().get("X-Client-Cert-Verified") {
-            Some(header_value) => match header_value.to_str() {
-                Ok(s) => s,
-                Err(_) => {
-                    logfire::warn!("Invalid X-Client-Cert-Verified header: not valid UTF-8");
-                    return Err(errors::UserError::Unauthorized.into());
-                }
-            },
-            None => {
-                logfire::warn!("Missing X-Client-Cert-Verified header - mTLS verification failed");
-                return Err(errors::UserError::Unauthorized.into());
-            }
-        };
-
-        if cert_verified != "SUCCESS" {
-            let status = cert_verified.to_string();
-            logfire::warn!(
-                "Client certificate verification failed: {status}",
-                status = status
-            );
-            return Err(errors::UserError::Unauthorized.into());
-        }
-
-        // Step 2: Verify the Common Name (CN) from X-Client-Cert-DN header
-        let cert_dn = match req.headers().get("X-Client-Cert-DN") {
-            Some(header_value) => match header_value.to_str() {
-                Ok(s) => s,
-                Err(_) => {
-                    logfire::warn!("Invalid X-Client-Cert-DN header: not valid UTF-8");
-                    return Err(errors::UserError::Unauthorized.into());
-                }
-            },
-            None => {
-                logfire::warn!("Missing X-Client-Cert-DN header");
-                return Err(errors::UserError::Unauthorized.into());
-            }
-        };
-
-        // Verify the CN matches Meta's webhook certificate (case-insensitive for robustness)
-        let cert_dn_lower = cert_dn.to_lowercase();
-        if !cert_dn_lower.contains("cn=client.webhooks.fbclientcerts.com") {
-            let dn = cert_dn.to_string();
-            logfire::warn!(
-                "Client certificate CN verification failed. Expected 'cn=client.webhooks.fbclientcerts.com' (case-insensitive), got: {dn}",
-                dn = dn
-            );
-            return Err(errors::UserError::Unauthorized.into());
-        }
+    if !has_valid_meta_signature(signature, &body, &app_config.whatsapp_app_secret) {
+        logfire::warn!("Rejected WhatsApp webhook with invalid signature");
+        return Err(errors::UserError::Unauthorized.into());
     }
 
-    // Parse the JSON payload after mTLS verification
+    // Parse the JSON payload before processing it.
     let payload: schemas::WebhookPayload = match serde_json::from_slice(&body) {
         Ok(p) => p,
         Err(e) => {
@@ -184,5 +163,34 @@ mod tests {
         assert_eq!(query.mode, "subscribe");
         assert_eq!(query.verify_token, "test123");
         assert_eq!(query.challenge, "challenge123");
+    }
+
+    #[test]
+    fn validates_meta_signature() {
+        let body = br#"{"object":"whatsapp_business_account"}"#;
+        let secret = "meta-app-secret";
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let signature = format!(
+            "sha256={}",
+            mac.finalize()
+                .into_bytes()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
+
+        assert!(has_valid_meta_signature(Some(&signature), body, secret));
+        assert!(!has_valid_meta_signature(
+            Some(&signature),
+            b"tampered",
+            secret
+        ));
+        assert!(!has_valid_meta_signature(None, body, secret));
+        assert!(!has_valid_meta_signature(
+            Some("sha256=éééééééééééééééééééééééééééééééé"),
+            body,
+            secret
+        ));
     }
 }

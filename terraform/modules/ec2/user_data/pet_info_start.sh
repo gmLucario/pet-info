@@ -25,56 +25,16 @@ git clone --depth 1 --branch ${git_branch} https://github.com/gmLucario/pet-info
 chown -R ec2-user:ec2-user pet-info/
 cd pet-info
 
-# Download DigiCert root CA certificate for mTLS webhook verification
-log "Downloading DigiCert High Assurance EV Root CA certificate for Nginx mTLS..."
-sudo mkdir -p /etc/nginx/certs
-
-# Download the certificate from DigiCert
-log "  Fetching certificate from DigiCert..."
-sudo wget -q "https://cacerts.digicert.com/DigiCertHighAssuranceEVRootCA.crt" \
-    -O /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.crt
-
-if [ ! -f /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.crt ]; then
-    log "ERROR: Failed to download DigiCert certificate"
-    exit 1
-fi
-
-# Convert from DER to PEM format
-log "  Converting certificate to PEM format..."
-sudo openssl x509 -inform DER -in /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.crt \
-    -out /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem
-
-if [ ! -f /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem ]; then
-    log "ERROR: Failed to convert certificate to PEM format"
-    exit 1
-fi
-
-# Verify the certificate
-log "  Verifying certificate..."
-sudo openssl x509 -in /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem -text -noout | grep -q "DigiCert High Assurance EV Root CA"
-if [ $? -eq 0 ]; then
-    log "✓ DigiCert certificate downloaded and verified successfully"
-else
-    log "ERROR: Certificate verification failed"
-    exit 1
-fi
-
 # Copy Meta Outbound API CA certificate
-log "  Copying Meta Outbound API CA certificate..."
+log "Configuring Meta Outbound API CA for Nginx mTLS..."
 sudo mkdir -p /etc/nginx/certs
 sudo cp /home/ec2-user/pet-info/terraform/modules/ec2/files/MetaOutboundAPICA2025-12.pem \
     /etc/nginx/certs/MetaOutboundAPICA2025-12.pem
 
-# Create combined trust store
-log "  Creating combined trust store for Webhooks..."
-cat /etc/nginx/certs/DigiCertHighAssuranceEVRootCA.pem \
-    /etc/nginx/certs/MetaOutboundAPICA2025-12.pem \
-    | sudo tee /etc/nginx/certs/webhook_trust_store.pem > /dev/null
-
 # Set proper permissions for certificate directory
 sudo chmod 755 /etc/nginx/certs
-sudo chmod 644 /etc/nginx/certs/*
-log "✓ mTLS certificates configured for Nginx (DigiCert + Meta CAs)"
+sudo chmod 644 /etc/nginx/certs/MetaOutboundAPICA2025-12.pem
+log "✓ Meta mTLS certificate authority configured for Nginx"
 
 # Configure Nginx (but don't start it yet - SSL certs will be uploaded by Terraform provisioner)
 log "Configuring Nginx..."
