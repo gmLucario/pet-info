@@ -2,7 +2,7 @@ data "aws_region" "this" {}
 
 resource "aws_instance" "app_instance" {
   ami                  = data.aws_ami.amazon_arm.id
-  instance_type        = "t4g.small"
+  instance_type        = "t4g.micro"
   key_name             = aws_key_pair.web_app_key.key_name
   iam_instance_profile = var.instance_profile_name
   availability_zone    = aws_ebs_volume.db.availability_zone
@@ -10,6 +10,13 @@ resource "aws_instance" "app_instance" {
   vpc_security_group_ids      = [aws_security_group.web_app_sg.id]
   associate_public_ip_address = false
   subnet_id                   = data.aws_subnet.selected.id
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "disabled"
+  }
 
   user_data = templatefile(
     var.user_data_path,
@@ -130,19 +137,79 @@ resource "null_resource" "upload_ssl_certificates" {
     }
   }
 
-  # Move SSL certificates to final location and start Nginx
+  # Upload Meta Outbound API CA certificate
+  provisioner "file" {
+    source      = "${path.module}/files/MetaOutboundAPICA2025-12.pem"
+    destination = "/tmp/MetaOutboundAPICA2025-12.pem"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  # Move SSL certificates to their final locations. The dependent Nginx
+  # configuration resource validates the complete setup before starting it.
   provisioner "remote-exec" {
     inline = [
-      "mkdir -p /home/ec2-user/certs",
-      "mv /tmp/server.crt /home/ec2-user/certs/server.crt",
-      "mv /tmp/server.key /home/ec2-user/certs/server.key",
-      "chmod 644 /home/ec2-user/certs/server.crt",
-      "chmod 600 /home/ec2-user/certs/server.key",
-      "echo 'SSL certificates uploaded, testing Nginx configuration...'",
+      "sudo install -d -o root -g root -m 0700 /etc/nginx/private",
+      "sudo install -o root -g root -m 0644 /tmp/server.crt /etc/nginx/server.crt",
+      "sudo install -o root -g root -m 0600 /tmp/server.key /etc/nginx/private/server.key",
+      "rm -f /tmp/server.crt /tmp/server.key",
+      "sudo mkdir -p /etc/nginx/certs",
+      "sudo mv /tmp/MetaOutboundAPICA2025-12.pem /etc/nginx/certs/MetaOutboundAPICA2025-12.pem",
+      "sudo chmod 755 /etc/nginx/certs",
+      "sudo chmod 644 /etc/nginx/certs/MetaOutboundAPICA2025-12.pem",
+      "echo 'SSL certificates uploaded; Nginx will be started after its configuration is deployed'"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+}
+
+# Deploy Nginx configuration whenever the local configuration changes.
+# user_data only runs when the instance is created, so it cannot propagate
+# subsequent webhook proxy changes to an existing instance.
+resource "null_resource" "deploy_nginx_configuration" {
+  depends_on = [null_resource.upload_ssl_certificates]
+
+  triggers = {
+    instance_id      = aws_instance.app_instance.id
+    config_hash      = filesha256("${path.module}/files/nginx-pet-info.conf")
+    certificate_hash = filesha256(var.cert_details.server_path)
+    private_key_hash = filesha256(var.cert_details.key_path)
+    meta_ca_hash     = filesha256("${path.module}/files/MetaOutboundAPICA2025-12.pem")
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/files/nginx-pet-info.conf"
+    destination = "/tmp/nginx-pet-info.conf"
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = tls_private_key.web_key.private_key_pem
+      host        = aws_eip.this.public_ip
+      timeout     = "5m"
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo install -m 0644 /tmp/nginx-pet-info.conf /etc/nginx/conf.d/pet-info.conf",
       "sudo nginx -t",
-      "echo 'Starting Nginx...'",
-      "sudo systemctl start nginx",
-      "echo 'Nginx started successfully'"
+      "sudo systemctl enable nginx",
+      "sudo systemctl restart nginx",
+      "sudo systemctl is-active --quiet nginx",
     ]
 
     connection {
@@ -277,4 +344,3 @@ resource "aws_route53_record" "dns_record" {
   ttl     = "300"
   records = [aws_eip.this.public_ip]
 }
-
