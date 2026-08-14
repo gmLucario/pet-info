@@ -10,7 +10,7 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn whatsapp_send_msg_endpoint(&self) -> String {
         format!(
-            "https://graph.facebook.com/v25.0/{id}/messages",
+            "https://graph.facebook.com/v26.0/{id}/messages",
             id = self.whatsapp_business_phone_number_id
         )
     }
