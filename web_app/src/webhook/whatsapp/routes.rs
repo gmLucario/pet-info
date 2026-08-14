@@ -18,6 +18,7 @@ use hmac::{Hmac, Mac};
 use ntex::{util::Bytes, web};
 use serde::Deserialize;
 use sha2::Sha256;
+use std::future::Future;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -101,8 +102,9 @@ pub async fn verify(
 ///
 /// # Processing
 ///
-/// Process webhook synchronously.
-/// WhatsApp gives us 20 seconds to respond, which should be sufficient.
+/// Authenticate and parse the request synchronously, then process the webhook
+/// in a background task. This lets Meta receive an acknowledgement without
+/// waiting for database, storage, or WhatsApp API calls to complete.
 #[web::post("")]
 pub async fn receive(
     req: web::HttpRequest,
@@ -134,27 +136,40 @@ pub async fn receive(
         }
     };
 
-    // Process the webhook
-    if let Err(e) = handler::process_webhook(
-        payload,
-        &app_state.whatsapp_client,
-        &app_state.repo,
-        &app_state.storage_service,
-        &app_state.magic_link_service,
-    )
-    .await
-    {
-        logfire::error!("Failed to process webhook: {error}", error = e.to_string());
-    }
+    let background_state = app_state.clone();
+    Ok(acknowledge_and_spawn(async move {
+        if let Err(e) = handler::process_webhook(
+            payload,
+            &background_state.whatsapp_client,
+            &background_state.repo,
+            &background_state.storage_service,
+            &background_state.magic_link_service,
+        )
+        .await
+        {
+            logfire::error!(
+                "Failed to process WhatsApp webhook in background: {error}",
+                error = e.to_string()
+            );
+        }
+    }))
+}
 
-    Ok(web::HttpResponse::Ok().json(&serde_json::json!({
+fn acknowledge_and_spawn<F>(processing: F) -> web::HttpResponse
+where
+    F: Future<Output = ()> + 'static,
+{
+    ntex::rt::spawn(processing);
+
+    web::HttpResponse::Ok().json(&serde_json::json!({
         "status": "received"
-    })))
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{cell::Cell, rc::Rc};
 
     #[test]
     fn test_verify_query_deserialization() {
@@ -192,5 +207,31 @@ mod tests {
             body,
             secret
         ));
+    }
+
+    #[ntex::test]
+    async fn acknowledges_before_background_processing_completes() {
+        let processing_started = Rc::new(Cell::new(false));
+        let processing_finished = Rc::new(Cell::new(false));
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
+        let started = processing_started.clone();
+        let finished = processing_finished.clone();
+
+        let response = acknowledge_and_spawn(async move {
+            started.set(true);
+            let _ = release_rx.await;
+            finished.set(true);
+        });
+
+        assert_eq!(response.status(), ntex::http::StatusCode::OK);
+        assert!(!processing_finished.get());
+
+        tokio::task::yield_now().await;
+        assert!(processing_started.get());
+        assert!(!processing_finished.get());
+
+        release_tx.send(()).unwrap();
+        tokio::task::yield_now().await;
+        assert!(processing_finished.get());
     }
 }
